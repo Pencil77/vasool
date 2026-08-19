@@ -15,10 +15,13 @@ export default function LoginScreen() {
   const { login } = useAuth();
   const router = useRouter();
 
-  const handleLogin = () => {
-    // Fake login
-    login();
-    router.replace("/(tabs)");
+  const handleLogin = async () => {
+    const success = await login({ email, password });
+    if (success) {
+      router.replace("/(tabs)");
+    } else {
+      alert("Login failed");
+    }
   };
 
   return (
@@ -50,8 +53,7 @@ export default function LoginScreen() {
         style={[styles.button, styles.googleButton]}
         onPress={() => {
           // Fake google login
-          login();
-          router.replace("/(tabs)");
+          alert("Google login not implemented");
         }}
       >
         <Text style={[styles.buttonText, styles.googleButtonText]}>

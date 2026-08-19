@@ -16,23 +16,29 @@ export default function SignupScreen() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isVerificationStep, setIsVerificationStep] = useState(false);
   const [verificationCode, setVerificationCode] = useState("");
-  const { login } = useAuth();
+  const { login, signup } = useAuth();
   const router = useRouter();
 
-  const handleSignup = () => {
-    // Fake signup -> move to verification step
-    setIsVerificationStep(true);
+  const handleSignup = async () => {
+    if (password !== confirmPassword) {
+      alert("Passwords do not match");
+      return;
+    }
+    const success = await signup({ name, email, password });
+    if (success) {
+      setIsVerificationStep(true);
+    } else {
+      alert("Signup failed");
+    }
   };
 
   const handleVerify = () => {
-    // Fake verification -> auto login
-    login();
+    // Verification would hit the backend too, for now just force navigate
     router.replace("/(tabs)");
   };
 
   const handleGoogleSignup = () => {
-    login();
-    router.replace("/(tabs)");
+    alert("Google signup not implemented");
   };
 
   if (isVerificationStep) {
