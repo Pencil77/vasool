@@ -3,6 +3,17 @@ from sqlalchemy.orm import Session
 import models
 import schemas
 from database import engine, get_db
+from passlib.context import CryptContext
+import random
+import string
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def get_password_hash(password):
+    return pwd_context.hash(password)
+
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
 
 # Create the database tables
 models.Base.metadata.create_all(bind=engine)
@@ -13,6 +24,56 @@ app = FastAPI(title="Vasool API", description="Centralized Hostel Expense Manage
 @app.get("/")
 def read_root():
     return {"message": "Welcome to the Vasool API!"}
+
+
+@app.post("/auth/signup")
+def signup(user: schemas.UserSignup, db: Session = Depends(get_db)):
+    db_user = db.query(models.User).filter(models.User.email == user.email).first()
+    if db_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    hashed_pwd = get_password_hash(user.password)
+    verification_code = "".join(random.choices(string.digits, k=6))
+    
+    db_user = models.User(
+        email=user.email,
+        name=user.name,
+        hashed_password=hashed_pwd,
+        is_verified=False,
+        verification_code=verification_code
+    )
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    
+    print(f"Verification code for {user.email}: {verification_code}")
+    return {"message": "User created. Check terminal for verification code."}
+
+
+@app.post("/auth/verify")
+def verify(user: schemas.UserVerify, db: Session = Depends(get_db)):
+    db_user = db.query(models.User).filter(models.User.email == user.email).first()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if db_user.verification_code != user.code:
+        raise HTTPException(status_code=400, detail="Invalid verification code")
+    
+    db_user.is_verified = True
+    db_user.verification_code = None
+    db.commit()
+    return {"message": "Email verified successfully"}
+
+
+@app.post("/auth/login")
+def login(user: schemas.UserLogin, db: Session = Depends(get_db)):
+    db_user = db.query(models.User).filter(models.User.email == user.email).first()
+    if not db_user or not verify_password(user.password, db_user.hashed_password):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    if not db_user.is_verified:
+        raise HTTPException(status_code=403, detail="Email not verified")
+    
+    # Mock JWT Token
+    return {"access_token": "mock-jwt-token-12345", "token_type": "bearer"}
 
 
 @app.post("/users/", response_model=schemas.UserResponse)

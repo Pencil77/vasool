@@ -13,6 +13,22 @@ class UserCreate(UserBase):
     password: str
 
 
+class UserSignup(BaseModel):
+    email: str
+    name: str
+    password: str
+
+
+class UserVerify(BaseModel):
+    email: str
+    code: str
+
+
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
+
 class UserResponse(UserBase):
     id: int
     model_config = ConfigDict(from_attributes=True)

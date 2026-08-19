@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Numeric
+from sqlalchemy import Column, Integer, String, ForeignKey, Numeric, Boolean
 from sqlalchemy.orm import relationship
 import enum
 from database import Base
@@ -22,6 +22,8 @@ class User(Base):
     email = Column(String, unique=True, index=True)
     hashed_password = Column(String)
     name = Column(String)
+    is_verified = Column(Boolean, default=False)
+    verification_code = Column(String, nullable=True)
 
     gangs_created = relationship("Gang", back_populates="leader")
     participants = relationship("GangParticipant", back_populates="user")
