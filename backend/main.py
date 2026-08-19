@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 import models
 import schemas
@@ -19,6 +20,14 @@ def verify_password(plain_password, hashed_password):
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Vasool API", description="Centralized Hostel Expense Manager")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/")
