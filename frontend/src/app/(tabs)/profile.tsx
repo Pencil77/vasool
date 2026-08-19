@@ -1,11 +1,11 @@
-import { StyleSheet, View, Text, SafeAreaView, Image } from 'react-native';
+import { StyleSheet, View, Text, SafeAreaView, Image } from "react-native";
 
 export default function ProfileScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
         <Text style={styles.header}>Profile</Text>
-        
+
         <View style={styles.profileCard}>
           <View style={styles.avatarPlaceholder}>
             <Text style={styles.avatarText}>JD</Text>
@@ -32,7 +32,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: "#f5f5f5",
   },
   container: {
     flex: 1,
@@ -40,16 +40,16 @@ const styles = StyleSheet.create({
   },
   header: {
     fontSize: 28,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginBottom: 20,
-    color: '#333',
+    color: "#333",
   },
   profileCard: {
-    alignItems: 'center',
-    backgroundColor: '#fff',
+    alignItems: "center",
+    backgroundColor: "#fff",
     padding: 30,
     borderRadius: 16,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -60,38 +60,38 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#3498db',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "#3498db",
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: 16,
   },
   avatarText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 28,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   name: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: "bold",
+    color: "#333",
     marginBottom: 4,
   },
   email: {
     fontSize: 16,
-    color: '#666',
+    color: "#666",
   },
   statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     gap: 16,
   },
   statBox: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     padding: 20,
     borderRadius: 12,
-    alignItems: 'center',
-    shadowColor: '#000',
+    alignItems: "center",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
@@ -99,12 +99,12 @@ const styles = StyleSheet.create({
   },
   statValue: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#3498db',
+    fontWeight: "bold",
+    color: "#3498db",
     marginBottom: 4,
   },
   statLabel: {
     fontSize: 14,
-    color: '#666',
+    color: "#666",
   },
 });

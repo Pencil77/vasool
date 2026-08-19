@@ -1,8 +1,8 @@
-import { StyleSheet, View, Text, SafeAreaView } from 'react-native';
+import { StyleSheet, View, Text, SafeAreaView } from "react-native";
 
 export default function DashboardScreen() {
-  const totalYouOwe = 120.50;
-  const totalYouAreOwed = 45.00;
+  const totalYouOwe = 120.5;
+  const totalYouAreOwed = 45.0;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -26,7 +26,7 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: "#f5f5f5",
   },
   container: {
     flex: 1,
@@ -34,16 +34,16 @@ const styles = StyleSheet.create({
   },
   header: {
     fontSize: 28,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginBottom: 20,
-    color: '#333',
+    color: "#333",
   },
   card: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     padding: 20,
     borderRadius: 12,
     marginBottom: 16,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -51,17 +51,17 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontSize: 16,
-    color: '#666',
+    color: "#666",
     marginBottom: 8,
   },
   oweAmount: {
     fontSize: 32,
-    fontWeight: 'bold',
-    color: '#e74c3c',
+    fontWeight: "bold",
+    color: "#e74c3c",
   },
   owedAmount: {
     fontSize: 32,
-    fontWeight: 'bold',
-    color: '#2ecc71',
+    fontWeight: "bold",
+    color: "#2ecc71",
   },
 });
