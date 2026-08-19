@@ -47,6 +47,19 @@ export default function LoginScreen() {
       </TouchableOpacity>
 
       <TouchableOpacity
+        style={[styles.button, styles.googleButton]}
+        onPress={() => {
+          // Fake google login
+          login();
+          router.replace("/(tabs)");
+        }}
+      >
+        <Text style={[styles.buttonText, styles.googleButtonText]}>
+          Sign in with Google
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
         onPress={() => router.push("/signup")}
         style={styles.linkButton}
       >
@@ -93,5 +106,14 @@ const styles = StyleSheet.create({
   },
   linkText: {
     color: "#2f95dc",
+  },
+  googleButton: {
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#ccc",
+    marginTop: 15,
+  },
+  googleButtonText: {
+    color: "#333",
   },
 });

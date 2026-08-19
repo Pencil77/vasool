@@ -10,20 +10,72 @@ import { useRouter } from "expo-router";
 import { useAuth } from "../context/AuthContext";
 
 export default function SignupScreen() {
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isVerificationStep, setIsVerificationStep] = useState(false);
+  const [verificationCode, setVerificationCode] = useState("");
   const { login } = useAuth();
   const router = useRouter();
 
   const handleSignup = () => {
-    // Fake signup -> auto login
+    // Fake signup -> move to verification step
+    setIsVerificationStep(true);
+  };
+
+  const handleVerify = () => {
+    // Fake verification -> auto login
     login();
     router.replace("/(tabs)");
   };
 
+  const handleGoogleSignup = () => {
+    login();
+    router.replace("/(tabs)");
+  };
+
+  if (isVerificationStep) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>Verify Email</Text>
+        <Text style={styles.subtitle}>
+          Enter the 6-digit code sent to your email.
+        </Text>
+
+        <TextInput
+          style={styles.input}
+          placeholder="6-digit code"
+          value={verificationCode}
+          onChangeText={setVerificationCode}
+          keyboardType="number-pad"
+          maxLength={6}
+        />
+
+        <TouchableOpacity style={styles.button} onPress={handleVerify}>
+          <Text style={styles.buttonText}>Verify</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => setIsVerificationStep(false)}
+          style={styles.linkButton}
+        >
+          <Text style={styles.linkText}>Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Create Account</Text>
+
+      <TextInput
+        style={styles.input}
+        placeholder="Name"
+        value={name}
+        onChangeText={setName}
+        autoCapitalize="words"
+      />
 
       <TextInput
         style={styles.input}
@@ -46,6 +98,15 @@ export default function SignupScreen() {
         <Text style={styles.buttonText}>Sign Up</Text>
       </TouchableOpacity>
 
+      <TouchableOpacity
+        style={[styles.button, styles.googleButton]}
+        onPress={handleGoogleSignup}
+      >
+        <Text style={[styles.buttonText, styles.googleButtonText]}>
+          Sign up with Google
+        </Text>
+      </TouchableOpacity>
+
       <TouchableOpacity onPress={() => router.back()} style={styles.linkButton}>
         <Text style={styles.linkText}>Already have an account? Log in</Text>
       </TouchableOpacity>
@@ -65,6 +126,12 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginBottom: 20,
     textAlign: "center",
+  },
+  subtitle: {
+    fontSize: 16,
+    marginBottom: 20,
+    textAlign: "center",
+    color: "#666",
   },
   input: {
     borderWidth: 1,
@@ -90,5 +157,14 @@ const styles = StyleSheet.create({
   },
   linkText: {
     color: "#2f95dc",
+  },
+  googleButton: {
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#ccc",
+    marginTop: 15,
+  },
+  googleButtonText: {
+    color: "#333",
   },
 });
