@@ -36,6 +36,8 @@ class UserResponse(UserBase):
 
 class GangBase(BaseModel):
     name: str
+    is_live_publish: bool = True
+    show_event_amounts: bool = True
 
 
 class GangCreate(GangBase):
@@ -85,6 +87,7 @@ class ExpenseBase(BaseModel):
     description: str
     total_amount: Decimal
     paid_by_id: int
+    is_published: bool = True
 
 
 class ExpenseCreate(ExpenseBase):

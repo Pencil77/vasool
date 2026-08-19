@@ -35,6 +35,8 @@ class Gang(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
     leader_id = Column(Integer, ForeignKey("users.id"))
+    is_live_publish = Column(Boolean, default=True)
+    show_event_amounts = Column(Boolean, default=True)
 
     leader = relationship("User", back_populates="gangs_created")
     participants = relationship("GangParticipant", back_populates="gang")
@@ -72,6 +74,7 @@ class Expense(Base):
     description = Column(String)
     total_amount = Column(Numeric(10, 2))
     paid_by_id = Column(Integer, ForeignKey("gang_participants.id"))
+    is_published = Column(Boolean, default=True)
 
     gang = relationship("Gang", back_populates="expenses")
     paid_by = relationship("GangParticipant", back_populates="expenses_paid")

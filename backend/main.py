@@ -93,7 +93,7 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
 
 @app.post("/gangs/", response_model=schemas.GangResponse)
 def create_gang(gang: schemas.GangCreate, user_id: int, db: Session = Depends(get_db)):
-    db_gang = models.Gang(name=gang.name, leader_id=user_id)
+    db_gang = models.Gang(name=gang.name, leader_id=user_id, is_live_publish=gang.is_live_publish, show_event_amounts=gang.show_event_amounts)
     db.add(db_gang)
     db.commit()
     db.refresh(db_gang)
@@ -140,6 +140,7 @@ def create_expense(
         description=expense.description,
         total_amount=expense.total_amount,
         paid_by_id=expense.paid_by_id,
+        is_published=expense.is_published,
     )
     db.add(db_expense)
     db.commit()
