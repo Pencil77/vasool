@@ -13,6 +13,7 @@ export default function SignupScreen() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [isVerificationStep, setIsVerificationStep] = useState(false);
   const [verificationCode, setVerificationCode] = useState("");
   const { login } = useAuth();
@@ -91,6 +92,14 @@ export default function SignupScreen() {
         placeholder="Password"
         value={password}
         onChangeText={setPassword}
+        secureTextEntry
+      />
+
+      <TextInput
+        style={styles.input}
+        placeholder="Re-enter Password"
+        value={confirmPassword}
+        onChangeText={setConfirmPassword}
         secureTextEntry
       />
 

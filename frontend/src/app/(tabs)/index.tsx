@@ -3,6 +3,7 @@ import { StyleSheet, View, Text, SafeAreaView } from "react-native";
 export default function DashboardScreen() {
   const totalYouOwe = 120.5;
   const totalYouAreOwed = 45.0;
+  const netBalance = totalYouAreOwed - totalYouOwe;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -10,13 +11,11 @@ export default function DashboardScreen() {
         <Text style={styles.header}>Dashboard</Text>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Total You Owe</Text>
-          <Text style={styles.oweAmount}>${totalYouOwe.toFixed(2)}</Text>
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Total You Are Owed</Text>
-          <Text style={styles.owedAmount}>${totalYouAreOwed.toFixed(2)}</Text>
+          <Text style={styles.cardTitle}>Net Balance</Text>
+          <Text style={netBalance >= 0 ? styles.owedAmount : styles.oweAmount}>
+            ${Math.abs(netBalance).toFixed(2)}{" "}
+            {netBalance >= 0 ? "(Owed to you)" : "(You owe)"}
+          </Text>
         </View>
       </View>
     </SafeAreaView>
