@@ -30,8 +30,8 @@ case "$ACTION" in
     exec infisical run --domain "${INFISICAL_DOMAIN}" --env=prod -- npx vercel --prod
     ;;
   sync-wydia)
-    echo "[*] Syncing splits-web-app to Wydia Shared Drive (depot13:Runtime/active_workspaces/splits-web-app)..."
-    rclone sync . "depot13:Runtime/active_workspaces/splits-web-app" \
+    echo "[*] Syncing vasool to Wydia Shared Drive (depot13:Runtime/active_workspaces/vasool)..."
+    rclone sync . "depot13:Runtime/active_workspaces/vasool" \
       --exclude "node_modules/**" \
       --exclude ".git/**" \
       --fast-list --transfers 8 -P

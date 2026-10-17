@@ -84,7 +84,7 @@ async function runAllTests() {
     const res = await fetch(BASE_URL);
     if (res.status !== 200) throw new Error(`Expected 200, got ${res.status}`);
     const html = await res.text();
-    if (!html.includes('SplitFlow') && !html.includes('Vasool')) throw new Error('HTML does not contain expected title/branding');
+    if (!html.includes('Vasool')) throw new Error('HTML does not contain expected title/branding');
     return `HTML size: ${html.length} bytes delivered`;
   });
 

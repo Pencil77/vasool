@@ -31,7 +31,7 @@ app.get('/api/health', async (req, res) => {
   }
 
   res.status(200).json({
-    service: 'vasool-splits-web-app',
+    service: 'vasool',
     status: 'ok',
     version: '2.0.0',
     mongodb: dbStatus,

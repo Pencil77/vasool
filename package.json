@@ -1,5 +1,5 @@
 {
-  "name": "vasool-splits-web-app",
+  "name": "vasool",
   "version": "2.0.0",
   "description": "Vasool - Shared Expense Splitting Web App with Email/Password + Google OAuth 2.0, MongoDB Atlas, Infisical Vault",
   "main": "server.js",

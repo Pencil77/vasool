@@ -1,4 +1,4 @@
-# SplitFlow — Full-Stack Expense Splitting Web App
+# Vasool — Full-Stack Expense Splitting Web App
 
 Full-stack expense splitting and debt simplification web application built with **Node.js, Express, MongoDB (Mongoose), Tailwind CSS**, and **Infisical Agent Vault** secret management.
 

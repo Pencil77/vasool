@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: splits-web-app
+    name: vasool
     runtime: node
     plan: free
     buildCommand: npm install
