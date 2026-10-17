@@ -228,6 +228,7 @@ async function runAllTests() {
     if (!res.data.group || !res.data.group._id) throw new Error('Group ID missing');
     if (!res.data.group.inviteCode.startsWith('SPL-')) throw new Error('Invite code format invalid');
     if (res.data.group.members.length !== 4) throw new Error(`Expected 4 members (owner + 3), got ${res.data.group.members.length}`);
+    if (res.data.group.splitVisibility !== 'all') throw new Error(`Expected default splitVisibility to be 'all', got ${res.data.group.splitVisibility}`);
     groupId = res.data.group._id;
     return `Created group ID: ${groupId}, Invite Code: ${res.data.group.inviteCode}, Members: 4`;
   });
@@ -551,8 +552,44 @@ async function runAllTests() {
   });
 
   // ==========================================
-  // 7. ADMIN PRIVILEGES & ADMINSHIP TRANSFER
+  // 7. ADMIN PRIVILEGES & SPLIT VISIBILITY PRIVACY
   // ==========================================
+  await assertTest('PATCH /api/groups/:id/visibility updates splitVisibility to \'self\' by group admin', 'Admin Privacy Control', async () => {
+    const res = await request(`/api/groups/${groupId}/visibility`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${authToken}` },
+      body: JSON.stringify({ splitVisibility: 'self' })
+    });
+    if (res.status !== 200) throw new Error(`Expected 200, got ${res.status}: ${JSON.stringify(res.data)}`);
+    if (res.data.group.splitVisibility !== 'self') throw new Error(`Expected splitVisibility 'self', got ${res.data.group.splitVisibility}`);
+    return `Updated split visibility to 'self' (Admin: ${testUser.email})`;
+  });
+
+  await assertTest('PATCH /api/groups/:id/visibility rejects invalid visibility value with 400', 'Privacy Validation', async () => {
+    const res = await request(`/api/groups/${groupId}/visibility`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${authToken}` },
+      body: JSON.stringify({ splitVisibility: 'invalid_mode' })
+    });
+    if (res.status !== 400) throw new Error(`Expected 400, got ${res.status}`);
+    return `Rejected invalid visibility value: ${res.data.error}`;
+  });
+
+  await assertTest('GET /api/expenses returns unrestricted full splits for Admin under \'self\' mode', 'Admin Visibility', async () => {
+    const res = await request(`/api/expenses?groupId=${groupId}`, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+    if (res.status !== 200) throw new Error(`Expected 200, got ${res.status}`);
+    const expenses = res.data.expenses;
+    if (!expenses.length) throw new Error('Expected at least one remaining expense');
+    const hasMultipleSplits = expenses.some((e) => e.splits && e.splits.length > 1);
+    if (!hasMultipleSplits) throw new Error('Admin should see full splits for all members');
+    const hasRestrictedFlag = expenses.some((e) => e.splitsRestricted === true);
+    if (hasRestrictedFlag) throw new Error('Admin should not have splitsRestricted set to true');
+    return `Admin sees all ${expenses.length} expenses with complete member split arrays`;
+  });
+
   await assertTest('POST /api/groups/:id/transfer-admin transfers adminship to another member', 'Admin Management', async () => {
     const targetEmail = `pavan.${uniqueId}@test.com`;
     const res = await request(`/api/groups/${groupId}/transfer-admin`, {
@@ -580,6 +617,55 @@ async function runAllTests() {
     });
     if (res.status !== 403) throw new Error(`Expected 403 Forbidden, got ${res.status}`);
     return `Non-admin adminship transfer blocked with 403 Forbidden: ${res.data.error}`;
+  });
+
+  await assertTest('PATCH /api/groups/:id/visibility rejects visibility update by non-admin with 403', 'Privacy Security', async () => {
+    const res = await request(`/api/groups/${groupId}/visibility`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${authToken}` },
+      body: JSON.stringify({ splitVisibility: 'all' })
+    });
+    if (res.status !== 403) throw new Error(`Expected 403 Forbidden, got ${res.status}`);
+    return `Non-admin visibility change blocked with 403 Forbidden: ${res.data.error}`;
+  });
+
+  await assertTest('GET /api/expenses restricts member view to personal split share under \'self\' mode', 'Member Privacy Filter', async () => {
+    const res = await request(`/api/expenses?groupId=${groupId}`, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+    if (res.status !== 200) throw new Error(`Expected 200, got ${res.status}`);
+    const expenses = res.data.expenses;
+    expenses.forEach((e) => {
+      if (e.splitsRestricted !== true) throw new Error(`Expense ${e._id} should have splitsRestricted: true`);
+      e.splits.forEach((s) => {
+        if (s.memberEmail.toLowerCase() !== testUser.email.toLowerCase()) {
+          throw new Error(`Expense contains another member's split (${s.memberEmail}) under 'self' mode`);
+        }
+      });
+    });
+    return `Verified member only sees their own split share across ${expenses.length} expenses (splitsRestricted: true)`;
+  });
+
+  await assertTest('GET /api/balances restricts member view to direct settlement with Admin under \'self\' mode', 'Member Balance Privacy', async () => {
+    const res = await request(`/api/balances?groupId=${groupId}`, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+    if (res.status !== 200) throw new Error(`Expected 200, got ${res.status}`);
+    if (res.data.visibilityPolicy !== 'self') throw new Error(`Expected visibilityPolicy 'self', got ${res.data.visibilityPolicy}`);
+    if (res.data.balances.length !== 1 || res.data.balances[0].email.toLowerCase() !== testUser.email.toLowerCase()) {
+      throw new Error(`Expected only user's personal balance, got ${JSON.stringify(res.data.balances)}`);
+    }
+    const adminEmail = `pavan.${uniqueId}@test.com`.toLowerCase();
+    res.data.simplifiedTransactions.forEach((t) => {
+      const involvesUser = t.fromEmail.toLowerCase() === testUser.email.toLowerCase() || t.toEmail.toLowerCase() === testUser.email.toLowerCase();
+      const involvesAdmin = t.fromEmail.toLowerCase() === adminEmail || t.toEmail.toLowerCase() === adminEmail;
+      if (!involvesUser || !involvesAdmin) {
+        throw new Error(`Transaction ${t.fromEmail} -> ${t.toEmail} should only be direct between member and admin`);
+      }
+    });
+    return `Verified member only sees their direct position against Admin (${adminEmail})`;
   });
 
   console.log(`\n======================================================`);

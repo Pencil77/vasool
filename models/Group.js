@@ -19,6 +19,7 @@ const GroupSchema = new mongoose.Schema(
     inviteCode: { type: String, required: true, unique: true, index: true },
     createdByEmail: { type: String, required: true, lowercase: true },
     adminEmail: { type: String, lowercase: true, trim: true },
+    splitVisibility: { type: String, enum: ['all', 'self'], default: 'all' },
     members: { type: [MemberSubSchema], default: [] }
   },
   { timestamps: true }

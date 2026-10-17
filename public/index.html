@@ -916,6 +916,7 @@
             currency: g.currency || 'INR',
             inviteCode: g.inviteCode,
             adminEmail: g.adminEmail || (g.members?.find((m) => m.role === 'admin' || m.role === 'owner')?.email),
+            splitVisibility: g.splitVisibility || 'all',
             members: (g.members || []).map((m) => ({
               name: m.name,
               email: m.email,
@@ -1862,9 +1863,24 @@ exec node server.js`
         }
       }
 
+      // Split Visibility policy filtering:
+      // If group is 'self', regular members only see their own balance and direct Admin transfer
+      const currentEmail = (stateRef.currentUser?.email || '').toLowerCase().trim();
+      const isUserAdmin = activeAdmin && activeAdmin.email.toLowerCase().trim() === currentEmail;
+
+      let finalSimplified = simplified;
+      let finalBalanceList = Object.values(balanceMap);
+
+      if (activeGroups.length === 1 && activeGroups[0].splitVisibility === 'self' && !isUserAdmin) {
+        finalBalanceList = finalBalanceList.filter((b) => b.email.toLowerCase() === currentEmail);
+        finalSimplified = finalSimplified.filter(
+          (t) => t.fromEmail.toLowerCase() === currentEmail || t.toEmail.toLowerCase() === currentEmail
+        );
+      }
+
       return {
-        balanceList: Object.values(balanceMap),
-        simplified,
+        balanceList: finalBalanceList,
+        simplified: finalSimplified,
         filteredExpenses,
         filteredSettlements,
         totalSpend
@@ -2098,12 +2114,24 @@ exec node server.js`
       container.innerHTML = list
         .map((e) => {
           const grp = appState.groups.find((g) => g.id === e.groupId);
-          const splitsPills = (e.splits || [])
-            .map(
-              (s) =>
-                `<span class="px-2 py-0.5 rounded bg-slate-800 text-[11px] text-slate-300">${escapeHtml(s.memberName.split(' ')[0])}: ${formatINR(s.amount)}</span>`
-            )
-            .join(' ');
+          const currentEmail = (appState.currentUser?.email || '').toLowerCase().trim();
+          const adminMember = grp ? (grp.members.find((m) => m.role === 'admin' || m.role === 'owner') || grp.members[0]) : null;
+          const isUserAdmin = adminMember && adminMember.email.toLowerCase().trim() === currentEmail;
+          const isRestrictedPolicy = grp && grp.splitVisibility === 'self' && !isUserAdmin;
+
+          let visibleSplits = e.splits || [];
+          if (isRestrictedPolicy) {
+            visibleSplits = visibleSplits.filter((s) => s.memberEmail.toLowerCase() === currentEmail);
+          }
+
+          const splitsPills = visibleSplits.length > 0
+            ? visibleSplits
+                .map(
+                  (s) =>
+                    `<span class="px-2 py-0.5 rounded ${isRestrictedPolicy ? 'bg-purple-900/40 text-purple-200 border border-purple-500/30 font-semibold' : 'bg-slate-800 text-slate-300'} text-[11px]">${isRestrictedPolicy ? 'Your Share: ' : escapeHtml(s.memberName.split(' ')[0]) + ': '}${formatINR(s.amount)}</span>`
+                )
+                .join(' ') + (isRestrictedPolicy ? ' <span class="text-[10px] text-purple-300/80 italic self-center">🔒 other splits private</span>' : '')
+            : (isRestrictedPolicy ? '<span class="text-[11px] text-slate-500 italic">No share allocated to you for this bill</span>' : '');
           return `
             <div data-testid="expense-card-${escapeHtml(e.id)}" class="glass-panel glass-card-hover rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div class="space-y-1">
@@ -2207,11 +2235,24 @@ exec node server.js`
           return `
             <div data-testid="group-card-${escapeHtml(g.id)}" class="glass-panel glass-card-hover rounded-2xl p-5 flex flex-col justify-between space-y-4">
               <div>
-                <div class="flex items-center justify-between gap-2">
-                  <span class="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-teal-500/15 text-teal-300 border border-teal-500/30">${escapeHtml(g.category)}</span>
-                  <button onclick="copyTextToClipboard('${escapeHtml(g.inviteCode)}', 'Invite code ${escapeHtml(g.inviteCode)} copied!')" class="text-[11px] font-mono-code text-slate-400 hover:text-emerald-300">
-                    Code: ${escapeHtml(g.inviteCode)} 📋
-                  </button>
+                <div class="flex items-center justify-between gap-2 flex-wrap">
+                  <div class="flex items-center gap-1.5">
+                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-teal-500/15 text-teal-300 border border-teal-500/30">${escapeHtml(g.category)}</span>
+                    <button onclick="copyTextToClipboard('${escapeHtml(g.inviteCode)}', 'Invite code ${escapeHtml(g.inviteCode)} copied!')" class="text-[11px] font-mono-code text-slate-400 hover:text-emerald-300">
+                      Code: ${escapeHtml(g.inviteCode)} 📋
+                    </button>
+                  </div>
+                  <div>
+                    ${isCurrentUserAdmin ? `
+                      <button data-testid="btn-toggle-visibility-${escapeHtml(g.id)}" onclick="toggleGroupSplitVisibility('${escapeHtml(g.id)}')" title="Admin control: Toggle member split visibility" class="text-[10px] font-semibold px-2 py-0.5 rounded-lg border transition ${g.splitVisibility === 'self' ? 'bg-purple-500/20 text-purple-300 border-purple-500/40 hover:bg-purple-500/30' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'}">
+                        ${g.splitVisibility === 'self' ? '🔒 Privacy: Own Share' : '🌐 Privacy: All Visible'}
+                      </button>
+                    ` : `
+                      <span class="text-[10px] font-medium px-2 py-0.5 rounded-lg border ${g.splitVisibility === 'self' ? 'bg-purple-500/15 text-purple-300 border-purple-500/30' : 'bg-slate-800/80 text-slate-400 border-slate-700/50'}">
+                        ${g.splitVisibility === 'self' ? '🔒 Own Share Only' : '🌐 All Visible'}
+                      </span>
+                    `}
+                  </div>
                 </div>
                 <h4 class="text-base font-bold text-white mt-2">${escapeHtml(g.name)}</h4>
                 <div class="text-xs text-slate-400 mt-1">
@@ -2280,6 +2321,41 @@ exec node server.js`
         showToast(`👑 Admin privileges successfully transferred to ${targetName}!`);
       } catch (err) {
         alert('Error transferring admin: ' + err.message);
+      }
+    }
+
+    async function toggleGroupSplitVisibility(groupId) {
+      const grp = appState.groups.find((g) => g.id === groupId);
+      if (!grp) return;
+      const currentPolicy = grp.splitVisibility || 'all';
+      const nextPolicy = currentPolicy === 'self' ? 'all' : 'self';
+      try {
+        if (localStorage.getItem(AUTH_TOKEN_KEY)) {
+          const res = await apiFetch(`/api/groups/${groupId}/visibility`, {
+            method: 'PATCH',
+            body: JSON.stringify({ splitVisibility: nextPolicy })
+          });
+          if (res && res.error) {
+            console.error('Failed to update split visibility:', res.error);
+            if (typeof alert === 'function') {
+              try { alert('Failed to update split visibility: ' + res.error); } catch (_) {}
+            }
+            return;
+          }
+        }
+        grp.splitVisibility = nextPolicy;
+        saveState();
+        refreshAllViews();
+        showToast(
+          nextPolicy === 'self'
+            ? '🔒 Privacy mode ON: Normal members only see their own splits!'
+            : '🌐 Privacy mode OFF: All group members can see all splits.'
+        );
+      } catch (err) {
+        console.error('Error updating visibility policy:', err.message);
+        if (typeof alert === 'function') {
+          try { alert('Error updating visibility policy: ' + err.message); } catch (_) {}
+        }
       }
     }
 
@@ -2623,6 +2699,7 @@ exec node server.js`
 
       let grpId = 'grp_' + Date.now();
       let invCode = 'SPL-' + Math.random().toString(36).substring(2, 7).toUpperCase();
+      let splitVisibility = 'all';
 
       if (localStorage.getItem(AUTH_TOKEN_KEY)) {
         try {
@@ -2633,6 +2710,7 @@ exec node server.js`
           if (res && res.group) {
             grpId = res.group._id ? res.group._id.toString() : grpId;
             invCode = res.group.inviteCode || invCode;
+            splitVisibility = res.group.splitVisibility || splitVisibility;
           }
         } catch (err) {
           console.warn('[Create Group] Server notice:', err.message);
@@ -2645,6 +2723,7 @@ exec node server.js`
         category,
         currency: 'INR',
         inviteCode: invCode,
+        splitVisibility,
         members
       };
 
@@ -3181,6 +3260,7 @@ exec node server.js`
     if (typeof window !== 'undefined') {
       window.promptTransferAdmin = promptTransferAdmin;
       window.handleTransferAdmin = handleTransferAdmin;
+      window.toggleGroupSplitVisibility = toggleGroupSplitVisibility;
     }
 
     window.onload = async function () {

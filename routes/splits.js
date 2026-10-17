@@ -257,7 +257,44 @@ router.post('/groups/:id/members', requireAuth, async (req, res) => {
   }
 });
 
-// GET /api/expenses - List expenses (optionally filtered by groupId)
+// PATCH /api/groups/:id/visibility - Update group split visibility policy (admin-only)
+router.patch('/groups/:id/visibility', requireAuth, async (req, res) => {
+  try {
+    await connectToDatabase();
+    const { splitVisibility } = req.body;
+    if (!['all', 'self'].includes(splitVisibility)) {
+      return res.status(400).json({ error: "splitVisibility must be 'all' or 'self'." });
+    }
+
+    const group = await Group.findById(req.params.id);
+    if (!group) {
+      return res.status(404).json({ error: 'Group not found.' });
+    }
+
+    const requesterEmail = req.user.email.toLowerCase().trim();
+    const currentAdmin = group.members.find((m) => m.role === 'admin') ||
+      (group.adminEmail ? group.members.find((m) => m.email.toLowerCase() === group.adminEmail.toLowerCase()) : null) ||
+      group.members.find((m) => m.role === 'owner') ||
+      group.members[0];
+
+    const isCurrentAdmin = currentAdmin && currentAdmin.email.toLowerCase().trim() === requesterEmail;
+    if (!isCurrentAdmin) {
+      return res.status(403).json({ error: 'Only the current group admin can control split visibility.' });
+    }
+
+    group.splitVisibility = splitVisibility;
+    await group.save();
+
+    return res.status(200).json({
+      message: `Group split visibility updated to '${splitVisibility}'.`,
+      group
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/expenses - List expenses (optionally filtered by groupId, with splitVisibility policy applied)
 router.get('/expenses', requireAuth, async (req, res) => {
   try {
     await connectToDatabase();
@@ -268,8 +305,42 @@ router.get('/expenses', requireAuth, async (req, res) => {
       const userGroups = await Group.find({ 'members.email': req.user.email }, { _id: 1 });
       filter.groupId = { $in: userGroups.map((g) => g._id) };
     }
+
+    const requesterEmail = req.user.email.toLowerCase().trim();
+    const groups = await Group.find(filter.groupId ? { _id: filter.groupId } : { 'members.email': req.user.email });
+    const groupPolicyMap = {};
+
+    groups.forEach((g) => {
+      const adminMember = g.members.find((m) => m.role === 'admin') ||
+        (g.adminEmail ? g.members.find((m) => m.email.toLowerCase() === g.adminEmail.toLowerCase()) : null) ||
+        g.members?.find((m) => m.role === 'owner') ||
+        g.members[0];
+
+      const isAdmin = adminMember && adminMember.email.toLowerCase().trim() === requesterEmail;
+      groupPolicyMap[String(g._id)] = {
+        splitVisibility: g.splitVisibility || 'all',
+        isAdmin
+      };
+    });
+
     const expenses = await Expense.find(filter).sort({ expenseDate: -1, createdAt: -1 });
-    return res.status(200).json({ expenses });
+
+    const sanitizedExpenses = expenses.map((exp) => {
+      const policy = groupPolicyMap[String(exp.groupId)];
+      if (policy && policy.splitVisibility === 'self' && !policy.isAdmin) {
+        // Normal user only sees their own split share
+        const obj = exp.toObject ? exp.toObject() : { ...exp };
+        const mySplits = (obj.splits || []).filter(
+          (s) => s.memberEmail.toLowerCase() === requesterEmail
+        );
+        obj.splits = mySplits;
+        obj.splitsRestricted = true;
+        return obj;
+      }
+      return exp;
+    });
+
+    return res.status(200).json({ expenses: sanitizedExpenses });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
@@ -420,6 +491,39 @@ router.get('/balances', requireAuth, async (req, res) => {
       });
     } else {
       simplifiedTransactions = simplifyDebtsGreedy(balanceMap);
+    }
+
+    const requesterEmail = req.user.email.toLowerCase().trim();
+
+    // Check if single group has splitVisibility === 'self' and requester is not the admin
+    if (groups.length === 1 && groups[0].splitVisibility === 'self') {
+      const g = groups[0];
+      const adminMember = g.members.find((m) => m.role === 'admin') ||
+        (g.adminEmail ? g.members.find((m) => m.email.toLowerCase() === g.adminEmail.toLowerCase()) : null) ||
+        g.members?.find((m) => m.role === 'owner') ||
+        g.members[0];
+
+      const isAdmin = adminMember && adminMember.email.toLowerCase().trim() === requesterEmail;
+      if (!isAdmin) {
+        // Non-admin user only sees their own net balance and direct Admin transfer
+        const myBalances = Object.values(balanceMap).filter(
+          (b) => b.email.toLowerCase() === requesterEmail
+        );
+        const myTransactions = simplifiedTransactions.filter(
+          (t) => t.fromEmail.toLowerCase() === requesterEmail || t.toEmail.toLowerCase() === requesterEmail
+        );
+        const mySettlements = settlements.filter(
+          (s) => s.fromEmail.toLowerCase() === requesterEmail || s.toEmail.toLowerCase() === requesterEmail
+        );
+
+        return res.status(200).json({
+          balances: myBalances,
+          simplifiedTransactions: myTransactions,
+          settlements: mySettlements,
+          visibilityPolicy: 'self',
+          adminInfo: { name: adminMember.name, email: adminMember.email }
+        });
+      }
     }
 
     return res.status(200).json({
