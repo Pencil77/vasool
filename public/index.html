@@ -885,7 +885,11 @@
         ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
         ...(options.headers || {})
       };
-      const res = await fetch(path, { ...options, headers });
+      const origin = (typeof window !== 'undefined' && window.location && window.location.origin && window.location.origin !== 'null')
+        ? window.location.origin
+        : 'https://vasool-ecru.vercel.app';
+      const fullUrl = path.startsWith('http') ? path : origin + (path.startsWith('/') ? path : '/' + path);
+      const res = await fetch(fullUrl, { ...options, headers });
       const text = await res.text();
       let data;
       try {
@@ -1249,6 +1253,9 @@ exec node server.js`
     }
 
     let appState = createDefaultState();
+    if (typeof window !== 'undefined') {
+      window.appState = appState;
+    }
 
     function loadState() {
       try {
@@ -1257,6 +1264,7 @@ exec node server.js`
           const parsed = JSON.parse(raw);
           if (parsed && parsed.groups && parsed.expenses) {
             appState = parsed;
+            if (typeof window !== 'undefined') window.appState = appState;
           }
         }
       } catch (err) {
