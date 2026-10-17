@@ -192,15 +192,13 @@ router.post('/groups/:id/transfer-admin', requireAuth, async (req, res) => {
     const cleanNewAdminEmail = String(newAdminEmail).toLowerCase().trim();
     const requesterEmail = req.user.email.toLowerCase().trim();
 
-    // Verify requester is current admin
-    const currentAdmin = group.members.find(
-      (m) => m.role === 'admin' || m.role === 'owner'
-    ) || group.members[0];
+    // Verify requester is current admin (strictly one admin in group)
+    const currentAdmin = group.members.find((m) => m.role === 'admin') ||
+      (group.adminEmail ? group.members.find((m) => m.email.toLowerCase() === group.adminEmail.toLowerCase()) : null) ||
+      group.members.find((m) => m.role === 'owner') ||
+      group.members[0];
 
-    const isCurrentAdmin =
-      (currentAdmin && currentAdmin.email === requesterEmail) ||
-      group.createdByEmail === requesterEmail ||
-      (group.adminEmail && group.adminEmail === requesterEmail);
+    const isCurrentAdmin = currentAdmin && currentAdmin.email.toLowerCase().trim() === requesterEmail;
 
     if (!isCurrentAdmin) {
       return res.status(403).json({ error: 'Only the current group admin can transfer admin privileges.' });
