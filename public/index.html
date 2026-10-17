@@ -207,7 +207,7 @@
           </div>
 
           <!-- Google Sign-In / Sign-Up Button -->
-          <div class="space-y-3 mb-5">
+          <div class="space-y-2 mb-5">
             <div id="googleGsiBtnContainer" class="flex justify-center w-full min-h-[44px]"></div>
             <button id="btnGoogleOAuth" data-testid="btn-google-oauth" onclick="openGoogleOAuthModal()" type="button" class="w-full py-2.5 px-4 rounded-xl bg-white hover:bg-slate-100 text-slate-900 font-semibold text-sm flex items-center justify-center gap-3 shadow transition">
               <svg class="w-5 h-5" viewBox="0 0 24 24">
@@ -216,8 +216,13 @@
                 <path fill="#FBBC05" d="M5.3 14.8c-.2-.8-.4-1.6-.4-2.5s.2-1.7.4-2.5L1.6 7C.6 9 0 11.2 0 13.5s.6 4.5 1.6 6.5l3.7-2.9z"/>
                 <path fill="#34A853" d="M12 24c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3.1 0-5.8-2.1-6.7-5l-3.7 2.8C3.5 21.4 7.4 24 12 24z"/>
               </svg>
-              <span id="googleBtnLabel">Continue with Google</span>
+              <span id="googleBtnLabel">Sign in with Google</span>
             </button>
+            <div class="text-center pt-1">
+              <button type="button" onclick="openGoogleOAuthModal()" class="text-[11px] text-slate-400 hover:text-emerald-400 transition underline">
+                Google popup blocked or error? Use direct Google auth
+              </button>
+            </div>
           </div>
 
           <div class="relative flex py-2 items-center mb-5">
@@ -837,22 +842,30 @@
             <path fill="#FBBC05" d="M5.3 14.8c-.2-.8-.4-1.6-.4-2.5s.2-1.7.4-2.5L1.6 7C.6 9 0 11.2 0 13.5s.6 4.5 1.6 6.5l3.7-2.9z"/>
             <path fill="#34A853" d="M12 24c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3.1 0-5.8-2.1-6.7-5l-3.7 2.8C3.5 21.4 7.4 24 12 24z"/>
           </svg>
-          <span class="font-semibold text-sm text-slate-700">Sign in with Google</span>
+          <span id="googleModalTitle" class="font-semibold text-sm text-slate-700">Sign in with Google</span>
         </div>
         <button type="button" onclick="closeModal('googleOAuthModal')" class="text-slate-400 hover:text-slate-700 text-sm px-2">✕</button>
       </div>
 
       <div class="mt-4">
-        <h4 class="text-base font-bold text-slate-900">Sign in with Google</h4>
-        <p class="text-xs text-slate-500 mt-0.5">to continue to <span class="font-semibold text-emerald-700">SplitFlow</span> (OAuth 2.0 / Google Identity Services)</p>
+        <h4 id="googleModalHeading" class="text-base font-bold text-slate-900">Sign in with Google</h4>
+        <p class="text-xs text-slate-500 mt-0.5">to continue to <span class="font-semibold text-emerald-700">SplitFlow</span></p>
 
-        <div id="modalGoogleGsiBtn" class="flex justify-center my-3"></div>
+        <!-- Informational Google origin policy note -->
+        <div class="p-3 my-3 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-900 leading-relaxed">
+          <div class="font-semibold text-amber-900 flex items-center gap-1.5 mb-0.5">
+            <span>ℹ️</span> Google OAuth Origin Policy Notice
+          </div>
+          If you encounter <code class="bg-amber-100 text-amber-950 px-1 py-0.5 rounded font-mono text-[10px]">Error 400: origin_mismatch</code>, register <code class="bg-amber-100 text-amber-950 px-1 py-0.5 rounded font-mono text-[10px]">https://vasool-ecru.vercel.app</code> in Google Cloud Console under Authorized JavaScript Origins, or enter your Google details below to sign in directly.
+        </div>
 
-        <form onsubmit="handleCustomGoogleAccount(event)" class="mt-4 pt-3 border-t border-slate-200 space-y-2.5">
-          <div class="text-xs font-semibold text-slate-600">Enter your Google account details:</div>
+        <div id="modalGoogleGsiBtn" class="flex justify-center my-2"></div>
+
+        <form onsubmit="handleCustomGoogleAccount(event)" class="mt-3 pt-3 border-t border-slate-200 space-y-2.5">
+          <div id="googleFormPrompt" class="text-xs font-semibold text-slate-600">Enter your Google account details to sign in:</div>
           <input id="customGoogleName" data-testid="input-custom-google-name" type="text" required placeholder="Full Name" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs text-slate-900" />
           <input id="customGoogleEmail" data-testid="input-custom-google-email" type="email" required placeholder="your.email@gmail.com" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs text-slate-900" />
-          <button type="submit" data-testid="btn-submit-custom-google" class="w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition">
+          <button type="submit" id="btnSubmitCustomGoogle" data-testid="btn-submit-custom-google" class="w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition">
             Continue with this Google Account
           </button>
         </form>
@@ -1561,25 +1574,70 @@ exec node server.js`
       }
     }
 
+    let currentAuthMode = 'login';
+    let cachedGoogleClientId = null;
+
+    function renderGoogleGsiButtons(buttonText = 'signin_with') {
+      if (window.google?.accounts?.id && cachedGoogleClientId) {
+        const container = document.getElementById('googleGsiBtnContainer');
+        if (container) {
+          container.innerHTML = '';
+          window.google.accounts.id.renderButton(container, {
+            theme: 'outline',
+            size: 'large',
+            width: 320,
+            shape: 'pill',
+            text: buttonText
+          });
+        }
+        const modalContainer = document.getElementById('modalGoogleGsiBtn');
+        if (modalContainer) {
+          modalContainer.innerHTML = '';
+          window.google.accounts.id.renderButton(modalContainer, {
+            theme: 'outline',
+            size: 'large',
+            width: 320,
+            shape: 'pill',
+            text: buttonText
+          });
+        }
+      }
+    }
+
     function switchAuthTab(mode) {
+      currentAuthMode = mode;
       const loginForm = document.getElementById('loginForm');
       const signupForm = document.getElementById('signupForm');
       const tabLogin = document.getElementById('tabAuthLogin');
       const tabSignup = document.getElementById('tabAuthSignup');
       const googleLabel = document.getElementById('googleBtnLabel');
+      const modalTitle = document.getElementById('googleModalTitle');
+      const modalHeading = document.getElementById('googleModalHeading');
+      const modalBtn = document.getElementById('btnSubmitCustomGoogle');
+      const formPrompt = document.getElementById('googleFormPrompt');
 
       if (mode === 'login') {
         loginForm.classList.remove('hidden');
         signupForm.classList.add('hidden');
         tabLogin.className = 'py-2.5 text-xs sm:text-sm font-semibold rounded-lg bg-emerald-500 text-slate-950 shadow transition';
         tabSignup.className = 'py-2.5 text-xs sm:text-sm font-semibold rounded-lg text-slate-400 hover:text-white transition';
-        googleLabel.textContent = 'Sign in with Google';
+        if (googleLabel) googleLabel.textContent = 'Sign in with Google';
+        if (modalTitle) modalTitle.textContent = 'Sign in with Google';
+        if (modalHeading) modalHeading.textContent = 'Sign in with Google';
+        if (modalBtn) modalBtn.textContent = 'Sign in with this Google Account';
+        if (formPrompt) formPrompt.textContent = 'Enter your Google account details to sign in:';
+        renderGoogleGsiButtons('signin_with');
       } else {
         loginForm.classList.add('hidden');
         signupForm.classList.remove('hidden');
         tabSignup.className = 'py-2.5 text-xs sm:text-sm font-semibold rounded-lg bg-emerald-500 text-slate-950 shadow transition';
         tabLogin.className = 'py-2.5 text-xs sm:text-sm font-semibold rounded-lg text-slate-400 hover:text-white transition';
-        googleLabel.textContent = 'Sign up with Google';
+        if (googleLabel) googleLabel.textContent = 'Sign up with Google';
+        if (modalTitle) modalTitle.textContent = 'Sign up with Google';
+        if (modalHeading) modalHeading.textContent = 'Sign up with Google';
+        if (modalBtn) modalBtn.textContent = 'Sign up with this Google Account';
+        if (formPrompt) formPrompt.textContent = 'Enter your Google account details to sign up:';
+        renderGoogleGsiButtons('signup_with');
       }
     }
 
@@ -1730,11 +1788,6 @@ exec node server.js`
     }
 
     function openGoogleOAuthModal() {
-      if (window.google?.accounts?.id) {
-        try {
-          window.google.accounts.id.prompt();
-        } catch (_e) {}
-      }
       openModal('googleOAuthModal');
     }
 
@@ -1820,6 +1873,7 @@ exec node server.js`
       try {
         const cfg = await apiFetch('/api/auth/config');
         if (cfg && cfg.googleClientId && window.google?.accounts?.id) {
+          cachedGoogleClientId = cfg.googleClientId;
           window.google.accounts.id.initialize({
             client_id: cfg.googleClientId,
             callback: handleGoogleCredentialResponse,
@@ -1827,27 +1881,10 @@ exec node server.js`
             cancel_on_tap_outside: true
           });
 
-          const container = document.getElementById('googleGsiBtnContainer');
+          renderGoogleGsiButtons(currentAuthMode === 'signup' ? 'signup_with' : 'signin_with');
           const customBtn = document.getElementById('btnGoogleOAuth');
-          if (container) {
-            window.google.accounts.id.renderButton(container, {
-              theme: 'outline',
-              size: 'large',
-              width: 320,
-              shape: 'pill'
-            });
-            if (customBtn) {
-              customBtn.classList.add('hidden');
-            }
-          }
-          const modalContainer = document.getElementById('modalGoogleGsiBtn');
-          if (modalContainer) {
-            window.google.accounts.id.renderButton(modalContainer, {
-              theme: 'outline',
-              size: 'large',
-              width: 320,
-              shape: 'pill'
-            });
+          if (customBtn) {
+            customBtn.classList.add('hidden');
           }
         }
       } catch (err) {
