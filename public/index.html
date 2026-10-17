@@ -80,34 +80,32 @@
   <header class="sticky top-0 z-30 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md">
     <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-3">
       <!-- Brand Logo -->
-      <div class="flex items-center gap-2 sm:gap-3 min-w-0">
+      <div class="flex items-center gap-2 sm:gap-3 flex-shrink-0">
         <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-emerald-400 via-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/25 ring-1 ring-emerald-300/30 flex-shrink-0">
           <svg class="w-5 h-5 sm:w-6 sm:h-6 text-slate-950" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         </div>
-        <div class="min-w-0">
-          <div class="flex items-center gap-1.5 sm:gap-2">
-            <span data-testid="brand-title" class="font-extrabold text-base sm:text-lg tracking-tight text-white">SplitFlow</span>
-            <span id="dbStatusBadge" data-testid="db-status-badge" class="text-[10px] sm:text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 truncate max-w-[130px] sm:max-w-none">
-              v2.0 Production · 24/24 Tests Passing
-            </span>
-          </div>
-          <p class="text-xs text-slate-400 hidden sm:block">Smart Expense Splitting, Dual OAuth/Email Auth, QA Suite &amp; CI/CD Pipelines</p>
+        <div class="flex items-center gap-1.5 sm:gap-2">
+          <span data-testid="brand-title" class="font-extrabold text-base sm:text-lg tracking-tight text-white whitespace-nowrap">SplitFlow</span>
+          <span id="dbStatusBadge" data-testid="db-status-badge" class="hidden sm:inline-flex items-center gap-1.5 text-[10px] sm:text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 truncate max-w-[130px] sm:max-w-none">
+            v2.0 Production · 24/24 Tests Passing
+          </span>
         </div>
+        <p class="text-xs text-slate-400 hidden lg:block">Smart Expense Splitting &amp; Settlement</p>
       </div>
 
       <!-- Right Controls -->
       <div class="flex items-center gap-1.5 sm:gap-2.5 flex-shrink-0">
         <!-- Currency Selector -->
-        <select id="currencySelector" data-testid="currency-selector" onchange="handleCurrencyChange(this.value)" aria-label="Select Currency" class="px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold bg-slate-900 text-slate-200 border border-slate-700 focus:outline-none focus:border-emerald-500">
+        <select id="currencySelector" data-testid="currency-selector" onchange="handleCurrencyChange(this.value)" aria-label="Select Currency" class="px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold bg-slate-900 text-slate-200 border border-slate-700 focus:outline-none focus:border-emerald-500 cursor-pointer">
           <option value="INR">₹ INR</option>
           <option value="USD">$ USD</option>
           <option value="EUR">€ EUR</option>
           <option value="GBP">£ GBP</option>
         </select>
 
-        <button id="btnToggleViewMode" data-testid="btn-toggle-view-mode" onclick="toggleAuthOrAppView()" class="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">
+        <button id="btnToggleViewMode" data-testid="btn-toggle-view-mode" onclick="toggleAuthOrAppView()" class="hidden md:inline-flex px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">
           <span class="hidden sm:inline">Switch to </span>Auth
         </button>
 
@@ -118,15 +116,15 @@
         </button>
 
         <!-- Active User Pill -->
-        <div id="headerUserArea" data-testid="header-user-area" class="flex items-center gap-1.5 sm:gap-2 pl-1.5 sm:pl-2 border-l border-slate-800">
-          <div id="headerUserAvatar" data-testid="header-user-avatar" class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-emerald-500/30 to-teal-500/30 border border-emerald-400/40 flex items-center justify-center text-[11px] sm:text-xs font-bold text-emerald-300">
+        <div id="headerUserArea" data-testid="header-user-area" class="flex items-center gap-1.5 sm:gap-2 pl-1 sm:pl-2 border-l border-slate-800">
+          <div id="headerUserAvatar" data-testid="header-user-avatar" class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-emerald-500/30 to-teal-500/30 border border-emerald-400/40 flex items-center justify-center text-[11px] sm:text-xs font-bold text-emerald-300 flex-shrink-0">
             ZM
           </div>
-          <div class="hidden md:block text-left">
+          <div class="hidden lg:block text-left">
             <div id="headerUserName" data-testid="header-user-name" class="text-xs font-semibold text-slate-100 leading-tight">Zubair Mohammed</div>
             <div id="headerUserProvider" data-testid="header-user-provider" class="text-[10px] text-emerald-400 leading-tight">Google + Email Linked</div>
           </div>
-          <button id="btnHeaderLogout" data-testid="btn-header-logout" onclick="handleLogout()" title="Sign out / Test Auth Screen" class="p-1 sm:p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800/80 transition">
+          <button id="btnHeaderLogout" data-testid="btn-header-logout" onclick="handleLogout()" title="Sign out / Test Auth Screen" class="p-1 sm:p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800/80 transition flex-shrink-0">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
             </svg>
@@ -140,6 +138,22 @@
   <!-- VIEW 1: AUTHENTICATION PORTAL (EMAIL/PASSWORD + GOOGLE OAUTH 2.0)     -->
   <!-- ===================================================================== -->
   <section id="authViewSection" data-testid="auth-view-section" class="hidden max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+    <!-- Active Session Return Banner (Mobile/Desktop Friendly) -->
+    <div id="authActiveUserBanner" class="hidden mb-6 p-3.5 sm:p-4 rounded-2xl bg-emerald-950/60 border border-emerald-500/30 flex items-center justify-between gap-3 shadow-lg">
+      <div class="flex items-center gap-2.5 min-w-0">
+        <div class="w-8 h-8 rounded-full bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-xs font-bold text-emerald-300 flex-shrink-0">
+          ✓
+        </div>
+        <div class="min-w-0">
+          <div class="text-xs font-bold text-white truncate">Active Session: <span id="authBannerUserName" class="text-emerald-400">User</span></div>
+          <div class="text-[11px] text-slate-400 truncate">You are already authenticated.</div>
+        </div>
+      </div>
+      <button onclick="toggleAuthOrAppView()" class="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs whitespace-nowrap transition flex-shrink-0">
+        Back to App →
+      </button>
+    </div>
+
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
       <!-- Left Column: Visual Hero & Architecture Highlights -->
       <div class="lg:col-span-7 space-y-6">
@@ -305,7 +319,7 @@
             All Groups
           </span>
         </div>
-        <p class="text-xs sm:text-sm text-slate-400 mt-1">
+        <p class="text-xs sm:text-sm text-slate-400 mt-1 hidden sm:block">
           Track shared bills, split by equal/exact/percentage/shares, run live UI &amp; unit tests, and settle minimum-cash-flow balances.
         </p>
       </div>
@@ -372,8 +386,8 @@
     </div>
 
     <!-- Workspace Navigation Bar & Group Filter -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 border-b border-slate-800 pb-3">
-      <div class="flex overflow-x-auto no-scrollbar items-center gap-1.5 pb-1 sm:pb-0">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-2.5 sm:gap-3 border-b border-slate-800 pb-3">
+      <div id="desktopNavTabsContainer" class="hidden md:flex overflow-x-auto no-scrollbar items-center gap-1.5 pb-1 sm:pb-0">
         <button id="navTabDashboard" data-testid="nav-tab-dashboard" onclick="switchMainTab('dashboard')" class="whitespace-nowrap px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-emerald-500 text-slate-950 transition">
           Overview &amp; Analytics
         </button>
@@ -393,9 +407,14 @@
       </div>
 
       <!-- Group Filter Select -->
-      <div class="flex items-center justify-between sm:justify-start gap-2 pt-1 sm:pt-0">
-        <label for="groupFilterSelect" class="text-xs text-slate-400 whitespace-nowrap">Filter Group:</label>
-        <select id="groupFilterSelect" data-testid="group-filter-select" onchange="handleGroupFilterChange(this.value)" class="flex-1 sm:flex-none px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs sm:text-sm text-white focus:outline-none focus:border-emerald-500">
+      <div class="flex items-center justify-between gap-2 pt-1 sm:pt-0 w-full md:w-auto">
+        <label for="groupFilterSelect" class="text-xs text-slate-400 whitespace-nowrap font-medium flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" />
+          </svg>
+          Filter Group:
+        </label>
+        <select id="groupFilterSelect" data-testid="group-filter-select" onchange="handleGroupFilterChange(this.value)" class="flex-1 md:flex-none px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs sm:text-sm text-white focus:outline-none focus:border-emerald-500">
           <option value="ALL">All Groups</option>
         </select>
       </div>
@@ -490,12 +509,12 @@
 
     <!-- TAB 3: GROUPS & FRIENDS -->
     <div id="panelGroups" data-testid="panel-groups" class="hidden space-y-6">
-      <div class="flex items-center justify-between">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3">
         <div>
           <h3 class="text-base font-bold text-white">Your Expense Groups</h3>
           <p class="text-xs text-slate-400">Manage group members, invite codes, and per-group balances</p>
         </div>
-        <button onclick="openModal('newGroupModal')" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs sm:text-sm transition">
+        <button onclick="openModal('newGroupModal')" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs sm:text-sm transition flex-shrink-0 self-start sm:self-auto">
           + Create Group
         </button>
       </div>
@@ -507,12 +526,12 @@
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <!-- Recommended Minimum-Cash-Flow Transfers -->
         <div class="lg:col-span-7 glass-panel rounded-2xl p-5 space-y-4">
-          <div class="flex items-center justify-between">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3">
             <div>
               <h3 class="text-base font-bold text-white">Minimum-Cash-Flow Debt Simplifier</h3>
               <p class="text-xs text-slate-400">Reduces multi-way group IOUs into the fewest direct payments</p>
             </div>
-            <button onclick="copySettlementSummary()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-emerald-300 border border-slate-700 transition">
+            <button onclick="copySettlementSummary()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-emerald-300 border border-slate-700 transition flex-shrink-0 self-start sm:self-auto">
               Copy WhatsApp/UPI Summary
             </button>
           </div>
@@ -1049,7 +1068,7 @@
 
         const badge = document.getElementById('dbStatusBadge');
         if (badge) {
-          badge.className = 'text-[11px] font-semibold px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1.5';
+          badge.className = 'hidden sm:inline-flex text-[11px] font-semibold px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 items-center gap-1.5';
           badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> MongoDB Atlas: Live Sync';
         }
         saveState();
@@ -1486,15 +1505,32 @@ exec node server.js`
       const authSec = document.getElementById('authViewSection');
       const appSec = document.getElementById('appWorkspaceSection');
       const toggleBtn = document.getElementById('btnToggleViewMode');
+      const authBanner = document.getElementById('authActiveUserBanner');
 
       if (showingAuthPortal || !appState.currentUser) {
         authSec.classList.remove('hidden');
         appSec.classList.add('hidden');
-        toggleBtn.textContent = appState.currentUser ? 'Back to Dashboard' : 'Auth Portal Active';
+        if (toggleBtn) {
+          toggleBtn.textContent = appState.currentUser ? 'Back to Dashboard' : 'Auth Portal Active';
+        }
+        if (authBanner) {
+          if (appState.currentUser) {
+            authBanner.classList.remove('hidden');
+            const bannerName = document.getElementById('authBannerUserName');
+            if (bannerName) bannerName.textContent = appState.currentUser.name;
+          } else {
+            authBanner.classList.add('hidden');
+          }
+        }
       } else {
         authSec.classList.add('hidden');
         appSec.classList.remove('hidden');
-        toggleBtn.textContent = 'Switch to Auth Portal';
+        if (toggleBtn) {
+          toggleBtn.textContent = 'Switch to Auth Portal';
+        }
+        if (authBanner) {
+          authBanner.classList.add('hidden');
+        }
       }
 
       if (appState.currentUser) {
