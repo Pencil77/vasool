@@ -216,4 +216,15 @@ router.get('/me', requireAuth, async (req, res) => {
   }
 });
 
+/**
+ * GET /api/auth/config
+ * Exposes public client configuration (e.g. Google OAuth 2.0 Web Client ID)
+ */
+router.get('/config', (req, res) => {
+  return res.status(200).json({
+    googleClientId: process.env.GOOGLE_CLIENT_ID || null,
+    environment: process.env.NODE_ENV || 'production'
+  });
+});
+
 module.exports = { authRouter: router, requireAuth };

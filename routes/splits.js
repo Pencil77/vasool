@@ -301,4 +301,22 @@ router.post('/settlements', requireAuth, async (req, res) => {
   }
 });
 
+// GET /api/settlements - List recorded settlements
+router.get('/settlements', requireAuth, async (req, res) => {
+  try {
+    await connectToDatabase();
+    const filter = {};
+    if (req.query.groupId) {
+      filter.groupId = req.query.groupId;
+    } else {
+      const userGroups = await Group.find({ 'members.email': req.user.email }, { _id: 1 });
+      filter.groupId = { $in: userGroups.map((g) => g._id) };
+    }
+    const settlements = await Settlement.find(filter).sort({ settledAt: -1, createdAt: -1 });
+    return res.status(200).json({ settlements });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = { splitsRouter: router };
