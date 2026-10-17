@@ -1,0 +1,19 @@
+{
+  "name": "vasool-splits-web-app",
+  "version": "2.0.0",
+  "description": "Vasool - Shared Expense Splitting Web App with Email/Password + Google OAuth 2.0, MongoDB Atlas, Infisical Vault",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "google-auth-library": "^9.14.1",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.6.1"
+  }
+}
