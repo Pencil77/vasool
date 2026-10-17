@@ -915,8 +915,8 @@
             category: g.category || 'Trip',
             currency: g.currency || 'INR',
             inviteCode: g.inviteCode,
+            splitsVisibility: g.splitsVisibility || 'personal_only',
             adminEmail: g.adminEmail || (g.members?.find((m) => m.role === 'admin' || m.role === 'owner')?.email),
-            splitVisibility: g.splitVisibility || 'all',
             members: (g.members || []).map((m) => ({
               name: m.name,
               email: m.email,
@@ -957,8 +957,13 @@
             toEmail: s.toEmail,
             toName: s.toName,
             amount: s.amount,
+            currency: s.currency || 'INR',
             method: s.method,
             referenceNote: s.referenceNote,
+            status: s.status || 'pending_admin_approval',
+            confirmedAt: s.confirmedAt,
+            confirmedByEmail: s.confirmedByEmail,
+            rejectedReason: s.rejectedReason,
             settledAt: s.settledAt ? s.settledAt.slice(0, 10) : new Date().toISOString().slice(0, 10)
           }));
         }
@@ -1141,6 +1146,8 @@ exec node server.js`
             category: 'Trip',
             currency: 'INR',
             inviteCode: 'SPL-GOA92',
+            splitsVisibility: 'personal_only',
+            adminEmail: 'mrzoromit3@gmail.com',
             members: [
               { name: 'Zubair Mohammed', email: 'mrzoromit3@gmail.com', role: 'admin' },
               { name: 'Omkar Chinnam', email: 'omkar.chinnam@gmail.com', role: 'member' },
@@ -1154,6 +1161,8 @@ exec node server.js`
             category: 'Home',
             currency: 'INR',
             inviteCode: 'SPL-HYD402',
+            splitsVisibility: 'personal_only',
+            adminEmail: 'mrzoromit3@gmail.com',
             members: [
               { name: 'Zubair Mohammed', email: 'mrzoromit3@gmail.com', role: 'admin' },
               { name: 'Omkar Chinnam', email: 'omkar.chinnam@gmail.com', role: 'member' },
@@ -1166,6 +1175,8 @@ exec node server.js`
             category: 'Project',
             currency: 'INR',
             inviteCode: 'SPL-LUNCH7',
+            splitsVisibility: 'personal_only',
+            adminEmail: 'mrzoromit3@gmail.com',
             members: [
               { name: 'Zubair Mohammed', email: 'mrzoromit3@gmail.com', role: 'admin' },
               { name: 'Krutika Morande', email: 'krutika.morande@gmail.com', role: 'member' },
@@ -1250,8 +1261,12 @@ exec node server.js`
             toEmail: 'mrzoromit3@gmail.com',
             toName: 'Zubair Mohammed',
             amount: 1500,
+            currency: 'INR',
             method: 'Amazon Pay',
             referenceNote: 'Partial villa settlement via Amazon Pay UPI',
+            status: 'confirmed',
+            confirmedAt: '2026-10-16',
+            confirmedByEmail: 'mrzoromit3@gmail.com',
             settledAt: '2026-10-16'
           }
         ]
@@ -1773,10 +1788,12 @@ exec node server.js`
       });
 
       filteredSettlements.forEach((st) => {
-        const fromP = ensurePerson(st.fromEmail, st.fromName);
-        const toP = ensurePerson(st.toEmail, st.toName);
-        fromP.net += Number(st.amount);
-        toP.net -= Number(st.amount);
+        if (st.status === 'confirmed' || (!st.status && !st.isPending)) {
+          const fromP = ensurePerson(st.fromEmail, st.fromName);
+          const toP = ensurePerson(st.toEmail, st.toName);
+          fromP.net += Number(st.amount);
+          toP.net -= Number(st.amount);
+        }
       });
 
       // Admin-Hub Debt Calibration:
@@ -1785,7 +1802,7 @@ exec node server.js`
       let activeAdmin = null;
       if (activeGroups.length >= 1) {
         const primary = activeGroups[0];
-        activeAdmin = primary.members?.find((m) => m.role === 'admin' || m.role === 'owner') || primary.members?.[0];
+        activeAdmin = primary.members?.find((m) => m.role === 'admin' || (primary.adminEmail && primary.adminEmail.toLowerCase() === m.email.toLowerCase())) || primary.members?.[0];
       }
 
       const simplified = [];
@@ -1863,26 +1880,55 @@ exec node server.js`
         }
       }
 
-      // Split Visibility policy filtering:
-      // If group is 'self', regular members only see their own balance and direct Admin transfer
+      // Calculate pending settlement amounts awaiting admin approval
+      const pendingMap = {};
+      const pendingSettlements = filteredSettlements.filter((s) => s.status === 'pending_admin_approval');
+      pendingSettlements.forEach((s) => {
+        const key = `${String(s.fromEmail).toLowerCase().trim()}->${String(s.toEmail).toLowerCase().trim()}`;
+        pendingMap[key] = (pendingMap[key] || 0) + Number(s.amount);
+      });
+
+      simplified.forEach((t) => {
+        const key = `${String(t.fromEmail).toLowerCase().trim()}->${String(t.toEmail).toLowerCase().trim()}`;
+        t.pendingApprovalAmount = Math.round((pendingMap[key] || 0) * 100) / 100;
+        t.isPendingApproval = t.pendingApprovalAmount > 0;
+        t.remainingDue = Math.max(0, Math.round((t.amount - t.pendingApprovalAmount) * 100) / 100);
+      });
+
       const currentEmail = (stateRef.currentUser?.email || '').toLowerCase().trim();
-      const isUserAdmin = activeAdmin && activeAdmin.email.toLowerCase().trim() === currentEmail;
+      const hasPersonalOnly = activeGroups.some((g) => (g.splitsVisibility || 'personal_only') === 'personal_only');
+      const isViewerAdmin = activeGroups.some((g) => {
+        const adm = g.members?.find((m) => m.role === 'admin' || (g.adminEmail && g.adminEmail.toLowerCase() === m.email.toLowerCase())) || g.members?.[0];
+        return adm && adm.email.toLowerCase().trim() === currentEmail;
+      });
 
       let finalSimplified = simplified;
       let finalBalanceList = Object.values(balanceMap);
 
-      if (activeGroups.length === 1 && activeGroups[0].splitVisibility === 'self' && !isUserAdmin) {
-        finalBalanceList = finalBalanceList.filter((b) => b.email.toLowerCase() === currentEmail);
-        finalSimplified = finalSimplified.filter(
+      if (hasPersonalOnly && !isViewerAdmin && currentEmail) {
+        finalSimplified = simplified.filter(
           (t) => t.fromEmail.toLowerCase() === currentEmail || t.toEmail.toLowerCase() === currentEmail
         );
+        const adminEmails = new Set(
+          activeGroups.map((g) => {
+            const adm = g.members?.find((m) => m.role === 'admin' || (g.adminEmail && g.adminEmail.toLowerCase() === m.email.toLowerCase())) || g.members?.[0];
+            return adm ? adm.email.toLowerCase().trim() : '';
+          })
+        );
+        finalBalanceList = finalBalanceList.filter(
+          (b) => b.email.toLowerCase() === currentEmail || adminEmails.has(b.email.toLowerCase())
+        );
       }
+
+      const isFullyClosed = finalSimplified.length === 0 && pendingSettlements.length === 0;
 
       return {
         balanceList: finalBalanceList,
         simplified: finalSimplified,
         filteredExpenses,
         filteredSettlements,
+        pendingSettlements,
+        isFullyClosed,
         totalSpend
       };
     }
@@ -2115,23 +2161,35 @@ exec node server.js`
         .map((e) => {
           const grp = appState.groups.find((g) => g.id === e.groupId);
           const currentEmail = (appState.currentUser?.email || '').toLowerCase().trim();
-          const adminMember = grp ? (grp.members.find((m) => m.role === 'admin' || m.role === 'owner') || grp.members[0]) : null;
+          const adminMember = grp ? (grp.members?.find((m) => m.role === 'admin' || (grp.adminEmail && grp.adminEmail.toLowerCase() === m.email.toLowerCase())) || grp.members?.[0]) : null;
           const isUserAdmin = adminMember && adminMember.email.toLowerCase().trim() === currentEmail;
-          const isRestrictedPolicy = grp && grp.splitVisibility === 'self' && !isUserAdmin;
+          const isPersonalOnly = grp && (grp.splitsVisibility || 'personal_only') === 'personal_only' && !isUserAdmin;
 
           let visibleSplits = e.splits || [];
-          if (isRestrictedPolicy) {
+          if (isPersonalOnly) {
             visibleSplits = visibleSplits.filter((s) => s.memberEmail.toLowerCase() === currentEmail);
           }
 
-          const splitsPills = visibleSplits.length > 0
-            ? visibleSplits
+          let splitsPills = '';
+          if (isPersonalOnly) {
+            if (visibleSplits.length > 0) {
+              splitsPills = visibleSplits
                 .map(
                   (s) =>
-                    `<span class="px-2 py-0.5 rounded ${isRestrictedPolicy ? 'bg-purple-900/40 text-purple-200 border border-purple-500/30 font-semibold' : 'bg-slate-800 text-slate-300'} text-[11px]">${isRestrictedPolicy ? 'Your Share: ' : escapeHtml(s.memberName.split(' ')[0]) + ': '}${formatINR(s.amount)}</span>`
+                    `<span class="px-2 py-0.5 rounded bg-purple-900/40 text-purple-200 border border-purple-500/30 font-semibold text-[11px]">Your Share: ${formatINR(s.amount)}</span>`
                 )
-                .join(' ') + (isRestrictedPolicy ? ' <span class="text-[10px] text-purple-300/80 italic self-center">🔒 other splits private</span>' : '')
-            : (isRestrictedPolicy ? '<span class="text-[11px] text-slate-500 italic">No share allocated to you for this bill</span>' : '');
+                .join(' ') + ` <span class="px-2 py-0.5 rounded bg-slate-800/80 text-slate-400 text-[10px] italic border border-slate-700/50">🔒 Other member shares kept private by Admin</span>`;
+            } else {
+              splitsPills = `<span class="px-2 py-0.5 rounded bg-slate-800/80 text-slate-400 text-[10px] italic">No share assigned to you · 🔒 Other member shares private</span>`;
+            }
+          } else {
+            splitsPills = visibleSplits
+              .map(
+                (s) =>
+                  `<span class="px-2 py-0.5 rounded bg-slate-800 text-[11px] text-slate-300">${escapeHtml(s.memberName.split(' ')[0])}: ${formatINR(s.amount)}</span>`
+              )
+              .join(' ');
+          }
           return `
             <div data-testid="expense-card-${escapeHtml(e.id)}" class="glass-panel glass-card-hover rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div class="space-y-1">
@@ -2199,13 +2257,13 @@ exec node server.js`
       container.innerHTML = appState.groups
         .map((g) => {
           const { totalSpend, simplified } = computeBalancesAndSimplifications(g.id);
-          const currentAdmin = g.members.find((m) => m.role === 'admin' || m.role === 'owner') || g.members[0];
-          const isCurrentUserAdmin = (currentAdmin && currentAdmin.email.toLowerCase().trim() === currentEmail) ||
-                                     (g.createdByEmail && g.createdByEmail.toLowerCase().trim() === currentEmail);
+          const currentAdmin = g.members.find((m) => m.role === 'admin' || (g.adminEmail && g.adminEmail.toLowerCase() === m.email.toLowerCase())) || g.members[0];
+          const isCurrentUserAdmin = currentAdmin && currentAdmin.email.toLowerCase().trim() === currentEmail;
+          const isPersonalOnly = (g.splitsVisibility || 'personal_only') === 'personal_only';
 
           const membersBadges = g.members
             .map((m) => {
-              const isAdmin = m.role === 'admin' || m.role === 'owner' || (g.adminEmail && g.adminEmail.toLowerCase() === m.email.toLowerCase());
+              const isAdmin = m.role === 'admin' || (g.adminEmail && g.adminEmail.toLowerCase() === m.email.toLowerCase());
               const ini = m.name
                 .split(' ')
                 .map((w) => w[0])
@@ -2244,12 +2302,12 @@ exec node server.js`
                   </div>
                   <div>
                     ${isCurrentUserAdmin ? `
-                      <button data-testid="btn-toggle-visibility-${escapeHtml(g.id)}" onclick="toggleGroupSplitVisibility('${escapeHtml(g.id)}')" title="Admin control: Toggle member split visibility" class="text-[10px] font-semibold px-2 py-0.5 rounded-lg border transition ${g.splitVisibility === 'self' ? 'bg-purple-500/20 text-purple-300 border-purple-500/40 hover:bg-purple-500/30' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'}">
-                        ${g.splitVisibility === 'self' ? '🔒 Privacy: Own Share' : '🌐 Privacy: All Visible'}
+                      <button data-testid="btn-toggle-visibility-${escapeHtml(g.id)}" onclick="toggleGroupSplitVisibility('${escapeHtml(g.id)}')" title="Admin control: Toggle member split visibility" class="text-[10px] font-semibold px-2 py-0.5 rounded-lg border transition ${isPersonalOnly ? 'bg-purple-500/20 text-purple-300 border-purple-500/40 hover:bg-purple-500/30' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'}">
+                        ${isPersonalOnly ? '🔒 Privacy: Personal Only' : '🌐 Privacy: Show All'}
                       </button>
                     ` : `
-                      <span class="text-[10px] font-medium px-2 py-0.5 rounded-lg border ${g.splitVisibility === 'self' ? 'bg-purple-500/15 text-purple-300 border-purple-500/30' : 'bg-slate-800/80 text-slate-400 border-slate-700/50'}">
-                        ${g.splitVisibility === 'self' ? '🔒 Own Share Only' : '🌐 All Visible'}
+                      <span class="text-[10px] font-medium px-2 py-0.5 rounded-lg border ${isPersonalOnly ? 'bg-purple-500/15 text-purple-300 border-purple-500/30' : 'bg-slate-800/80 text-slate-400 border-slate-700/50'}">
+                        ${isPersonalOnly ? '🔒 Personal Only' : '🌐 All Visible'}
                       </span>
                     `}
                   </div>
@@ -2279,6 +2337,35 @@ exec node server.js`
           `;
         })
         .join('');
+    }
+
+    async function toggleGroupSplitVisibility(groupId) {
+      const grp = appState.groups.find((g) => g.id === groupId);
+      if (!grp) return;
+      const current = grp.splitsVisibility || 'personal_only';
+      const next = current === 'personal_only' ? 'show_all' : 'personal_only';
+      try {
+        if (localStorage.getItem(AUTH_TOKEN_KEY)) {
+          const res = await apiFetch(`/api/groups/${groupId}/visibility`, {
+            method: 'PATCH',
+            body: JSON.stringify({ splitsVisibility: next })
+          });
+          if (res && res.error) {
+            alert('Failed to update split visibility: ' + res.error);
+            return;
+          }
+        }
+        grp.splitsVisibility = next;
+        saveState();
+        refreshAllViews();
+        showToast(
+          next === 'personal_only'
+            ? '🔒 Split Privacy ON: Non-admin members will only see their own shares.'
+            : '🌐 Split Privacy OFF: All group members can view everyone\'s splits.'
+        );
+      } catch (err) {
+        alert('Error updating split visibility: ' + err.message);
+      }
     }
 
     async function promptTransferAdmin(groupId, targetEmail, targetName) {
@@ -2324,38 +2411,55 @@ exec node server.js`
       }
     }
 
-    async function toggleGroupSplitVisibility(groupId) {
-      const grp = appState.groups.find((g) => g.id === groupId);
-      if (!grp) return;
-      const currentPolicy = grp.splitVisibility || 'all';
-      const nextPolicy = currentPolicy === 'self' ? 'all' : 'self';
+    async function handleConfirmSettlement(settlementId) {
       try {
         if (localStorage.getItem(AUTH_TOKEN_KEY)) {
-          const res = await apiFetch(`/api/groups/${groupId}/visibility`, {
-            method: 'PATCH',
-            body: JSON.stringify({ splitVisibility: nextPolicy })
+          const res = await apiFetch(`/api/settlements/${settlementId}/confirm`, {
+            method: 'POST'
           });
           if (res && res.error) {
-            console.error('Failed to update split visibility:', res.error);
-            if (typeof alert === 'function') {
-              try { alert('Failed to update split visibility: ' + res.error); } catch (_) {}
-            }
+            alert('Failed to confirm settlement: ' + res.error);
             return;
           }
         }
-        grp.splitVisibility = nextPolicy;
+        const stl = appState.settlements.find((s) => s.id === settlementId);
+        if (stl) {
+          stl.status = 'confirmed';
+          stl.confirmedAt = new Date().toISOString();
+          stl.confirmedByEmail = appState.currentUser?.email || '';
+        }
         saveState();
         refreshAllViews();
-        showToast(
-          nextPolicy === 'self'
-            ? '🔒 Privacy mode ON: Normal members only see their own splits!'
-            : '🌐 Privacy mode OFF: All group members can see all splits.'
-        );
+        showToast('✅ Payment confirmed received by Admin! Transaction officially settled.');
       } catch (err) {
-        console.error('Error updating visibility policy:', err.message);
-        if (typeof alert === 'function') {
-          try { alert('Error updating visibility policy: ' + err.message); } catch (_) {}
+        alert('Error confirming settlement: ' + err.message);
+      }
+    }
+
+    async function handleRejectSettlement(settlementId) {
+      const reason = prompt('Reason for rejecting this settlement claim (e.g., payment not received):', 'Payment not received in account');
+      if (reason === null) return;
+      try {
+        if (localStorage.getItem(AUTH_TOKEN_KEY)) {
+          const res = await apiFetch(`/api/settlements/${settlementId}/reject`, {
+            method: 'POST',
+            body: JSON.stringify({ reason })
+          });
+          if (res && res.error) {
+            alert('Failed to reject settlement: ' + res.error);
+            return;
+          }
         }
+        const stl = appState.settlements.find((s) => s.id === settlementId);
+        if (stl) {
+          stl.status = 'rejected';
+          stl.rejectedReason = reason;
+        }
+        saveState();
+        refreshAllViews();
+        showToast('❌ Settlement claim rejected by Admin.');
+      } catch (err) {
+        alert('Error rejecting settlement: ' + err.message);
       }
     }
 
@@ -2371,57 +2475,200 @@ exec node server.js`
       const histEl = document.getElementById('settlementHistoryContainer');
       if (!simpEl || !histEl) return;
 
-      if (!simplified.length) {
-        simpEl.innerHTML = `<div class="p-6 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center text-xs text-emerald-300">All group debts are completely settled!</div>`;
-      } else {
-        simpEl.innerHTML = `
-          <div class="mb-3 px-3.5 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-between text-xs text-amber-300">
-            <span class="flex items-center gap-2">
-              <span class="text-base">👑</span>
-              <span><strong>Admin-Hub Calibration Active:</strong> Everyone pays their share to the group Admin, and the Admin settles payouts to creditors.</span>
-            </span>
-          </div>
-        ` + simplified
-          .map(
-            (t, idx) => `
-          <div class="p-4 rounded-xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      const currentEmail = (appState.currentUser?.email || '').toLowerCase().trim();
+      const activeGroups = selectedGroupId === 'ALL'
+        ? appState.groups
+        : appState.groups.filter((g) => g.id === selectedGroupId);
+
+      const isViewerAdminOfAny = activeGroups.some((g) => {
+        const adm = g.members?.find((m) => m.role === 'admin' || (g.adminEmail && g.adminEmail.toLowerCase() === m.email.toLowerCase())) || g.members?.[0];
+        return adm && adm.email.toLowerCase().trim() === currentEmail;
+      });
+
+      const pendingApprovalList = filteredSettlements.filter(
+        (s) => s.status === 'pending_admin_approval'
+      );
+
+      const hasRemainingDebts = simplified.some((t) => {
+        const rem = typeof t.remainingDue === 'number' ? t.remainingDue : t.amount;
+        return rem > 0.01;
+      });
+
+      const isFullySettledAndClosed = !hasRemainingDebts && pendingApprovalList.length === 0;
+
+      let html = '';
+
+      // 1. Overall Group / Event Settlement Status Banner
+      if (isFullySettledAndClosed) {
+        html += `
+          <div data-testid="status-fully-closed-banner" class="mb-4 p-5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center gap-3">
+            <span class="text-2xl">🎉</span>
             <div>
-              <div class="text-xs sm:text-sm flex items-center gap-1.5 flex-wrap">
-                <strong class="text-rose-300">${escapeHtml(t.fromName)}</strong>
-                <span class="text-slate-400">pays</span>
-                <strong class="text-emerald-300">${escapeHtml(t.toName)}</strong>
-                ${t.type === 'pay_to_admin' ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">Pay to Admin 👑</span>' : ''}
-                ${t.type === 'admin_payout' ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/20 text-teal-300 border border-teal-500/40">Admin Settlement 💸</span>' : ''}
-              </div>
-              <div class="text-[11px] text-slate-400 mt-0.5">${escapeHtml(t.fromEmail)} &rarr; ${escapeHtml(t.toEmail)}</div>
-            </div>
-            <div class="flex items-center gap-3">
-              <span class="text-base font-extrabold text-white">${formatINR(t.amount)}</span>
-              <button data-testid="btn-record-payment-${idx}" onclick="openSettleConfirm('${escapeHtml(t.fromEmail)}', '${escapeHtml(t.fromName)}', '${escapeHtml(t.toEmail)}', '${escapeHtml(t.toName)}', ${t.amount})" class="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition">
-                Record Payment
-              </button>
+              <div class="text-sm font-bold text-emerald-300">All Group Debts Fully Settled & Closed!</div>
+              <div class="text-xs text-slate-400 mt-0.5">Every member transaction has been fully verified and confirmed by the Admin. No pending dues or owing balances remain.</div>
             </div>
           </div>
-        `
-          )
+        `;
+      } else {
+        const totalPendingDue = simplified.reduce((acc, t) => acc + (typeof t.remainingDue === 'number' ? t.remainingDue : t.amount), 0);
+        const totalPendingApproval = pendingApprovalList.reduce((acc, s) => acc + s.amount, 0);
+
+        html += `
+          <div data-testid="status-pending-due-banner" class="mb-4 p-4 rounded-2xl bg-slate-900 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="flex items-center gap-2.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
+              <div>
+                <div class="text-xs font-bold text-amber-300 uppercase tracking-wide">Status: Pending Due or Owing</div>
+                <div class="text-[11px] text-slate-400 mt-0.5">Event remains open until payees mark paid and the group Admin confirms receipt.</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 text-xs">
+              <span class="px-2.5 py-1 rounded-lg bg-rose-500/15 text-rose-300 border border-rose-500/30 font-semibold">Remaining Due: ${formatINR(totalPendingDue)}</span>
+              ${totalPendingApproval > 0 ? `<span class="px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-300 border border-amber-500/30 font-semibold">Awaiting Admin: ${formatINR(totalPendingApproval)}</span>` : ''}
+            </div>
+          </div>
+        `;
+      }
+
+      // 2. Admin Pending Confirmation Action Inbox
+      if (isViewerAdminOfAny && pendingApprovalList.length > 0) {
+        html += `
+          <div data-testid="admin-approval-inbox" class="mb-5 p-4 rounded-2xl bg-gradient-to-br from-amber-500/15 to-slate-900 border border-amber-500/40 space-y-3">
+            <div class="flex items-center justify-between gap-2 flex-wrap">
+              <div class="flex items-center gap-2">
+                <span class="text-lg">👑</span>
+                <h4 class="text-sm font-bold text-amber-200">Admin Action Required: Pending Payment Confirmations (${pendingApprovalList.length})</h4>
+              </div>
+              <span class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-amber-400/25 text-amber-300 border border-amber-400/40">Handshake Step 2</span>
+            </div>
+            <p class="text-xs text-slate-300">
+              Members have marked these shares as paid. Verify payment in your UPI / bank account, then confirm to officially close the debt, or reject if unreceived:
+            </p>
+            <div class="space-y-2">
+              ${pendingApprovalList.map((s) => `
+                <div data-testid="pending-approval-card-${escapeHtml(s.id)}" class="p-3.5 rounded-xl bg-slate-950/80 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <div class="text-xs text-white">
+                      <strong class="text-rose-300">${escapeHtml(s.fromName)}</strong> claims paid <strong class="text-emerald-300 text-sm">${formatINR(s.amount)}</strong> via <span class="text-teal-300 font-semibold">${escapeHtml(s.method)}</span>
+                    </div>
+                    <div class="text-[11px] text-slate-400 mt-1">
+                      ${escapeHtml(s.fromEmail)} &rarr; ${escapeHtml(s.toEmail)} · ${escapeHtml(s.settledAt || 'Recent')}
+                      ${s.referenceNote ? ` · Note: "<span class="text-slate-200">${escapeHtml(s.referenceNote)}</span>"` : ''}
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <button data-testid="btn-confirm-settle-${escapeHtml(s.id)}" onclick="handleConfirmSettlement('${escapeHtml(s.id)}')" class="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition">
+                      ✅ Confirm Received
+                    </button>
+                    <button data-testid="btn-reject-settle-${escapeHtml(s.id)}" onclick="handleRejectSettlement('${escapeHtml(s.id)}')" class="px-3 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 font-semibold text-xs transition">
+                      ❌ Reject
+                    </button>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      }
+
+      // 3. Admin-Hub Debt Calibration Banner
+      html += `
+        <div class="mb-3 px-3.5 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-between text-xs text-amber-300">
+          <span class="flex items-center gap-2">
+            <span class="text-base">👑</span>
+            <span><strong>Admin-Hub Calibration Active:</strong> Everyone pays their share to the group Admin, and the Admin settles payouts to creditors.</span>
+          </span>
+        </div>
+      `;
+
+      // 4. Simplified Transactions List
+      if (!simplified.length) {
+        if (!isFullySettledAndClosed) {
+          html += `<div class="p-6 rounded-xl bg-slate-900 border border-slate-800 text-center text-xs text-slate-400">No pending debt calculations remaining.</div>`;
+        }
+      } else {
+        html += simplified
+          .map((t, idx) => {
+            const pendingAmt = t.pendingApprovalAmount || 0;
+            const remDue = typeof t.remainingDue === 'number' ? t.remainingDue : Math.max(0, t.amount - pendingAmt);
+
+            return `
+              <div data-testid="settle-card-${idx}" class="p-4 rounded-xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2.5">
+                <div>
+                  <div class="text-xs sm:text-sm flex items-center gap-1.5 flex-wrap">
+                    <strong class="text-rose-300">${escapeHtml(t.fromName)}</strong>
+                    <span class="text-slate-400">pays</span>
+                    <strong class="text-emerald-300">${escapeHtml(t.toName)}</strong>
+                    ${t.type === 'pay_to_admin' ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">Pay to Admin 👑</span>' : ''}
+                    ${t.type === 'admin_payout' ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/20 text-teal-300 border border-teal-500/40">Admin Settlement 💸</span>' : ''}
+                  </div>
+                  <div class="text-[11px] text-slate-400 mt-0.5">${escapeHtml(t.fromEmail)} &rarr; ${escapeHtml(t.toEmail)}</div>
+                  ${pendingAmt > 0 ? `
+                    <div class="mt-1 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-amber-500/15 border border-amber-500/30 text-[11px] text-amber-300 font-semibold">
+                      <span>⏳ ${formatINR(pendingAmt)} paid</span>
+                      <span class="text-slate-400">· Awaiting Admin Confirmation</span>
+                    </div>
+                  ` : ''}
+                </div>
+                <div class="flex items-center gap-3">
+                  <div class="text-right">
+                    <div class="text-base font-extrabold text-white">${formatINR(t.amount)}</div>
+                    ${pendingAmt > 0 ? `<div class="text-[10px] text-slate-400">Remaining Due: <strong class="text-rose-300">${formatINR(remDue)}</strong></div>` : ''}
+                  </div>
+                  ${remDue <= 0.01 && pendingAmt > 0 ? `
+                    <span class="px-3.5 py-2 rounded-xl bg-amber-500/15 text-amber-300 border border-amber-500/30 font-semibold text-xs">
+                      ⏳ Pending Approval
+                    </span>
+                  ` : `
+                    <button data-testid="btn-record-payment-${idx}" onclick="openSettleConfirm('${escapeHtml(t.fromEmail)}', '${escapeHtml(t.fromName)}', '${escapeHtml(t.toEmail)}', '${escapeHtml(t.toName)}', ${remDue})" class="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition">
+                      ${isViewerAdminOfAny ? 'Record Payment' : 'Mark as Settled'}
+                    </button>
+                  `}
+                </div>
+              </div>
+            `;
+          })
           .join('');
       }
 
+      simpEl.innerHTML = html;
+
+      // 5. Settlement History List
       if (!filteredSettlements.length) {
         histEl.innerHTML = `<div class="text-xs text-slate-500 py-6 text-center">No settlements recorded yet.</div>`;
       } else {
         histEl.innerHTML = filteredSettlements
-          .map(
-            (s) => `
-          <div class="p-3 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between gap-2">
-            <div class="text-xs">
-              <div><strong class="text-emerald-300">${escapeHtml(s.fromName)}</strong> paid <strong class="text-white">${escapeHtml(s.toName)}</strong></div>
-              <div class="text-[11px] text-slate-400">${escapeHtml(s.method)} · ${escapeHtml(s.settledAt || 'Recent')} ${s.referenceNote ? '· ' + escapeHtml(s.referenceNote) : ''}</div>
-            </div>
-            <div class="text-xs font-bold text-emerald-400">${formatINR(s.amount)}</div>
-          </div>
-        `
-          )
+          .map((s) => {
+            const isConfirmed = s.status === 'confirmed';
+            const isPending = s.status === 'pending_admin_approval';
+            const isRejected = s.status === 'rejected';
+
+            let statusBadge = '';
+            if (isConfirmed) {
+              statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">✅ Confirmed by Admin</span>`;
+            } else if (isPending) {
+              statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">⏳ Awaiting Admin Confirmation</span>`;
+            } else if (isRejected) {
+              statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">❌ Rejected: ${escapeHtml(s.rejectedReason || 'Unverified')}</span>`;
+            }
+
+            return `
+              <div data-testid="settle-history-card-${escapeHtml(s.id)}" class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div class="text-xs">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <div><strong class="text-emerald-300">${escapeHtml(s.fromName)}</strong> paid <strong class="text-white">${escapeHtml(s.toName)}</strong></div>
+                    ${statusBadge}
+                  </div>
+                  <div class="text-[11px] text-slate-400 mt-0.5">
+                    ${escapeHtml(s.method)} · ${escapeHtml(s.settledAt || 'Recent')}
+                    ${s.referenceNote ? '· ' + escapeHtml(s.referenceNote) : ''}
+                    ${s.confirmedByEmail ? `· Confirmed by ${escapeHtml(s.confirmedByEmail)}` : ''}
+                  </div>
+                </div>
+                <div class="text-sm font-bold ${isConfirmed ? 'text-emerald-400' : isRejected ? 'text-rose-400 line-through' : 'text-amber-300'}">${formatINR(s.amount)}</div>
+              </div>
+            `;
+          })
           .join('');
       }
     }
@@ -2699,7 +2946,6 @@ exec node server.js`
 
       let grpId = 'grp_' + Date.now();
       let invCode = 'SPL-' + Math.random().toString(36).substring(2, 7).toUpperCase();
-      let splitVisibility = 'all';
 
       if (localStorage.getItem(AUTH_TOKEN_KEY)) {
         try {
@@ -2710,7 +2956,6 @@ exec node server.js`
           if (res && res.group) {
             grpId = res.group._id ? res.group._id.toString() : grpId;
             invCode = res.group.inviteCode || invCode;
-            splitVisibility = res.group.splitVisibility || splitVisibility;
           }
         } catch (err) {
           console.warn('[Create Group] Server notice:', err.message);
@@ -2723,7 +2968,6 @@ exec node server.js`
         category,
         currency: 'INR',
         inviteCode: invCode,
-        splitVisibility,
         members
       };
 
@@ -2801,7 +3045,16 @@ exec node server.js`
       const method = document.getElementById('settleMethodSelect').value;
       const referenceNote = document.getElementById('settleNoteInput').value.trim();
 
+      const currentEmail = (appState.currentUser?.email || '').toLowerCase().trim();
+      const grp = appState.groups.find((g) => g.id === groupId) || appState.groups[0];
+      const adminMember = grp ? (grp.members?.find((m) => m.role === 'admin' || (grp.adminEmail && grp.adminEmail.toLowerCase() === m.email.toLowerCase())) || grp.members?.[0]) : null;
+      const isViewerAdmin = adminMember && adminMember.email.toLowerCase().trim() === currentEmail;
+
       let stlId = 'stl_' + Date.now();
+      let status = isViewerAdmin ? 'confirmed' : 'pending_admin_approval';
+      let confirmedAt = isViewerAdmin ? new Date().toISOString() : null;
+      let confirmedByEmail = isViewerAdmin ? currentEmail : null;
+
       if (localStorage.getItem(AUTH_TOKEN_KEY)) {
         try {
           const res = await apiFetch('/api/settlements', {
@@ -2819,6 +3072,9 @@ exec node server.js`
           });
           if (res && res.settlement && res.settlement._id) {
             stlId = res.settlement._id.toString();
+            status = res.settlement.status || status;
+            confirmedAt = res.settlement.confirmedAt || confirmedAt;
+            confirmedByEmail = res.settlement.confirmedByEmail || confirmedByEmail;
           }
         } catch (err) {
           console.warn('[Settlement] Server notice:', err.message);
@@ -2833,15 +3089,24 @@ exec node server.js`
         toEmail,
         toName,
         amount,
+        currency: 'INR',
         method,
         referenceNote,
+        status,
+        confirmedAt,
+        confirmedByEmail,
         settledAt: new Date().toISOString().slice(0, 10)
       });
 
       closeModal('settleConfirmModal');
       saveState();
       refreshAllViews();
-      showToast(`Recorded ${formatINR(amount)} settlement via ${method}.`);
+
+      if (status === 'confirmed') {
+        showToast(`✅ Payment of ${formatINR(amount)} confirmed and settled.`);
+      } else {
+        showToast(`⏳ Payment of ${formatINR(amount)} marked as settled by payee. Awaiting admin confirmation.`);
+      }
     }
 
     // =========================================================================
@@ -3009,6 +3274,30 @@ exec node server.js`
         return 'Output: ' + escaped;
       });
 
+      runCase('Unit', 'UT-11: Split Visibility Privacy Mode isolates member share and hides other splits', () => {
+        const mockState = {
+          currentUser: { email: 'member@test.com', name: 'Member' },
+          groups: [{ id: 'g1', splitsVisibility: 'personal_only', members: [{ email: 'admin@test.com', name: 'Admin', role: 'admin' }, { email: 'member@test.com', name: 'Member', role: 'member' }, { email: 'other@test.com', name: 'Other', role: 'member' }] }],
+          expenses: [{
+            groupId: 'g1',
+            amount: 3000,
+            paidByEmail: 'admin@test.com',
+            paidByName: 'Admin',
+            splits: [
+              { memberEmail: 'admin@test.com', memberName: 'Admin', amount: 1000 },
+              { memberEmail: 'member@test.com', memberName: 'Member', amount: 1000 },
+              { memberEmail: 'other@test.com', memberName: 'Other', amount: 1000 }
+            ]
+          }],
+          settlements: []
+        };
+        const out = computeBalancesAndSimplifications('g1', mockState);
+        if (out.simplified.some((t) => t.fromEmail === 'other@test.com' || t.toEmail === 'other@test.com')) {
+          throw new Error('Other member debt leaked in personal_only mode');
+        }
+        return 'Personal privacy enforced: only member share visible';
+      });
+
       // --- 7 INTEGRATION TESTS ---
       runCase('Integration', 'IT-01: Default MongoDB State seeds 4 Users, 3 Groups, Expenses & Settlements', () => {
         const def = createDefaultState();
@@ -3064,6 +3353,44 @@ exec node server.js`
           throw new Error('Cloud inspector metadata invalid');
         }
         return 'splits_app + app.infisical.com verified';
+      });
+
+      runCase('Integration', 'IT-08: Two-Step Settlement Handshake marks pending approval until Admin confirms', () => {
+        const mockState = {
+          currentUser: { email: 'admin@test.com', name: 'Admin' },
+          groups: [{ id: 'g1', members: [{ email: 'admin@test.com', name: 'Admin', role: 'admin' }, { email: 'debtor@test.com', name: 'Debtor', role: 'member' }] }],
+          expenses: [{
+            groupId: 'g1',
+            amount: 1000,
+            paidByEmail: 'admin@test.com',
+            paidByName: 'Admin',
+            splits: [
+              { memberEmail: 'admin@test.com', memberName: 'Admin', amount: 500 },
+              { memberEmail: 'debtor@test.com', memberName: 'Debtor', amount: 500 }
+            ]
+          }],
+          settlements: [{
+            id: 's1',
+            groupId: 'g1',
+            fromEmail: 'debtor@test.com',
+            fromName: 'Debtor',
+            toEmail: 'admin@test.com',
+            toName: 'Admin',
+            amount: 500,
+            status: 'pending_admin_approval'
+          }]
+        };
+        const pre = computeBalancesAndSimplifications('g1', mockState);
+        if (pre.isFullyClosed || !pre.simplified[0].isPendingApproval || pre.simplified[0].pendingApprovalAmount !== 500) {
+          throw new Error('Pending settlement should keep debt open awaiting admin');
+        }
+        // Transition to confirmed
+        mockState.settlements[0].status = 'confirmed';
+        const post = computeBalancesAndSimplifications('g1', mockState);
+        if (!post.isFullyClosed || post.simplified.length !== 0) {
+          throw new Error('Confirmed settlement should fully close debt');
+        }
+        return 'Handshake verified: pending keeps debt open; confirmed closes debt';
       });
 
       // --- 7 UI E2E & DOM INSTRUMENTATION TESTS ---
@@ -3261,6 +3588,8 @@ exec node server.js`
       window.promptTransferAdmin = promptTransferAdmin;
       window.handleTransferAdmin = handleTransferAdmin;
       window.toggleGroupSplitVisibility = toggleGroupSplitVisibility;
+      window.handleConfirmSettlement = handleConfirmSettlement;
+      window.handleRejectSettlement = handleRejectSettlement;
     }
 
     window.onload = async function () {

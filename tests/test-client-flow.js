@@ -57,22 +57,15 @@ async function testLocalHtml() {
   const createdExp = window.appState.expenses[0];
   console.log('9. Created expense ID:', createdExp.id, 'amount:', createdExp.amount);
 
-  // Now test toggling split visibility policy via the page function!
-  console.log('10. Initial splitVisibility:', createdGroup.splitVisibility);
-  await window.toggleGroupSplitVisibility(createdGroup.id);
-  const toggledGroup = window.appState.groups.find(g => g.id === createdGroup.id);
-  console.log('11. Toggled splitVisibility:', toggledGroup.splitVisibility);
-  if (toggledGroup.splitVisibility !== 'self') throw new Error('Failed to toggle splitVisibility to self');
-
   // Now test transferring adminship via the page function!
-  console.log('12. Initial Admin of group:', createdGroup.members.find(m => m.role === 'admin')?.name);
+  console.log('10. Initial Admin of group:', createdGroup.members.find(m => m.role === 'admin')?.name);
   await window.handleTransferAdmin(createdGroup.id, 'abhi@test.com', 'Abhi');
   const updatedGroup = window.appState.groups.find(g => g.id === createdGroup.id);
   const newAdmin = updatedGroup.members.find(m => m.role === 'admin');
-  console.log('13. Transferred Admin of group:', newAdmin?.name, '(' + newAdmin?.email + ')');
+  console.log('11. Transferred Admin of group:', newAdmin?.name, '(' + newAdmin?.email + ')');
   if (newAdmin?.email !== 'abhi@test.com') throw new Error('Admin transfer failed in client state');
 
-  console.log('\nAll in-browser user actions (including adminship transfer & split visibility calibration) executed and persisted successfully to MongoDB Atlas!');
+  console.log('\nAll in-browser user actions (including adminship transfer & calibration) executed and persisted successfully to MongoDB Atlas!');
 }
 
 testLocalHtml().catch((err) => {

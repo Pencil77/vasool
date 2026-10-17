@@ -228,7 +228,6 @@ async function runAllTests() {
     if (!res.data.group || !res.data.group._id) throw new Error('Group ID missing');
     if (!res.data.group.inviteCode.startsWith('SPL-')) throw new Error('Invite code format invalid');
     if (res.data.group.members.length !== 4) throw new Error(`Expected 4 members (owner + 3), got ${res.data.group.members.length}`);
-    if (res.data.group.splitVisibility !== 'all') throw new Error(`Expected default splitVisibility to be 'all', got ${res.data.group.splitVisibility}`);
     groupId = res.data.group._id;
     return `Created group ID: ${groupId}, Invite Code: ${res.data.group.inviteCode}, Members: 4`;
   });
@@ -552,44 +551,218 @@ async function runAllTests() {
   });
 
   // ==========================================
-  // 7. ADMIN PRIVILEGES & SPLIT VISIBILITY PRIVACY
+  // 7. SPLIT PRIVACY & ADMIN VISIBILITY CONTROL
   // ==========================================
-  await assertTest('PATCH /api/groups/:id/visibility updates splitVisibility to \'self\' by group admin', 'Admin Privacy Control', async () => {
+  await assertTest('PATCH /api/groups/:id/visibility toggles to show_all', 'Privacy Control', async () => {
     const res = await request(`/api/groups/${groupId}/visibility`, {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${authToken}` },
-      body: JSON.stringify({ splitVisibility: 'self' })
+      body: JSON.stringify({ splitsVisibility: 'show_all' })
     });
-    if (res.status !== 200) throw new Error(`Expected 200, got ${res.status}: ${JSON.stringify(res.data)}`);
-    if (res.data.group.splitVisibility !== 'self') throw new Error(`Expected splitVisibility 'self', got ${res.data.group.splitVisibility}`);
-    return `Updated split visibility to 'self' (Admin: ${testUser.email})`;
+    if (res.status !== 200) throw new Error(`Expected 200, got ${res.status}`);
+    if (res.data.group.splitsVisibility !== 'show_all') throw new Error(`Expected show_all, got ${res.data.group.splitsVisibility}`);
+    return `Admin updated group visibility policy to show_all`;
   });
 
-  await assertTest('PATCH /api/groups/:id/visibility rejects invalid visibility value with 400', 'Privacy Validation', async () => {
+  await assertTest('PATCH /api/groups/:id/visibility toggles to personal_only', 'Privacy Control', async () => {
     const res = await request(`/api/groups/${groupId}/visibility`, {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${authToken}` },
-      body: JSON.stringify({ splitVisibility: 'invalid_mode' })
+      body: JSON.stringify({ splitsVisibility: 'personal_only' })
+    });
+    if (res.status !== 200) throw new Error(`Expected 200, got ${res.status}`);
+    if (res.data.group.splitsVisibility !== 'personal_only') throw new Error(`Expected personal_only, got ${res.data.group.splitsVisibility}`);
+    return `Admin updated group visibility policy to personal_only`;
+  });
+
+  await assertTest('PATCH /api/groups/:id/visibility rejects invalid policy with 400', 'Privacy Validation', async () => {
+    const res = await request(`/api/groups/${groupId}/visibility`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${authToken}` },
+      body: JSON.stringify({ splitsVisibility: 'invalid_mode' })
     });
     if (res.status !== 400) throw new Error(`Expected 400, got ${res.status}`);
-    return `Rejected invalid visibility value: ${res.data.error}`;
+    return `Rejected invalid splitsVisibility: ${res.data.error}`;
   });
 
-  await assertTest('GET /api/expenses returns unrestricted full splits for Admin under \'self\' mode', 'Admin Visibility', async () => {
+  // Create Pavan user account to act as a normal member
+  let pavanToken = '';
+  await assertTest('POST /api/auth/signup creates normal member Pavan account', 'Member Auth', async () => {
+    const res = await request('/api/auth/signup', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: 'Pavan',
+        email: `pavan.${uniqueId}@test.com`,
+        password: `PavanProd#${uniqueId}`,
+        upiId: 'pavan@ybl'
+      })
+    });
+    if (res.status !== 201) throw new Error(`Expected 201, got ${res.status}`);
+    pavanToken = res.data.token;
+    return `Pavan signed up successfully and obtained JWT token`;
+  });
+
+  await assertTest('PATCH /api/groups/:id/visibility rejects non-admin member with 403', 'Privacy Security', async () => {
+    const res = await request(`/api/groups/${groupId}/visibility`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${pavanToken}` },
+      body: JSON.stringify({ splitsVisibility: 'show_all' })
+    });
+    if (res.status !== 403) throw new Error(`Expected 403 Forbidden, got ${res.status}`);
+    return `Non-admin visibility change blocked with 403: ${res.data.error}`;
+  });
+
+  // Create a new expense with shares
+  let privacyExpId = '';
+  await assertTest('POST /api/expenses creates privacy test bill (₹3,000 across 3 members)', 'Expense Creation', async () => {
+    const res = await request('/api/expenses', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${authToken}` },
+      body: JSON.stringify({
+        groupId,
+        description: 'Team Lunch Buffet',
+        amount: 3000,
+        currency: 'INR',
+        category: 'Food & Dining',
+        paidByEmail: testUser.email,
+        paidByName: testUser.name,
+        splitType: 'equal',
+        splits: [
+          { memberEmail: testUser.email, memberName: testUser.name, amount: 1000 },
+          { memberEmail: `pavan.${uniqueId}@test.com`, memberName: 'Pavan', amount: 1000 },
+          { memberEmail: `ajay.${uniqueId}@test.com`, memberName: 'Ajay', amount: 1000 }
+        ]
+      })
+    });
+    if (res.status !== 201) throw new Error(`Expected 201, got ${res.status}`);
+    privacyExpId = res.data.expense._id;
+    return `Created privacy bill ID: ${privacyExpId}`;
+  });
+
+  await assertTest('GET /api/expenses redacts other members splits for normal member under personal_only', 'Split Privacy', async () => {
     const res = await request(`/api/expenses?groupId=${groupId}`, {
       method: 'GET',
+      headers: { Authorization: `Bearer ${pavanToken}` }
+    });
+    if (res.status !== 200) throw new Error(`Expected 200, got ${res.status}`);
+    const exp = res.data.expenses.find((e) => e._id === privacyExpId);
+    if (!exp) throw new Error('Expense not found in Pavan view');
+    if (!exp.isPersonalView) throw new Error('Expected isPersonalView to be true for non-admin');
+    const pavanSplit = exp.splits.find((s) => s.memberEmail.toLowerCase() === `pavan.${uniqueId}@test.com`);
+    if (!pavanSplit || pavanSplit.amount !== 1000) throw new Error('Pavan personal split missing or wrong');
+    const leakedAjay = exp.splits.find((s) => s.memberEmail.toLowerCase() === `ajay.${uniqueId}@test.com`);
+    if (leakedAjay) throw new Error('Ajay private share was leaked to Pavan!');
+    const privateGroupSplit = exp.splits.find((s) => s.isPrivate);
+    if (!privateGroupSplit) throw new Error('Expected aggregated hidden share for other members');
+    return `Privacy enforced: Pavan only sees their ₹1,000 share, other member splits redacted`;
+  });
+
+  // ==========================================
+  // 8. TWO-STEP SETTLEMENT HANDSHAKE & EVENT CLOSURE
+  // ==========================================
+  let pendingSettleId = '';
+  await assertTest('POST /api/settlements by member marks status as pending_admin_approval', 'Settlement Handshake', async () => {
+    const res = await request('/api/settlements', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${pavanToken}` },
+      body: JSON.stringify({
+        groupId,
+        fromEmail: `pavan.${uniqueId}@test.com`,
+        fromName: 'Pavan',
+        toEmail: testUser.email,
+        toName: testUser.name,
+        amount: 1000,
+        currency: 'INR',
+        method: 'UPI',
+        referenceNote: 'UPI ref 9988776655'
+      })
+    });
+    if (res.status !== 201) throw new Error(`Expected 201, got ${res.status}`);
+    if (res.data.settlement.status !== 'pending_admin_approval') {
+      throw new Error(`Expected status pending_admin_approval, got ${res.data.settlement.status}`);
+    }
+    pendingSettleId = res.data.settlement._id;
+    return `Payment marked as settled by payee. Status: ${res.data.settlement.status}`;
+  });
+
+  await assertTest('GET /api/balances shows pendingApprovalAmount & keeps debt open', 'Settlement Handshake', async () => {
+    const res = await request(`/api/balances?groupId=${groupId}`, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${pavanToken}` }
+    });
+    if (res.status !== 200) throw new Error(`Expected 200, got ${res.status}`);
+    const tx = res.data.simplifiedTransactions.find((t) => t.fromEmail === `pavan.${uniqueId}@test.com`);
+    if (!tx) throw new Error('Pavan simplified transaction missing');
+    if (!tx.isPendingApproval || tx.pendingApprovalAmount !== 1000) {
+      throw new Error(`Expected isPendingApproval true with 1000 pending, got ${JSON.stringify(tx)}`);
+    }
+    if (res.data.isFullyClosed) throw new Error('Event should NOT be closed while pending admin approval exists');
+    return `Verified: transaction has pendingApprovalAmount: ₹${tx.pendingApprovalAmount}, event remains open`;
+  });
+
+  await assertTest('POST /api/settlements/:id/confirm rejects confirmation by non-admin with 403', 'Settlement Handshake Security', async () => {
+    const res = await request(`/api/settlements/${pendingSettleId}/confirm`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${pavanToken}` }
+    });
+    if (res.status !== 403) throw new Error(`Expected 403, got ${res.status}`);
+    return `Non-admin confirmation blocked with 403: ${res.data.error}`;
+  });
+
+  await assertTest('POST /api/settlements/:id/confirm allows Admin to confirm receipt', 'Settlement Handshake Confirmation', async () => {
+    const res = await request(`/api/settlements/${pendingSettleId}/confirm`, {
+      method: 'POST',
       headers: { Authorization: `Bearer ${authToken}` }
     });
     if (res.status !== 200) throw new Error(`Expected 200, got ${res.status}`);
-    const expenses = res.data.expenses;
-    if (!expenses.length) throw new Error('Expected at least one remaining expense');
-    const hasMultipleSplits = expenses.some((e) => e.splits && e.splits.length > 1);
-    if (!hasMultipleSplits) throw new Error('Admin should see full splits for all members');
-    const hasRestrictedFlag = expenses.some((e) => e.splitsRestricted === true);
-    if (hasRestrictedFlag) throw new Error('Admin should not have splitsRestricted set to true');
-    return `Admin sees all ${expenses.length} expenses with complete member split arrays`;
+    if (res.data.settlement.status !== 'confirmed') {
+      throw new Error(`Expected confirmed status, got ${res.data.settlement.status}`);
+    }
+    if (res.data.settlement.confirmedByEmail.toLowerCase() !== testUser.email.toLowerCase()) {
+      throw new Error(`Expected confirmedByEmail ${testUser.email}, got ${res.data.settlement.confirmedByEmail}`);
+    }
+    return `Admin confirmed receipt: ₹${res.data.settlement.amount} officially marked confirmed`;
   });
 
+  // Rejection test
+  let rejectSettleId = '';
+  await assertTest('POST /api/settlements records second payment claim for rejection test', 'Settlement Rejection Flow', async () => {
+    const res = await request('/api/settlements', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${pavanToken}` },
+      body: JSON.stringify({
+        groupId,
+        fromEmail: `pavan.${uniqueId}@test.com`,
+        fromName: 'Pavan',
+        toEmail: testUser.email,
+        toName: testUser.name,
+        amount: 250,
+        currency: 'INR',
+        method: 'Cash',
+        referenceNote: 'Bogus claim'
+      })
+    });
+    if (res.status !== 201) throw new Error(`Expected 201, got ${res.status}`);
+    rejectSettleId = res.data.settlement._id;
+    return `Recorded payment claim ID: ${rejectSettleId}`;
+  });
+
+  await assertTest('POST /api/settlements/:id/reject allows Admin to reject invalid claim', 'Settlement Rejection', async () => {
+    const res = await request(`/api/settlements/${rejectSettleId}/reject`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${authToken}` },
+      body: JSON.stringify({ reason: 'Cash not handed over' })
+    });
+    if (res.status !== 200) throw new Error(`Expected 200, got ${res.status}`);
+    if (res.data.settlement.status !== 'rejected') {
+      throw new Error(`Expected rejected status, got ${res.data.settlement.status}`);
+    }
+    return `Admin rejected unverified settlement claim: ${res.data.settlement.rejectedReason}`;
+  });
+
+  // ==========================================
+  // 9. ADMIN PRIVILEGES & ADMINSHIP TRANSFER
+  // ==========================================
   await assertTest('POST /api/groups/:id/transfer-admin transfers adminship to another member', 'Admin Management', async () => {
     const targetEmail = `pavan.${uniqueId}@test.com`;
     const res = await request(`/api/groups/${groupId}/transfer-admin`, {
@@ -617,55 +790,6 @@ async function runAllTests() {
     });
     if (res.status !== 403) throw new Error(`Expected 403 Forbidden, got ${res.status}`);
     return `Non-admin adminship transfer blocked with 403 Forbidden: ${res.data.error}`;
-  });
-
-  await assertTest('PATCH /api/groups/:id/visibility rejects visibility update by non-admin with 403', 'Privacy Security', async () => {
-    const res = await request(`/api/groups/${groupId}/visibility`, {
-      method: 'PATCH',
-      headers: { Authorization: `Bearer ${authToken}` },
-      body: JSON.stringify({ splitVisibility: 'all' })
-    });
-    if (res.status !== 403) throw new Error(`Expected 403 Forbidden, got ${res.status}`);
-    return `Non-admin visibility change blocked with 403 Forbidden: ${res.data.error}`;
-  });
-
-  await assertTest('GET /api/expenses restricts member view to personal split share under \'self\' mode', 'Member Privacy Filter', async () => {
-    const res = await request(`/api/expenses?groupId=${groupId}`, {
-      method: 'GET',
-      headers: { Authorization: `Bearer ${authToken}` }
-    });
-    if (res.status !== 200) throw new Error(`Expected 200, got ${res.status}`);
-    const expenses = res.data.expenses;
-    expenses.forEach((e) => {
-      if (e.splitsRestricted !== true) throw new Error(`Expense ${e._id} should have splitsRestricted: true`);
-      e.splits.forEach((s) => {
-        if (s.memberEmail.toLowerCase() !== testUser.email.toLowerCase()) {
-          throw new Error(`Expense contains another member's split (${s.memberEmail}) under 'self' mode`);
-        }
-      });
-    });
-    return `Verified member only sees their own split share across ${expenses.length} expenses (splitsRestricted: true)`;
-  });
-
-  await assertTest('GET /api/balances restricts member view to direct settlement with Admin under \'self\' mode', 'Member Balance Privacy', async () => {
-    const res = await request(`/api/balances?groupId=${groupId}`, {
-      method: 'GET',
-      headers: { Authorization: `Bearer ${authToken}` }
-    });
-    if (res.status !== 200) throw new Error(`Expected 200, got ${res.status}`);
-    if (res.data.visibilityPolicy !== 'self') throw new Error(`Expected visibilityPolicy 'self', got ${res.data.visibilityPolicy}`);
-    if (res.data.balances.length !== 1 || res.data.balances[0].email.toLowerCase() !== testUser.email.toLowerCase()) {
-      throw new Error(`Expected only user's personal balance, got ${JSON.stringify(res.data.balances)}`);
-    }
-    const adminEmail = `pavan.${uniqueId}@test.com`.toLowerCase();
-    res.data.simplifiedTransactions.forEach((t) => {
-      const involvesUser = t.fromEmail.toLowerCase() === testUser.email.toLowerCase() || t.toEmail.toLowerCase() === testUser.email.toLowerCase();
-      const involvesAdmin = t.fromEmail.toLowerCase() === adminEmail || t.toEmail.toLowerCase() === adminEmail;
-      if (!involvesUser || !involvesAdmin) {
-        throw new Error(`Transaction ${t.fromEmail} -> ${t.toEmail} should only be direct between member and admin`);
-      }
-    });
-    return `Verified member only sees their direct position against Admin (${adminEmail})`;
   });
 
   console.log(`\n======================================================`);

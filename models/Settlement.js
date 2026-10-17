@@ -11,6 +11,14 @@ const SettlementSchema = new mongoose.Schema(
     currency: { type: String, default: 'INR' },
     method: { type: String, enum: ['UPI', 'Amazon Pay', 'Bank Transfer', 'Cash'], default: 'UPI' },
     referenceNote: { type: String, default: '' },
+    status: {
+      type: String,
+      enum: ['pending_admin_approval', 'confirmed', 'rejected'],
+      default: 'pending_admin_approval'
+    },
+    confirmedAt: { type: Date, default: null },
+    confirmedByEmail: { type: String, lowercase: true, default: null },
+    rejectedReason: { type: String, default: '' },
     settledAt: { type: Date, default: Date.now }
   },
   { timestamps: true }

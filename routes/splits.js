@@ -129,7 +129,7 @@ router.get('/groups', requireAuth, async (req, res) => {
 router.post('/groups', requireAuth, async (req, res) => {
   try {
     await connectToDatabase();
-    const { name, description, category, currency, members = [] } = req.body;
+    const { name, description, category, currency, members = [], splitsVisibility = 'personal_only' } = req.body;
     if (!name) {
       return res.status(400).json({ error: 'Group name is required.' });
     }
@@ -166,6 +166,7 @@ router.post('/groups', requireAuth, async (req, res) => {
       inviteCode,
       createdByEmail: normalizedCreator.email,
       adminEmail: normalizedCreator.email,
+      splitsVisibility: splitsVisibility || 'personal_only',
       members: finalMembers
     });
 
@@ -231,6 +232,42 @@ router.post('/groups/:id/transfer-admin', requireAuth, async (req, res) => {
   }
 });
 
+// PATCH /api/groups/:id/visibility - Update group splits visibility setting (Admin only)
+router.patch('/groups/:id/visibility', requireAuth, async (req, res) => {
+  try {
+    await connectToDatabase();
+    const { splitsVisibility } = req.body;
+    if (!['personal_only', 'show_all'].includes(splitsVisibility)) {
+      return res.status(400).json({ error: "splitsVisibility must be 'personal_only' or 'show_all'." });
+    }
+
+    const group = await Group.findById(req.params.id);
+    if (!group) {
+      return res.status(404).json({ error: 'Group not found.' });
+    }
+
+    const requesterEmail = req.user.email.toLowerCase().trim();
+    const currentAdmin = group.members.find((m) => m.role === 'admin') ||
+      (group.adminEmail ? group.members.find((m) => m.email.toLowerCase() === group.adminEmail.toLowerCase()) : null) ||
+      group.members[0];
+
+    const isCurrentAdmin = currentAdmin && currentAdmin.email.toLowerCase().trim() === requesterEmail;
+    if (!isCurrentAdmin) {
+      return res.status(403).json({ error: 'Only the group admin can change group splits visibility.' });
+    }
+
+    group.splitsVisibility = splitsVisibility;
+    await group.save();
+
+    return res.status(200).json({
+      message: `Group splits visibility updated to ${splitsVisibility}.`,
+      group
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/groups/:id/members - Add a member to a group
 router.post('/groups/:id/members', requireAuth, async (req, res) => {
   try {
@@ -257,86 +294,69 @@ router.post('/groups/:id/members', requireAuth, async (req, res) => {
   }
 });
 
-// PATCH /api/groups/:id/visibility - Update group split visibility policy (admin-only)
-router.patch('/groups/:id/visibility', requireAuth, async (req, res) => {
-  try {
-    await connectToDatabase();
-    const { splitVisibility } = req.body;
-    if (!['all', 'self'].includes(splitVisibility)) {
-      return res.status(400).json({ error: "splitVisibility must be 'all' or 'self'." });
-    }
-
-    const group = await Group.findById(req.params.id);
-    if (!group) {
-      return res.status(404).json({ error: 'Group not found.' });
-    }
-
-    const requesterEmail = req.user.email.toLowerCase().trim();
-    const currentAdmin = group.members.find((m) => m.role === 'admin') ||
-      (group.adminEmail ? group.members.find((m) => m.email.toLowerCase() === group.adminEmail.toLowerCase()) : null) ||
-      group.members.find((m) => m.role === 'owner') ||
-      group.members[0];
-
-    const isCurrentAdmin = currentAdmin && currentAdmin.email.toLowerCase().trim() === requesterEmail;
-    if (!isCurrentAdmin) {
-      return res.status(403).json({ error: 'Only the current group admin can control split visibility.' });
-    }
-
-    group.splitVisibility = splitVisibility;
-    await group.save();
-
-    return res.status(200).json({
-      message: `Group split visibility updated to '${splitVisibility}'.`,
-      group
-    });
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
-});
-
-// GET /api/expenses - List expenses (optionally filtered by groupId, with splitVisibility policy applied)
+// GET /api/expenses - List expenses (optionally filtered by groupId)
 router.get('/expenses', requireAuth, async (req, res) => {
   try {
     await connectToDatabase();
     const filter = {};
+    const userGroups = await Group.find({ 'members.email': req.user.email });
+    const userGroupIds = userGroups.map((g) => g._id.toString());
+
     if (req.query.groupId) {
+      if (!userGroupIds.includes(String(req.query.groupId))) {
+        return res.status(403).json({ error: 'Access denied to this group expenses.' });
+      }
       filter.groupId = req.query.groupId;
     } else {
-      const userGroups = await Group.find({ 'members.email': req.user.email }, { _id: 1 });
       filter.groupId = { $in: userGroups.map((g) => g._id) };
     }
 
-    const requesterEmail = req.user.email.toLowerCase().trim();
-    const groups = await Group.find(filter.groupId ? { _id: filter.groupId } : { 'members.email': req.user.email });
-    const groupPolicyMap = {};
+    const expenses = await Expense.find(filter).sort({ expenseDate: -1, createdAt: -1 });
 
-    groups.forEach((g) => {
+    const groupMap = {};
+    userGroups.forEach((g) => {
+      groupMap[g._id.toString()] = g;
+    });
+
+    const requesterEmail = req.user.email.toLowerCase().trim();
+
+    // Privacy filter: if group has splitsVisibility === 'personal_only' and user is not admin,
+    // normal users can only see their own part of the share, not others
+    const sanitizedExpenses = expenses.map((exp) => {
+      const g = groupMap[exp.groupId.toString()];
+      if (!g) return exp;
+
       const adminMember = g.members.find((m) => m.role === 'admin') ||
         (g.adminEmail ? g.members.find((m) => m.email.toLowerCase() === g.adminEmail.toLowerCase()) : null) ||
-        g.members?.find((m) => m.role === 'owner') ||
         g.members[0];
 
       const isAdmin = adminMember && adminMember.email.toLowerCase().trim() === requesterEmail;
-      groupPolicyMap[String(g._id)] = {
-        splitVisibility: g.splitVisibility || 'all',
-        isAdmin
-      };
-    });
+      const isPersonalOnly = (g.splitsVisibility || 'personal_only') === 'personal_only';
 
-    const expenses = await Expense.find(filter).sort({ expenseDate: -1, createdAt: -1 });
+      if (isPersonalOnly && !isAdmin) {
+        // Redact other members' split shares, only show requester's share
+        const mySplit = exp.splits.find((s) => s.memberEmail.toLowerCase() === requesterEmail);
+        const otherSum = exp.splits
+          .filter((s) => s.memberEmail.toLowerCase() !== requesterEmail)
+          .reduce((acc, s) => acc + s.amount, 0);
 
-    const sanitizedExpenses = expenses.map((exp) => {
-      const policy = groupPolicyMap[String(exp.groupId)];
-      if (policy && policy.splitVisibility === 'self' && !policy.isAdmin) {
-        // Normal user only sees their own split share
-        const obj = exp.toObject ? exp.toObject() : { ...exp };
-        const mySplits = (obj.splits || []).filter(
-          (s) => s.memberEmail.toLowerCase() === requesterEmail
-        );
-        obj.splits = mySplits;
-        obj.splitsRestricted = true;
-        return obj;
+        const visibleSplits = [];
+        if (mySplit) visibleSplits.push(mySplit);
+        if (otherSum > 0) {
+          visibleSplits.push({
+            memberEmail: 'private@group',
+            memberName: 'Other Members (Hidden by Admin)',
+            amount: Math.round(otherSum * 100) / 100,
+            isPrivate: true
+          });
+        }
+
+        const expObj = exp.toObject ? exp.toObject() : { ...exp };
+        expObj.splits = visibleSplits;
+        expObj.isPersonalView = true;
+        return expObj;
       }
+
       return exp;
     });
 
@@ -440,16 +460,21 @@ router.get('/balances', requireAuth, async (req, res) => {
     });
 
     settlements.forEach((st) => {
-      const payer = ensureMember(st.fromEmail, st.fromName);
-      const receiver = ensureMember(st.toEmail, st.toName);
-      payer.net += st.amount;
-      receiver.net -= st.amount;
+      // Handshake rule: Only CONFIRMED settlements reduce net debt balances!
+      if (st.status === 'confirmed') {
+        const payer = ensureMember(st.fromEmail, st.fromName);
+        const receiver = ensureMember(st.toEmail, st.toName);
+        payer.net += st.amount;
+        receiver.net -= st.amount;
+      }
     });
 
     let simplifiedTransactions = [];
     if (groups.length === 1) {
       const g = groups[0];
-      const adminMember = g.members.find((m) => m.role === 'admin' || m.role === 'owner') || g.members[0];
+      const adminMember = g.members.find((m) => m.role === 'admin') ||
+        (g.adminEmail ? g.members.find((m) => m.email.toLowerCase() === g.adminEmail.toLowerCase()) : null) ||
+        g.members[0];
       simplifiedTransactions = simplifyDebtsAdminHub(balanceMap, adminMember);
     } else if (groups.length > 1) {
       // Calculate Admin-Hub transactions for each group
@@ -480,56 +505,76 @@ router.get('/balances', requireAuth, async (req, res) => {
         });
 
         grpSettlements.forEach((st) => {
-          const payer = ensureGroupMember(st.fromEmail, st.fromName);
-          const receiver = ensureGroupMember(st.toEmail, st.toName);
-          payer.net += st.amount;
-          receiver.net -= st.amount;
+          if (st.status === 'confirmed') {
+            const payer = ensureGroupMember(st.fromEmail, st.fromName);
+            const receiver = ensureGroupMember(st.toEmail, st.toName);
+            payer.net += st.amount;
+            receiver.net -= st.amount;
+          }
         });
 
-        const adminMember = g.members.find((m) => m.role === 'admin' || m.role === 'owner') || g.members[0];
+        const adminMember = g.members.find((m) => m.role === 'admin') ||
+          (g.adminEmail ? g.members.find((m) => m.email.toLowerCase() === g.adminEmail.toLowerCase()) : null) ||
+          g.members[0];
         simplifiedTransactions.push(...simplifyDebtsAdminHub(groupBalanceMap, adminMember));
       });
     } else {
       simplifiedTransactions = simplifyDebtsGreedy(balanceMap);
     }
 
+    // Attach pending approval amounts to transactions
+    const pendingSettlements = settlements.filter((s) => s.status === 'pending_admin_approval');
+    const pendingMap = {};
+    pendingSettlements.forEach((s) => {
+      const key = `${s.fromEmail}->${s.toEmail}`;
+      pendingMap[key] = (pendingMap[key] || 0) + s.amount;
+    });
+
+    simplifiedTransactions.forEach((t) => {
+      const key = `${t.fromEmail}->${t.toEmail}`;
+      t.pendingApprovalAmount = Math.round((pendingMap[key] || 0) * 100) / 100;
+      t.isPendingApproval = t.pendingApprovalAmount > 0;
+      t.remainingDue = Math.max(0, Math.round((t.amount - t.pendingApprovalAmount) * 100) / 100);
+    });
+
     const requesterEmail = req.user.email.toLowerCase().trim();
+    let balances = Object.values(balanceMap);
 
-    // Check if single group has splitVisibility === 'self' and requester is not the admin
-    if (groups.length === 1 && groups[0].splitVisibility === 'self') {
-      const g = groups[0];
-      const adminMember = g.members.find((m) => m.role === 'admin') ||
+    // Privacy rule: If group is personal_only and user is not admin,
+    // they only see their own part of the share, not others
+    const hasPersonalOnly = groups.some((g) => (g.splitsVisibility || 'personal_only') === 'personal_only');
+    const isRequesterAdmin = groups.some((g) => {
+      const adm = g.members.find((m) => m.role === 'admin') ||
         (g.adminEmail ? g.members.find((m) => m.email.toLowerCase() === g.adminEmail.toLowerCase()) : null) ||
-        g.members?.find((m) => m.role === 'owner') ||
         g.members[0];
+      return adm && adm.email.toLowerCase().trim() === requesterEmail;
+    });
 
-      const isAdmin = adminMember && adminMember.email.toLowerCase().trim() === requesterEmail;
-      if (!isAdmin) {
-        // Non-admin user only sees their own net balance and direct Admin transfer
-        const myBalances = Object.values(balanceMap).filter(
-          (b) => b.email.toLowerCase() === requesterEmail
-        );
-        const myTransactions = simplifiedTransactions.filter(
-          (t) => t.fromEmail.toLowerCase() === requesterEmail || t.toEmail.toLowerCase() === requesterEmail
-        );
-        const mySettlements = settlements.filter(
-          (s) => s.fromEmail.toLowerCase() === requesterEmail || s.toEmail.toLowerCase() === requesterEmail
-        );
-
-        return res.status(200).json({
-          balances: myBalances,
-          simplifiedTransactions: myTransactions,
-          settlements: mySettlements,
-          visibilityPolicy: 'self',
-          adminInfo: { name: adminMember.name, email: adminMember.email }
-        });
-      }
+    if (hasPersonalOnly && !isRequesterAdmin) {
+      simplifiedTransactions = simplifiedTransactions.filter(
+        (t) => t.fromEmail.toLowerCase() === requesterEmail || t.toEmail.toLowerCase() === requesterEmail
+      );
+      const adminEmails = new Set(
+        groups.map((g) => {
+          const adm = g.members.find((m) => m.role === 'admin') ||
+            (g.adminEmail ? g.members.find((m) => m.email.toLowerCase() === g.adminEmail.toLowerCase()) : null) ||
+            g.members[0];
+          return adm ? adm.email.toLowerCase().trim() : '';
+        })
+      );
+      balances = balances.filter(
+        (b) => b.email.toLowerCase() === requesterEmail || adminEmails.has(b.email.toLowerCase())
+      );
     }
 
+    const isFullyClosed = simplifiedTransactions.length === 0 && pendingSettlements.length === 0;
+
     return res.status(200).json({
-      balances: Object.values(balanceMap),
+      balances,
       simplifiedTransactions,
-      settlements
+      settlements,
+      pendingSettlements,
+      isFullyClosed
     });
   } catch (err) {
     return res.status(500).json({ error: err.message });
@@ -545,6 +590,24 @@ router.post('/settlements', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Valid groupId, payer, recipient, and amount are required.' });
     }
 
+    const group = await Group.findById(groupId);
+    if (!group) {
+      return res.status(404).json({ error: 'Group not found.' });
+    }
+
+    const requesterEmail = req.user.email.toLowerCase().trim();
+    const adminMember = group.members.find((m) => m.role === 'admin') ||
+      (group.adminEmail ? group.members.find((m) => m.email.toLowerCase() === group.adminEmail.toLowerCase()) : null) ||
+      group.members[0];
+
+    const isAdmin = adminMember && adminMember.email.toLowerCase().trim() === requesterEmail;
+
+    // Handshake: payee marks as settled -> pending_admin_approval
+    // If admin is creating or confirming directly -> confirmed
+    const status = isAdmin ? 'confirmed' : 'pending_admin_approval';
+    const confirmedAt = isAdmin ? new Date() : null;
+    const confirmedByEmail = isAdmin ? requesterEmail : null;
+
     const settlement = await Settlement.create({
       groupId,
       fromEmail: String(fromEmail).toLowerCase().trim(),
@@ -554,10 +617,89 @@ router.post('/settlements', requireAuth, async (req, res) => {
       amount: Math.round(Number(amount) * 100) / 100,
       currency: currency || 'INR',
       method: method || 'UPI',
-      referenceNote: referenceNote || ''
+      referenceNote: referenceNote || '',
+      status,
+      confirmedAt,
+      confirmedByEmail
     });
 
-    return res.status(201).json({ settlement });
+    const message = isAdmin
+      ? 'Settlement recorded and confirmed by admin.'
+      : 'Payment marked as settled by payee. Awaiting admin confirmation.';
+
+    return res.status(201).json({ settlement, message });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/settlements/:id/confirm - Admin confirms receipt of payment
+router.post('/settlements/:id/confirm', requireAuth, async (req, res) => {
+  try {
+    await connectToDatabase();
+    const settlement = await Settlement.findById(req.params.id);
+    if (!settlement) {
+      return res.status(404).json({ error: 'Settlement not found.' });
+    }
+
+    const group = await Group.findById(settlement.groupId);
+    if (!group) {
+      return res.status(404).json({ error: 'Group not found.' });
+    }
+
+    const requesterEmail = req.user.email.toLowerCase().trim();
+    const adminMember = group.members.find((m) => m.role === 'admin') ||
+      (group.adminEmail ? group.members.find((m) => m.email.toLowerCase() === group.adminEmail.toLowerCase()) : null) ||
+      group.members[0];
+
+    const isAdmin = adminMember && adminMember.email.toLowerCase().trim() === requesterEmail;
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Only the group admin can confirm payment receipt.' });
+    }
+
+    settlement.status = 'confirmed';
+    settlement.confirmedAt = new Date();
+    settlement.confirmedByEmail = requesterEmail;
+    await settlement.save();
+
+    return res.status(200).json({
+      message: `Payment of ₹${settlement.amount} confirmed by admin. Transaction is now settled.`,
+      settlement
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/settlements/:id/reject - Admin rejects an unconfirmed settlement claim
+router.post('/settlements/:id/reject', requireAuth, async (req, res) => {
+  try {
+    await connectToDatabase();
+    const { reason } = req.body;
+    const settlement = await Settlement.findById(req.params.id);
+    if (!settlement) {
+      return res.status(404).json({ error: 'Settlement not found.' });
+    }
+
+    const group = await Group.findById(settlement.groupId);
+    const requesterEmail = req.user.email.toLowerCase().trim();
+    const adminMember = group.members.find((m) => m.role === 'admin') ||
+      (group.adminEmail ? group.members.find((m) => m.email.toLowerCase() === group.adminEmail.toLowerCase()) : null) ||
+      group.members[0];
+
+    const isAdmin = adminMember && adminMember.email.toLowerCase().trim() === requesterEmail;
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Only the group admin can reject payment claims.' });
+    }
+
+    settlement.status = 'rejected';
+    settlement.rejectedReason = reason || 'Payment not verified by admin.';
+    await settlement.save();
+
+    return res.status(200).json({
+      message: 'Settlement payment claim rejected.',
+      settlement
+    });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
