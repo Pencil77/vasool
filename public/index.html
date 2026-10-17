@@ -958,6 +958,84 @@
         </div>
         <pre id="dbJsonInspector" data-testid="db-json-inspector" class="p-3 rounded-xl bg-slate-950 border border-slate-800 text-[11px] text-emerald-300 font-mono-code max-h-60 overflow-y-auto custom-scroll"></pre>
       </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 7: EMAIL OTP & MAGIC LINK VERIFICATION (BOTTOM SHEET / MODAL)    -->
+  <!-- ===================================================================== -->
+  <div id="emailVerificationModal" data-testid="email-verification-modal" class="fixed inset-0 z-50 hidden bg-slate-950/85 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
+    <div class="glass-panel rounded-t-3xl sm:rounded-2xl max-w-md w-full p-5 sm:p-6 border border-slate-700 shadow-2xl my-0 sm:my-8 space-y-4 max-h-[92vh] sm:max-h-[85vh] overflow-y-auto">
+      <div class="w-12 h-1.5 bg-slate-700/80 rounded-full mx-auto mb-3 sm:hidden"></div>
+      
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+            </svg>
+          </div>
+          <div>
+            <h3 class="text-sm sm:text-base font-bold text-white">Verify Your Email</h3>
+            <p class="text-[11px] text-slate-400">Enter code or click link in email</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeModal('emailVerificationModal')" class="text-slate-400 hover:text-white text-sm px-2">✕</button>
+      </div>
+
+      <div class="space-y-3.5">
+        <p class="text-xs text-slate-300 leading-relaxed">
+          We've sent a 6-digit verification code and a 1-click magic link to:
+          <span id="verifyModalEmailDisplay" class="block font-semibold text-emerald-400 text-sm mt-0.5 break-all"></span>
+        </p>
+
+        <form id="otpVerificationForm" onsubmit="handleOtpVerificationSubmit(event)" class="space-y-3 pt-1">
+          <div>
+            <label for="otpCodeInput" class="block text-xs font-medium text-slate-300 mb-1.5">Enter 6-Digit Code</label>
+            <input
+              id="otpCodeInput"
+              data-testid="input-otp-code"
+              type="text"
+              inputmode="numeric"
+              pattern="[0-9]*"
+              maxlength="6"
+              required
+              placeholder="••••••"
+              class="w-full text-center text-2xl tracking-[10px] sm:tracking-[12px] font-mono-code py-3 px-4 rounded-xl bg-slate-900 border border-slate-700 text-emerald-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+            />
+          </div>
+
+          <button
+            type="submit"
+            id="btnSubmitOtp"
+            data-testid="btn-submit-otp"
+            class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold text-sm shadow-lg shadow-emerald-500/20 transition flex items-center justify-center gap-2"
+          >
+            <span>Verify &amp; Continue</span>
+          </button>
+        </form>
+
+        <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-[11px] text-slate-400 space-y-1">
+          <div class="flex items-center gap-1.5 text-slate-300 font-semibold">
+            <span>✨</span> Magic Link Option
+          </div>
+          <div>You can also open the email on your phone or desktop and click <strong>"Verify Email Address"</strong> to activate instantly.</div>
+        </div>
+
+        <div class="flex items-center justify-between pt-1 text-xs text-slate-400">
+          <span id="otpCountdownTimer">Expires in 15:00</span>
+          <button
+            type="button"
+            id="btnResendOtp"
+            data-testid="btn-resend-otp"
+            onclick="handleResendOtp()"
+            class="text-emerald-400 hover:text-emerald-300 font-semibold hover:underline disabled:text-slate-600 disabled:no-underline"
+          >
+            Resend Code
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- ===================================================================== -->
@@ -987,7 +1065,10 @@
         data = { raw: text };
       }
       if (!res.ok) {
-        throw new Error(data.error || `HTTP ${res.status}: ${res.statusText}`);
+        const err = new Error(data.error || `HTTP ${res.status}: ${res.statusText}`);
+        err.data = data;
+        err.status = res.status;
+        throw err;
       }
       return data;
     }
@@ -1709,17 +1790,12 @@ exec node server.js`
         showToast(`Welcome back, ${res.user.name}!`);
         await syncWithBackend();
       } catch (err) {
-        // Fallback for demo mode if backend is not reachable
-        let user = appState.users.find((u) => u.email.toLowerCase() === email);
-        if (user && user.passwordHash === password) {
-          appState.currentUser = user;
-          showingAuthPortal = false;
-          saveState();
-          refreshAllViews();
-          showToast(`Logged in as ${user.name} (Demo Mode).`);
-        } else {
-          showToast(err.message || 'Login failed.', 'error');
+        if (err.data && err.data.requiresVerification) {
+          openEmailVerificationModal(err.data.email || email);
+          showToast(err.message || 'Please verify your email address to continue.', 'info');
+          return;
         }
+        showToast(err.message || 'Login failed.', 'error');
       } finally {
         if (submitBtn) {
           submitBtn.disabled = false;
@@ -1753,36 +1829,209 @@ exec node server.js`
           body: JSON.stringify({ name, email, password, upiId })
         });
 
+        if (res.requiresVerification) {
+          openEmailVerificationModal(res.email || email);
+          showToast(res.message || 'Verification email sent! Check your inbox.');
+          return;
+        }
+
+        if (res.token && res.user) {
+          localStorage.setItem(AUTH_TOKEN_KEY, res.token);
+          appState.currentUser = res.user;
+          if (!appState.users.some((u) => u.email === res.user.email)) {
+            appState.users.push(res.user);
+          }
+          showingAuthPortal = false;
+          saveState();
+          refreshAllViews();
+          showToast(res.message || `Account created for ${name}! Welcome to Vasool.`);
+          await syncWithBackend();
+        }
+      } catch (err) {
+        showToast(err.message || 'Signup failed.', 'error');
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalText;
+        }
+      }
+    }
+
+    let pendingVerificationEmail = '';
+    let otpTimerInterval = null;
+    let otpSecondsLeft = 900;
+    let resendCooldownSeconds = 0;
+    let resendCooldownInterval = null;
+
+    function openEmailVerificationModal(email) {
+      pendingVerificationEmail = email;
+      const display = document.getElementById('verifyModalEmailDisplay');
+      if (display) display.textContent = email;
+
+      const input = document.getElementById('otpCodeInput');
+      if (input) {
+        input.value = '';
+        setTimeout(() => input.focus(), 300);
+      }
+
+      clearInterval(otpTimerInterval);
+      otpSecondsLeft = 900;
+      updateOtpTimerDisplay();
+      otpTimerInterval = setInterval(() => {
+        otpSecondsLeft--;
+        if (otpSecondsLeft <= 0) {
+          clearInterval(otpTimerInterval);
+          const timerEl = document.getElementById('otpCountdownTimer');
+          if (timerEl) timerEl.textContent = 'Code expired';
+        } else {
+          updateOtpTimerDisplay();
+        }
+      }, 1000);
+
+      startResendCooldown(60);
+      openModal('emailVerificationModal');
+    }
+
+    function updateOtpTimerDisplay() {
+      const timerEl = document.getElementById('otpCountdownTimer');
+      if (!timerEl) return;
+      const mins = Math.floor(otpSecondsLeft / 60);
+      const secs = otpSecondsLeft % 60;
+      timerEl.textContent = `Expires in ${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    }
+
+    function startResendCooldown(seconds = 60) {
+      resendCooldownSeconds = seconds;
+      const btn = document.getElementById('btnResendOtp');
+      if (!btn) return;
+      btn.disabled = true;
+
+      clearInterval(resendCooldownInterval);
+      resendCooldownInterval = setInterval(() => {
+        resendCooldownSeconds--;
+        if (resendCooldownSeconds <= 0) {
+          clearInterval(resendCooldownInterval);
+          btn.disabled = false;
+          btn.textContent = 'Resend Code';
+        } else {
+          btn.textContent = `Resend in ${resendCooldownSeconds}s`;
+        }
+      }, 1000);
+    }
+
+    async function handleOtpVerificationSubmit(e) {
+      e.preventDefault();
+      const otpInput = document.getElementById('otpCodeInput');
+      const otp = otpInput ? otpInput.value.trim() : '';
+
+      if (!otp || otp.length !== 6) {
+        showToast('Please enter the 6-digit verification code.', 'error');
+        return;
+      }
+
+      const submitBtn = document.getElementById('btnSubmitOtp');
+      const originalText = submitBtn ? submitBtn.innerHTML : '';
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span>Verifying...</span>';
+      }
+
+      try {
+        const res = await apiFetch('/api/auth/verify-otp', {
+          method: 'POST',
+          body: JSON.stringify({ email: pendingVerificationEmail, otp })
+        });
+
         localStorage.setItem(AUTH_TOKEN_KEY, res.token);
         appState.currentUser = res.user;
         if (!appState.users.some((u) => u.email === res.user.email)) {
           appState.users.push(res.user);
         }
+
+        closeModal('emailVerificationModal');
+        clearInterval(otpTimerInterval);
+        clearInterval(resendCooldownInterval);
+
         showingAuthPortal = false;
         saveState();
         refreshAllViews();
-        showToast(`Account created for ${name}! Welcome to Vasool.`);
+        showToast(`🎉 ${res.message || 'Email verified successfully! Welcome to Vasool.'}`);
         await syncWithBackend();
       } catch (err) {
-        // Fallback if offline
-        const newUser = {
-          id: 'usr_' + Date.now(),
-          name,
-          email,
-          passwordHash: password,
-          authProviders: ['email'],
-          upiId
-        };
-        appState.users.push(newUser);
-        appState.currentUser = newUser;
-        showingAuthPortal = false;
-        saveState();
-        refreshAllViews();
-        showToast(`Account created for ${name} (${err.message.includes('exists') ? err.message : 'Demo Mode'}).`);
+        showToast(err.message || 'Verification failed. Please check the code.', 'error');
+        if (otpInput) {
+          otpInput.focus();
+          otpInput.select();
+        }
       } finally {
         if (submitBtn) {
           submitBtn.disabled = false;
-          submitBtn.textContent = originalText;
+          submitBtn.innerHTML = originalText;
+        }
+      }
+    }
+
+    async function handleResendOtp() {
+      if (!pendingVerificationEmail) return;
+      const btn = document.getElementById('btnResendOtp');
+      if (btn) btn.disabled = true;
+
+      try {
+        const res = await apiFetch('/api/auth/resend-otp', {
+          method: 'POST',
+          body: JSON.stringify({ email: pendingVerificationEmail })
+        });
+
+        showToast(res.message || 'A fresh verification code and link were sent to your email.');
+        otpSecondsLeft = 900;
+        updateOtpTimerDisplay();
+        startResendCooldown(60);
+      } catch (err) {
+        showToast(err.message || 'Failed to resend code.', 'error');
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    async function checkVerificationUrlParams() {
+      if (typeof window === 'undefined' || !window.location) return;
+      const params = new URLSearchParams(window.location.search);
+
+      if (params.get('verified') === 'true' && params.get('token')) {
+        const token = params.get('token');
+        localStorage.setItem(AUTH_TOKEN_KEY, token);
+        window.history.replaceState({}, document.title, window.location.pathname);
+
+        try {
+          const meRes = await apiFetch('/api/auth/me');
+          if (meRes && meRes.user) {
+            appState.currentUser = meRes.user;
+            if (!appState.users.some((u) => u.email === meRes.user.email)) {
+              appState.users.push(meRes.user);
+            }
+            showingAuthPortal = false;
+            saveState();
+            refreshAllViews();
+            showToast('🎉 Email verified successfully via Magic Link! Welcome to Vasool.');
+            await syncWithBackend();
+          }
+        } catch (err) {
+          console.warn('[Magic Link Auth] Error loading user profile:', err);
+        }
+        return;
+      }
+
+      if (params.get('verifyError')) {
+        const errorType = params.get('verifyError');
+        const email = params.get('email') || '';
+        window.history.replaceState({}, document.title, window.location.pathname);
+
+        if (errorType === 'expired_token') {
+          showToast('Verification link has expired. A fresh code can be requested.', 'error');
+          if (email) openEmailVerificationModal(email);
+        } else if (errorType === 'invalid_token') {
+          showToast('Invalid verification link. Please check your email or request a new code.', 'error');
+        } else {
+          showToast('Email verification link could not be validated. Please try again.', 'error');
         }
       }
     }
@@ -3788,10 +4037,13 @@ exec node server.js`
       window.openNewGroupModal = openNewGroupModal;
       window.openModal = openModal;
       window.closeModal = closeModal;
+      window.handleOtpVerificationSubmit = handleOtpVerificationSubmit;
+      window.handleResendOtp = handleResendOtp;
     }
 
     window.onload = async function () {
       loadState();
+      await checkVerificationUrlParams();
       renderTopLevelView();
       refreshAllViews();
       runAutomatedTestSuite(false);

@@ -10,6 +10,10 @@ const UserSchema = new mongoose.Schema(
     avatarUrl: { type: String, default: '' },
     defaultCurrency: { type: String, default: 'INR' },
     upiId: { type: String, default: '' },
+    isEmailVerified: { type: Boolean, default: false },
+    emailVerificationOtp: { type: String, default: null },
+    emailVerificationToken: { type: String, default: null, index: true },
+    emailVerificationExpires: { type: Date, default: null },
     lastLoginAt: { type: Date, default: Date.now }
   },
   { timestamps: true }

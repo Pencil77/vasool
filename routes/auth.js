@@ -1,14 +1,24 @@
 const express = require('express');
+const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
 const { connectToDatabase } = require('../lib/mongodb');
+const { sendVerificationEmail } = require('../lib/mailer');
 const User = require('../models/User');
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-fallback-secret-override-in-infisical';
 const GOOGLE_CLIENT_ID = process.env.VASOOL_GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID;
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
+
+function generateOtp() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+function generateToken() {
+  return crypto.randomBytes(32).toString('hex');
+}
 
 function signAuthToken(user) {
   return jwt.sign(
@@ -31,7 +41,8 @@ function sanitizeUser(user) {
     avatarUrl: user.avatarUrl,
     authProviders: user.authProviders,
     defaultCurrency: user.defaultCurrency,
-    upiId: user.upiId
+    upiId: user.upiId,
+    isEmailVerified: Boolean(user.isEmailVerified)
   };
 }
 
@@ -51,7 +62,7 @@ function requireAuth(req, res, next) {
 
 /**
  * POST /api/auth/signup
- * Register with Email & Password
+ * Register with Email & Password (initiates 6-digit OTP + Magic Link email verification)
  */
 router.post('/signup', async (req, res) => {
   try {
@@ -66,32 +77,73 @@ router.post('/signup', async (req, res) => {
 
     const normalizedEmail = String(email).toLowerCase().trim();
     const existing = await User.findOne({ email: normalizedEmail });
+
+    const otp = generateOtp();
+    const token = generateToken();
+    const expires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes validity
+    const passwordHash = await bcrypt.hash(password, 12);
+
     if (existing) {
-      if (existing.passwordHash) {
+      if (existing.isEmailVerified && existing.passwordHash) {
         return res.status(409).json({ error: 'An account with this email already exists. Please log in.' });
       }
-      // Account was created via Google Sign-In previously; link password
-      existing.passwordHash = await bcrypt.hash(password, 12);
-      if (!existing.authProviders.includes('email')) {
-        existing.authProviders.push('email');
+
+      // If user was created via Google Sign-In previously (pre-verified), link password directly
+      if (existing.authProviders.includes('google') && existing.isEmailVerified) {
+        existing.passwordHash = passwordHash;
+        if (!existing.authProviders.includes('email')) {
+          existing.authProviders.push('email');
+        }
+        existing.lastLoginAt = new Date();
+        await existing.save();
+        const authToken = signAuthToken(existing);
+        return res.status(200).json({
+          token: authToken,
+          user: sanitizeUser(existing),
+          linkedProvider: true,
+          message: 'Password successfully linked to your existing Google account.'
+        });
       }
-      existing.lastLoginAt = new Date();
+
+      // User registered previously with email/password but never verified: update credentials and send fresh OTP/link
+      existing.name = String(name).trim();
+      existing.passwordHash = passwordHash;
+      if (upiId) existing.upiId = String(upiId).trim();
+      existing.emailVerificationOtp = otp;
+      existing.emailVerificationToken = token;
+      existing.emailVerificationExpires = expires;
+      existing.isEmailVerified = false;
       await existing.save();
-      const token = signAuthToken(existing);
-      return res.status(200).json({ token, user: sanitizeUser(existing), linkedProvider: true });
+
+      await sendVerificationEmail({ email: normalizedEmail, name: existing.name, otp, token });
+
+      return res.status(200).json({
+        requiresVerification: true,
+        email: normalizedEmail,
+        message: 'Verification email sent. Please enter the 6-digit code or click the verification link in your email.'
+      });
     }
 
-    const passwordHash = await bcrypt.hash(password, 12);
+    // New unverified user account
     const user = await User.create({
       name: String(name).trim(),
       email: normalizedEmail,
       passwordHash,
       authProviders: ['email'],
-      upiId: upiId ? String(upiId).trim() : ''
+      upiId: upiId ? String(upiId).trim() : '',
+      isEmailVerified: false,
+      emailVerificationOtp: otp,
+      emailVerificationToken: token,
+      emailVerificationExpires: expires
     });
 
-    const token = signAuthToken(user);
-    return res.status(201).json({ token, user: sanitizeUser(user) });
+    await sendVerificationEmail({ email: normalizedEmail, name: user.name, otp, token });
+
+    return res.status(201).json({
+      requiresVerification: true,
+      email: normalizedEmail,
+      message: 'Verification email sent. Please enter the 6-digit code or click the verification link in your email.'
+    });
   } catch (err) {
     return res.status(500).json({ error: err.message || 'Signup failed.' });
   }
@@ -99,7 +151,7 @@ router.post('/signup', async (req, res) => {
 
 /**
  * POST /api/auth/login
- * Log in with Email & Password
+ * Log in with Email & Password (requires verified email)
  */
 router.post('/login', async (req, res) => {
   try {
@@ -123,6 +175,26 @@ router.post('/login', async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.passwordHash);
     if (!isMatch) {
       return res.status(401).json({ error: 'Invalid email or password.' });
+    }
+
+    // If user has not yet verified their email, block login and offer OTP/magic link verification
+    if (!user.isEmailVerified) {
+      // Regenerate fresh OTP & link if expired
+      if (!user.emailVerificationExpires || user.emailVerificationExpires < new Date()) {
+        const otp = generateOtp();
+        const token = generateToken();
+        user.emailVerificationOtp = otp;
+        user.emailVerificationToken = token;
+        user.emailVerificationExpires = new Date(Date.now() + 15 * 60 * 1000);
+        await user.save();
+        await sendVerificationEmail({ email: user.email, name: user.name, otp, token });
+      }
+
+      return res.status(403).json({
+        error: 'Please verify your email address to continue. We have sent a verification code to your email.',
+        requiresVerification: true,
+        email: user.email
+      });
     }
 
     user.lastLoginAt = new Date();
@@ -172,10 +244,15 @@ router.post('/google', async (req, res) => {
         googleId: googlePayload.sub,
         avatarUrl: googlePayload.picture || '',
         authProviders: ['google'],
+        isEmailVerified: true,
         lastLoginAt: new Date()
       });
     } else {
       user.googleId = googlePayload.sub || user.googleId;
+      user.isEmailVerified = true;
+      user.emailVerificationOtp = null;
+      user.emailVerificationToken = null;
+      user.emailVerificationExpires = null;
       if (googlePayload.picture && !user.avatarUrl) {
         user.avatarUrl = googlePayload.picture;
       }
@@ -226,6 +303,147 @@ router.get('/config', (req, res) => {
     googleClientId: GOOGLE_CLIENT_ID || null,
     environment: process.env.NODE_ENV || 'production'
   });
+});
+
+/**
+ * POST /api/auth/verify-otp
+ * Verify email using the 6-digit OTP code entered on-screen
+ */
+router.post('/verify-otp', async (req, res) => {
+  try {
+    await connectToDatabase();
+    const { email, otp } = req.body;
+    if (!email || !otp) {
+      return res.status(400).json({ error: 'Email and 6-digit verification code are required.' });
+    }
+
+    const normalizedEmail = String(email).toLowerCase().trim();
+    const cleanOtp = String(otp).trim();
+    const user = await User.findOne({ email: normalizedEmail });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User account not found. Please sign up.' });
+    }
+
+    if (user.isEmailVerified) {
+      const token = signAuthToken(user);
+      return res.status(200).json({
+        token,
+        user: sanitizeUser(user),
+        message: 'Email is already verified.'
+      });
+    }
+
+    if (!user.emailVerificationExpires || user.emailVerificationExpires < new Date()) {
+      return res.status(400).json({
+        error: 'Verification code has expired. Please click "Resend Code" to receive a new one.'
+      });
+    }
+
+    if (user.emailVerificationOtp !== cleanOtp) {
+      return res.status(400).json({ error: 'Invalid verification code. Please check your email and try again.' });
+    }
+
+    user.isEmailVerified = true;
+    user.emailVerificationOtp = null;
+    user.emailVerificationToken = null;
+    user.emailVerificationExpires = null;
+    user.lastLoginAt = new Date();
+    await user.save();
+
+    const token = signAuthToken(user);
+    return res.status(200).json({
+      token,
+      user: sanitizeUser(user),
+      message: 'Email verified successfully! Welcome to Vasool.'
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'OTP verification failed.' });
+  }
+});
+
+/**
+ * GET /api/auth/verify
+ * Magic Link verification endpoint: verifies token from email and redirects to web app
+ */
+router.get('/verify', async (req, res) => {
+  const baseUrl = (process.env.APP_URL || 'https://vasool-ecru.vercel.app').replace(/\/+$/, '');
+  try {
+    await connectToDatabase();
+    const { token, email } = req.query;
+
+    if (!token || !email) {
+      return res.redirect(`${baseUrl}/?verifyError=missing_params`);
+    }
+
+    const normalizedEmail = String(email).toLowerCase().trim();
+    const cleanToken = String(token).trim();
+
+    const user = await User.findOne({
+      email: normalizedEmail,
+      emailVerificationToken: cleanToken
+    });
+
+    if (!user) {
+      return res.redirect(`${baseUrl}/?verifyError=invalid_token`);
+    }
+
+    if (!user.emailVerificationExpires || user.emailVerificationExpires < new Date()) {
+      return res.redirect(`${baseUrl}/?verifyError=expired_token&email=${encodeURIComponent(normalizedEmail)}`);
+    }
+
+    user.isEmailVerified = true;
+    user.emailVerificationOtp = null;
+    user.emailVerificationToken = null;
+    user.emailVerificationExpires = null;
+    user.lastLoginAt = new Date();
+    await user.save();
+
+    const authToken = signAuthToken(user);
+    return res.redirect(`${baseUrl}/?verified=true&token=${encodeURIComponent(authToken)}`);
+  } catch (err) {
+    return res.redirect(`${baseUrl}/?verifyError=server_error`);
+  }
+});
+
+/**
+ * POST /api/auth/resend-otp
+ * Resend a fresh 6-digit OTP and Magic Link to the user's email
+ */
+router.post('/resend-otp', async (req, res) => {
+  try {
+    await connectToDatabase();
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required to resend verification code.' });
+    }
+
+    const normalizedEmail = String(email).toLowerCase().trim();
+    const user = await User.findOne({ email: normalizedEmail });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User account not found.' });
+    }
+
+    if (user.isEmailVerified) {
+      return res.status(200).json({ message: 'Your email is already verified. Please log in.' });
+    }
+
+    const otp = generateOtp();
+    const token = generateToken();
+    user.emailVerificationOtp = otp;
+    user.emailVerificationToken = token;
+    user.emailVerificationExpires = new Date(Date.now() + 15 * 60 * 1000);
+    await user.save();
+
+    await sendVerificationEmail({ email: normalizedEmail, name: user.name, otp, token });
+
+    return res.status(200).json({
+      message: 'A fresh verification code and link have been sent to your email.'
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Failed to resend verification email.' });
+  }
 });
 
 module.exports = { authRouter: router, requireAuth };
