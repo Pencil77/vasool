@@ -188,7 +188,15 @@ router.post('/google', async (req, res) => {
     const token = signAuthToken(user);
     return res.status(200).json({ token, user: sanitizeUser(user) });
   } catch (err) {
-    return res.status(500).json({ error: err.message || 'Google authentication failed.' });
+    const isAuthError = err.message && (
+      err.message.toLowerCase().includes('token') ||
+      err.message.toLowerCase().includes('signature') ||
+      err.message.toLowerCase().includes('audience') ||
+      err.message.toLowerCase().includes('recipient') ||
+      err.message.toLowerCase().includes('jwt') ||
+      err.message.toLowerCase().includes('wrong number of segments')
+    );
+    return res.status(isAuthError ? 401 : 500).json({ error: err.message || 'Google authentication failed.' });
   }
 });
 
