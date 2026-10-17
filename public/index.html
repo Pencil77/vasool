@@ -915,7 +915,12 @@
             category: g.category || 'Trip',
             currency: g.currency || 'INR',
             inviteCode: g.inviteCode,
-            members: (g.members || []).map((m) => ({ name: m.name, email: m.email, role: m.role || 'member' }))
+            adminEmail: g.adminEmail || (g.members?.find((m) => m.role === 'admin' || m.role === 'owner')?.email),
+            members: (g.members || []).map((m) => ({
+              name: m.name,
+              email: m.email,
+              role: m.role === 'owner' ? 'admin' : (m.role || 'member')
+            }))
           }));
         }
 
@@ -1136,7 +1141,7 @@ exec node server.js`
             currency: 'INR',
             inviteCode: 'SPL-GOA92',
             members: [
-              { name: 'Zubair Mohammed', email: 'mrzoromit3@gmail.com', role: 'owner' },
+              { name: 'Zubair Mohammed', email: 'mrzoromit3@gmail.com', role: 'admin' },
               { name: 'Omkar Chinnam', email: 'omkar.chinnam@gmail.com', role: 'member' },
               { name: 'Krutika Morande', email: 'krutika.morande@gmail.com', role: 'member' },
               { name: 'Anshuman Barik', email: 'anshuman.barik@gmail.com', role: 'member' }
@@ -1149,7 +1154,7 @@ exec node server.js`
             currency: 'INR',
             inviteCode: 'SPL-HYD402',
             members: [
-              { name: 'Zubair Mohammed', email: 'mrzoromit3@gmail.com', role: 'owner' },
+              { name: 'Zubair Mohammed', email: 'mrzoromit3@gmail.com', role: 'admin' },
               { name: 'Omkar Chinnam', email: 'omkar.chinnam@gmail.com', role: 'member' },
               { name: 'Anshuman Barik', email: 'anshuman.barik@gmail.com', role: 'member' }
             ]
@@ -1161,7 +1166,7 @@ exec node server.js`
             currency: 'INR',
             inviteCode: 'SPL-LUNCH7',
             members: [
-              { name: 'Zubair Mohammed', email: 'mrzoromit3@gmail.com', role: 'owner' },
+              { name: 'Zubair Mohammed', email: 'mrzoromit3@gmail.com', role: 'admin' },
               { name: 'Krutika Morande', email: 'krutika.morande@gmail.com', role: 'member' },
               { name: 'Omkar Chinnam', email: 'omkar.chinnam@gmail.com', role: 'member' }
             ]
@@ -1773,38 +1778,88 @@ exec node server.js`
         toP.net -= Number(st.amount);
       });
 
-      // Greedy Minimum-Cash-Flow Simplification
-      const debtors = [];
-      const creditors = [];
-      Object.values(balanceMap).forEach((p) => {
-        const rounded = Math.round(p.net * 100) / 100;
-        if (rounded < -0.01) debtors.push({ ...p, amount: Math.abs(rounded) });
-        else if (rounded > 0.01) creditors.push({ ...p, amount: rounded });
-      });
-
-      debtors.sort((a, b) => b.amount - a.amount);
-      creditors.sort((a, b) => b.amount - a.amount);
+      // Admin-Hub Debt Calibration:
+      // Everyone pays to the group Admin, and the Admin settles back to all creditors.
+      // The Admin is also a normal person in the group who may share splits and owe or be owed.
+      let activeAdmin = null;
+      if (activeGroups.length >= 1) {
+        const primary = activeGroups[0];
+        activeAdmin = primary.members?.find((m) => m.role === 'admin' || m.role === 'owner') || primary.members?.[0];
+      }
 
       const simplified = [];
-      let i = 0;
-      let j = 0;
-      while (i < debtors.length && j < creditors.length) {
-        const d = debtors[i];
-        const c = creditors[j];
-        const amt = Math.round(Math.min(d.amount, c.amount) * 100) / 100;
-        if (amt > 0) {
-          simplified.push({
-            fromEmail: d.email,
-            fromName: d.name,
-            toEmail: c.email,
-            toName: c.name,
-            amount: amt
-          });
+      if (activeAdmin && activeAdmin.email) {
+        const adminEmail = String(activeAdmin.email).toLowerCase().trim();
+        const adminName = activeAdmin.name || 'Admin';
+
+        Object.values(balanceMap).forEach((p) => {
+          const pEmail = String(p.email).toLowerCase().trim();
+          if (pEmail === adminEmail) return;
+
+          const rounded = Math.round(p.net * 100) / 100;
+          if (rounded < -0.01) {
+            // Debtor pays the group Admin
+            simplified.push({
+              fromEmail: p.email,
+              fromName: p.name,
+              toEmail: adminEmail,
+              toName: adminName,
+              amount: Math.round(Math.abs(rounded) * 100) / 100,
+              isAdminTransfer: true,
+              type: 'pay_to_admin'
+            });
+          } else if (rounded > 0.01) {
+            // Group Admin settles to the creditor
+            simplified.push({
+              fromEmail: adminEmail,
+              fromName: adminName,
+              toEmail: p.email,
+              toName: p.name,
+              amount: Math.round(rounded * 100) / 100,
+              isAdminTransfer: true,
+              type: 'admin_payout'
+            });
+          }
+        });
+
+        simplified.sort((a, b) => {
+          if (a.toEmail === adminEmail && b.toEmail !== adminEmail) return -1;
+          if (a.toEmail !== adminEmail && b.toEmail === adminEmail) return 1;
+          return b.amount - a.amount;
+        });
+      } else {
+        // Fallback greedy simplification
+        const debtors = [];
+        const creditors = [];
+        Object.values(balanceMap).forEach((p) => {
+          const rounded = Math.round(p.net * 100) / 100;
+          if (rounded < -0.01) debtors.push({ ...p, amount: Math.abs(rounded) });
+          else if (rounded > 0.01) creditors.push({ ...p, amount: rounded });
+        });
+
+        debtors.sort((a, b) => b.amount - a.amount);
+        creditors.sort((a, b) => b.amount - a.amount);
+
+        let i = 0;
+        let j = 0;
+        while (i < debtors.length && j < creditors.length) {
+          const d = debtors[i];
+          const c = creditors[j];
+          const amt = Math.round(Math.min(d.amount, c.amount) * 100) / 100;
+          if (amt > 0) {
+            simplified.push({
+              fromEmail: d.email,
+              fromName: d.name,
+              toEmail: c.email,
+              toName: c.name,
+              amount: amt
+            });
+          }
+          d.amount = Math.round((d.amount - amt) * 100) / 100;
+          c.amount = Math.round((c.amount - amt) * 100) / 100;
+          if (d.amount <= 0.01) i++;
+          if (c.amount <= 0.01) j++;
         }
-        d.amount = Math.round((d.amount - amt) * 100) / 100;
-        c.amount = Math.round((c.amount - amt) * 100) / 100;
-        if (d.amount <= 0.01) i++;
-        if (c.amount <= 0.01) j++;
       }
 
       return {
@@ -2111,18 +2166,41 @@ exec node server.js`
       const container = document.getElementById('groupsGridContainer');
       if (!container) return;
 
+      const currentEmail = (appState.currentUser?.email || '').toLowerCase().trim();
+
       container.innerHTML = appState.groups
         .map((g) => {
           const { totalSpend, simplified } = computeBalancesAndSimplifications(g.id);
+          const currentAdmin = g.members.find((m) => m.role === 'admin' || m.role === 'owner') || g.members[0];
+          const isCurrentUserAdmin = (currentAdmin && currentAdmin.email.toLowerCase().trim() === currentEmail) ||
+                                     (g.createdByEmail && g.createdByEmail.toLowerCase().trim() === currentEmail);
+
           const membersBadges = g.members
             .map((m) => {
+              const isAdmin = m.role === 'admin' || m.role === 'owner' || (g.adminEmail && g.adminEmail.toLowerCase() === m.email.toLowerCase());
               const ini = m.name
                 .split(' ')
                 .map((w) => w[0])
                 .join('')
                 .slice(0, 2)
                 .toUpperCase();
-              return `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-200"><span class="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-300 text-[9px] font-bold flex items-center justify-center">${escapeHtml(ini)}</span>${escapeHtml(m.name)}</span>`;
+
+              const canTransfer = isCurrentUserAdmin && !isAdmin;
+
+              return `
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg ${isAdmin ? 'bg-amber-500/15 border-amber-500/40 text-amber-200' : 'bg-slate-900 border-slate-800 text-slate-200'} border text-xs">
+                  <span class="w-4 h-4 rounded-full ${isAdmin ? 'bg-amber-400 text-slate-950 font-bold' : 'bg-emerald-500/20 text-emerald-300 font-bold'} text-[9px] flex items-center justify-center">
+                    ${isAdmin ? '👑' : escapeHtml(ini)}
+                  </span>
+                  <span class="font-medium">${escapeHtml(m.name)}</span>
+                  ${isAdmin ? '<span class="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-400/25 text-amber-300 border border-amber-400/30">Admin</span>' : ''}
+                  ${canTransfer ? `
+                    <button data-testid="btn-transfer-admin-${escapeHtml(m.email)}" onclick="promptTransferAdmin('${escapeHtml(g.id)}', '${escapeHtml(m.email)}', '${escapeHtml(m.name)}')" title="Transfer Adminship to ${escapeHtml(m.name)}" class="ml-1 text-[10px] text-amber-300/80 hover:text-amber-200 underline font-semibold">
+                      Make Admin
+                    </button>
+                  ` : ''}
+                </span>
+              `;
             })
             .join('');
 
@@ -2140,7 +2218,10 @@ exec node server.js`
                   Total Spend: <strong class="text-white">${formatINR(totalSpend)}</strong> · ${simplified.length} open settlement(s)
                 </div>
                 <div class="mt-3">
-                  <div class="text-[11px] text-slate-400 mb-1.5">Members (${g.members.length}):</div>
+                  <div class="text-[11px] text-slate-400 mb-1.5 flex items-center justify-between">
+                    <span>Members (${g.members.length}):</span>
+                    ${currentAdmin ? `<span class="text-[10px] text-amber-300 font-semibold">Admin: ${escapeHtml(currentAdmin.name)} 👑</span>` : ''}
+                  </div>
                   <div class="flex flex-wrap gap-1.5">${membersBadges}</div>
                 </div>
               </div>
@@ -2159,6 +2240,49 @@ exec node server.js`
         .join('');
     }
 
+    async function promptTransferAdmin(groupId, targetEmail, targetName) {
+      const confirmed = confirm(
+        `Transfer Admin privileges for this group to ${targetName} (${targetEmail})?\n\n` +
+        `Only one admin can exist in this group. You will pass the admin card to ${targetName} and become a regular member.`
+      );
+      if (!confirmed) return;
+      await handleTransferAdmin(groupId, targetEmail, targetName);
+    }
+
+    async function handleTransferAdmin(groupId, targetEmail, targetName) {
+      try {
+        if (localStorage.getItem(AUTH_TOKEN_KEY)) {
+          const res = await apiFetch(`/api/groups/${groupId}/transfer-admin`, {
+            method: 'POST',
+            body: JSON.stringify({ newAdminEmail: targetEmail })
+          });
+          if (res && res.error) {
+            alert('Failed to transfer admin: ' + res.error);
+            return;
+          }
+        }
+
+        // Update local appState.groups
+        const grp = appState.groups.find((g) => g.id === groupId);
+        if (grp) {
+          grp.members.forEach((m) => {
+            if (m.email.toLowerCase() === targetEmail.toLowerCase()) {
+              m.role = 'admin';
+            } else {
+              m.role = 'member';
+            }
+          });
+          grp.adminEmail = targetEmail.toLowerCase();
+        }
+
+        saveState();
+        refreshAllViews();
+        showToast(`👑 Admin privileges successfully transferred to ${targetName}!`);
+      } catch (err) {
+        alert('Error transferring admin: ' + err.message);
+      }
+    }
+
     function selectGroupAndOpenExpenses(groupId) {
       selectedGroupId = groupId;
       document.getElementById('groupFilterSelect').value = groupId;
@@ -2174,15 +2298,24 @@ exec node server.js`
       if (!simplified.length) {
         simpEl.innerHTML = `<div class="p-6 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center text-xs text-emerald-300">All group debts are completely settled!</div>`;
       } else {
-        simpEl.innerHTML = simplified
+        simpEl.innerHTML = `
+          <div class="mb-3 px-3.5 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-between text-xs text-amber-300">
+            <span class="flex items-center gap-2">
+              <span class="text-base">👑</span>
+              <span><strong>Admin-Hub Calibration Active:</strong> Everyone pays their share to the group Admin, and the Admin settles payouts to creditors.</span>
+            </span>
+          </div>
+        ` + simplified
           .map(
             (t, idx) => `
           <div class="p-4 rounded-xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <div class="text-xs sm:text-sm">
+              <div class="text-xs sm:text-sm flex items-center gap-1.5 flex-wrap">
                 <strong class="text-rose-300">${escapeHtml(t.fromName)}</strong>
-                <span class="text-slate-400 mx-1.5">pays</span>
+                <span class="text-slate-400">pays</span>
                 <strong class="text-emerald-300">${escapeHtml(t.toName)}</strong>
+                ${t.type === 'pay_to_admin' ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">Pay to Admin 👑</span>' : ''}
+                ${t.type === 'admin_payout' ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/20 text-teal-300 border border-teal-500/40">Admin Settlement 💸</span>' : ''}
               </div>
               <div class="text-[11px] text-slate-400 mt-0.5">${escapeHtml(t.fromEmail)} &rarr; ${escapeHtml(t.toEmail)}</div>
             </div>
@@ -2464,7 +2597,7 @@ exec node server.js`
       const rawMembers = document.getElementById('newGroupMembersInput').value;
 
       const creator = appState.currentUser || { name: 'Zubair Mohammed', email: 'mrzoromit3@gmail.com' };
-      const members = [{ name: creator.name, email: creator.email.toLowerCase(), role: 'owner' }];
+      const members = [{ name: creator.name, email: creator.email.toLowerCase(), role: 'admin' }];
       const seen = new Set([creator.email.toLowerCase()]);
 
       rawMembers
@@ -2762,9 +2895,9 @@ exec node server.js`
         return '0 transfers required';
       });
 
-      runCase('Unit', 'UT-08: Transitive Debt Chain (A->B ₹1,000 & B->C ₹1,000) collapses to A->C ₹1,000', () => {
+      runCase('Unit', 'UT-08: Admin-Hub Debt Calibration routes debtor payments to Admin & Admin settles to creditors', () => {
         const mockState = {
-          groups: [{ id: 'g', members: [{ email: 'a', name: 'A' }, { email: 'b', name: 'B' }, { email: 'c', name: 'C' }] }],
+          groups: [{ id: 'g', members: [{ email: 'a', name: 'A', role: 'member' }, { email: 'b', name: 'B', role: 'admin' }, { email: 'c', name: 'C', role: 'member' }] }],
           expenses: [
             { groupId: 'g', amount: 1000, paidByEmail: 'b', paidByName: 'B', splits: [{ memberEmail: 'a', memberName: 'A', amount: 1000 }] },
             { groupId: 'g', amount: 1000, paidByEmail: 'c', paidByName: 'C', splits: [{ memberEmail: 'b', memberName: 'B', amount: 1000 }] }
@@ -2772,10 +2905,16 @@ exec node server.js`
           settlements: []
         };
         const out = computeBalancesAndSimplifications('g', mockState);
-        if (out.simplified.length !== 1 || out.simplified[0].fromEmail !== 'a' || out.simplified[0].toEmail !== 'c') {
-          throw new Error('Transitive simplification failed');
+        if (
+          out.simplified.length !== 2 ||
+          out.simplified[0].fromEmail !== 'a' ||
+          out.simplified[0].toEmail !== 'b' ||
+          out.simplified[1].fromEmail !== 'b' ||
+          out.simplified[1].toEmail !== 'c'
+        ) {
+          throw new Error('Admin-Hub routing failed');
         }
-        return 'Single direct transfer: A -> C ₹1,000';
+        return 'Admin-Hub verified: A pays Admin B (₹1,000) & Admin B settles C (₹1,000)';
       });
 
       runCase('Unit', 'UT-09: Password Strength Evaluator scores weak vs strong passwords', () => {
@@ -3037,6 +3176,11 @@ exec node server.js`
       refreshAllViews();
       closeModal('cloudModal');
       showToast('Demo database reset to initial state.');
+    }
+
+    if (typeof window !== 'undefined') {
+      window.promptTransferAdmin = promptTransferAdmin;
+      window.handleTransferAdmin = handleTransferAdmin;
     }
 
     window.onload = async function () {

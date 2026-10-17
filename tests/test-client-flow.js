@@ -57,7 +57,15 @@ async function testLocalHtml() {
   const createdExp = window.appState.expenses[0];
   console.log('9. Created expense ID:', createdExp.id, 'amount:', createdExp.amount);
 
-  console.log('\nAll in-browser user actions executed and persisted successfully to MongoDB Atlas!');
+  // Now test transferring adminship via the page function!
+  console.log('10. Initial Admin of group:', createdGroup.members.find(m => m.role === 'admin')?.name);
+  await window.handleTransferAdmin(createdGroup.id, 'abhi@test.com', 'Abhi');
+  const updatedGroup = window.appState.groups.find(g => g.id === createdGroup.id);
+  const newAdmin = updatedGroup.members.find(m => m.role === 'admin');
+  console.log('11. Transferred Admin of group:', newAdmin?.name, '(' + newAdmin?.email + ')');
+  if (newAdmin?.email !== 'abhi@test.com') throw new Error('Admin transfer failed in client state');
+
+  console.log('\nAll in-browser user actions (including adminship transfer & calibration) executed and persisted successfully to MongoDB Atlas!');
 }
 
 testLocalHtml().catch((err) => {

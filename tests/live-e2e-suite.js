@@ -444,7 +444,7 @@ async function runAllTests() {
     return `Zero-sum invariant verified (Sum: ${netSum}). Balances computed for ${balances.length} members`;
   });
 
-  await assertTest('GET /api/balances produces valid simplified transfer graph', 'Debt Simplification', async () => {
+  await assertTest('GET /api/balances produces Admin-Hub simplified transfer graph', 'Debt Simplification', async () => {
     const res = await request(`/api/balances?groupId=${groupId}`, {
       method: 'GET',
       headers: { Authorization: `Bearer ${authToken}` }
@@ -455,8 +455,11 @@ async function runAllTests() {
     txs.forEach((t) => {
       if (t.amount <= 0) throw new Error(`Transfer amount must be positive, got ${t.amount}`);
       if (!t.fromEmail || !t.toEmail) throw new Error('Missing debtor/creditor email');
+      // Admin-Hub verification: every transfer routes to or from the group Admin
+      const isHub = t.fromEmail.toLowerCase() === testUser.email.toLowerCase() || t.toEmail.toLowerCase() === testUser.email.toLowerCase();
+      if (!isHub) throw new Error(`Transfer ${t.fromEmail} -> ${t.toEmail} bypassed group Admin ${testUser.email}`);
     });
-    return `Greedy algorithm produced ${txs.length} minimal transfer(s)`;
+    return `Admin-Hub calibration verified: ${txs.length} transfer(s) routed strictly through Admin (${testUser.email})`;
   });
 
   await assertTest('POST /api/settlements records a UPI settlement transfer', 'Settlements', async () => {
@@ -545,6 +548,38 @@ async function runAllTests() {
     if (res.status !== 200) throw new Error(`Expected 200, got ${res.status}`);
     if (!res.data.deleted) throw new Error('Expense deleted flag not returned');
     return `Expense ${expenseId} deleted successfully`;
+  });
+
+  // ==========================================
+  // 7. ADMIN PRIVILEGES & ADMINSHIP TRANSFER
+  // ==========================================
+  await assertTest('POST /api/groups/:id/transfer-admin transfers adminship to another member', 'Admin Management', async () => {
+    const targetEmail = `pavan.${uniqueId}@test.com`;
+    const res = await request(`/api/groups/${groupId}/transfer-admin`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${authToken}` },
+      body: JSON.stringify({ newAdminEmail: targetEmail })
+    });
+    if (res.status !== 200) throw new Error(`Expected 200, got ${res.status}: ${JSON.stringify(res.data)}`);
+    const group = res.data.group;
+    const adminCount = group.members.filter((m) => m.role === 'admin').length;
+    if (adminCount !== 1) throw new Error(`Expected strictly 1 admin, found ${adminCount}`);
+    const newAdmin = group.members.find((m) => m.role === 'admin');
+    if (newAdmin.email !== targetEmail) throw new Error(`Expected admin ${targetEmail}, found ${newAdmin.email}`);
+    const oldAdmin = group.members.find((m) => m.email === testUser.email);
+    if (oldAdmin.role !== 'member') throw new Error(`Expected old admin role to be 'member', got ${oldAdmin.role}`);
+    return `Admin privileges successfully transferred to Pavan (${targetEmail}). Strictly 1 admin verified`;
+  });
+
+  await assertTest('POST /api/groups/:id/transfer-admin rejects transfer by non-admin with 403', 'Admin Security', async () => {
+    // Current user is now a regular member, attempting to transfer admin again must fail with 403
+    const res = await request(`/api/groups/${groupId}/transfer-admin`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${authToken}` },
+      body: JSON.stringify({ newAdminEmail: testUser.email })
+    });
+    if (res.status !== 403) throw new Error(`Expected 403 Forbidden, got ${res.status}`);
+    return `Non-admin adminship transfer blocked with 403 Forbidden: ${res.data.error}`;
   });
 
   console.log(`\n======================================================`);

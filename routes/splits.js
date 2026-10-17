@@ -9,11 +9,9 @@ const { requireAuth } = require('./auth');
 const router = express.Router();
 
 /**
- * Greedy Minimum-Cash-Flow Debt Simplification Algorithm
- * Takes net balances { email: { name, email, net } } and produces the minimal
- * set of directed transfers [{ fromEmail, fromName, toEmail, toName, amount }].
+ * Greedy Minimum-Cash-Flow Fallback
  */
-function simplifyDebts(balanceMap) {
+function simplifyDebtsGreedy(balanceMap) {
   const debtors = [];
   const creditors = [];
 
@@ -58,6 +56,64 @@ function simplifyDebts(balanceMap) {
   return transactions;
 }
 
+/**
+ * Admin-Hub Debt Calibration Algorithm:
+ * All group members pay to the group Admin, and the Admin settles back to all creditors.
+ * The Admin is also a normal member of the group who shares splits and may owe or be owed.
+ * 
+ * For every non-admin member M != Admin:
+ * - If M's net balance < -0.01 (M owes): M pays Admin |M.net|
+ * - If M's net balance > 0.01 (M is owed): Admin pays M M.net
+ */
+function simplifyDebtsAdminHub(balanceMap, adminMember) {
+  if (!adminMember || !adminMember.email) {
+    return simplifyDebtsGreedy(balanceMap);
+  }
+
+  const adminEmail = String(adminMember.email).toLowerCase().trim();
+  const adminName = adminMember.name || 'Admin';
+  const transactions = [];
+
+  Object.values(balanceMap).forEach((entry) => {
+    const memberEmail = String(entry.email).toLowerCase().trim();
+    if (memberEmail === adminEmail) return;
+
+    const rounded = Math.round(entry.net * 100) / 100;
+    if (rounded < -0.01) {
+      // Non-admin debtor pays the group Admin
+      transactions.push({
+        fromEmail: entry.email,
+        fromName: entry.name,
+        toEmail: adminEmail,
+        toName: adminName,
+        amount: Math.round(Math.abs(rounded) * 100) / 100,
+        isAdminTransfer: true,
+        type: 'pay_to_admin'
+      });
+    } else if (rounded > 0.01) {
+      // Group Admin pays the non-admin creditor
+      transactions.push({
+        fromEmail: adminEmail,
+        fromName: adminName,
+        toEmail: entry.email,
+        toName: entry.name,
+        amount: Math.round(rounded * 100) / 100,
+        isAdminTransfer: true,
+        type: 'admin_payout'
+      });
+    }
+  });
+
+  // Sort: payments to admin first, payouts by admin second, then descending by amount
+  transactions.sort((a, b) => {
+    if (a.toEmail === adminEmail && b.toEmail !== adminEmail) return -1;
+    if (a.toEmail !== adminEmail && b.toEmail === adminEmail) return 1;
+    return b.amount - a.amount;
+  });
+
+  return transactions;
+}
+
 // GET /api/groups - List groups where user is a member
 router.get('/groups', requireAuth, async (req, res) => {
   try {
@@ -69,7 +125,7 @@ router.get('/groups', requireAuth, async (req, res) => {
   }
 });
 
-// POST /api/groups - Create a new group
+// POST /api/groups - Create a new group (creator is default Admin)
 router.post('/groups', requireAuth, async (req, res) => {
   try {
     await connectToDatabase();
@@ -81,7 +137,7 @@ router.post('/groups', requireAuth, async (req, res) => {
     const normalizedCreator = {
       name: req.user.name,
       email: req.user.email.toLowerCase(),
-      role: 'owner'
+      role: 'admin'
     };
 
     const seenEmails = new Set([normalizedCreator.email]);
@@ -109,10 +165,69 @@ router.post('/groups', requireAuth, async (req, res) => {
       currency: currency || 'INR',
       inviteCode,
       createdByEmail: normalizedCreator.email,
+      adminEmail: normalizedCreator.email,
       members: finalMembers
     });
 
     return res.status(201).json({ group });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/groups/:id/transfer-admin - Transfer group adminship to another member
+router.post('/groups/:id/transfer-admin', requireAuth, async (req, res) => {
+  try {
+    await connectToDatabase();
+    const { newAdminEmail } = req.body;
+    if (!newAdminEmail) {
+      return res.status(400).json({ error: 'newAdminEmail is required.' });
+    }
+
+    const group = await Group.findById(req.params.id);
+    if (!group) {
+      return res.status(404).json({ error: 'Group not found.' });
+    }
+
+    const cleanNewAdminEmail = String(newAdminEmail).toLowerCase().trim();
+    const requesterEmail = req.user.email.toLowerCase().trim();
+
+    // Verify requester is current admin
+    const currentAdmin = group.members.find(
+      (m) => m.role === 'admin' || m.role === 'owner'
+    ) || group.members[0];
+
+    const isCurrentAdmin =
+      (currentAdmin && currentAdmin.email === requesterEmail) ||
+      group.createdByEmail === requesterEmail ||
+      (group.adminEmail && group.adminEmail === requesterEmail);
+
+    if (!isCurrentAdmin) {
+      return res.status(403).json({ error: 'Only the current group admin can transfer admin privileges.' });
+    }
+
+    // Verify target member is in group
+    const targetMember = group.members.find((m) => m.email === cleanNewAdminEmail);
+    if (!targetMember) {
+      return res.status(400).json({ error: 'Target user is not a member of this group.' });
+    }
+
+    // Enforce strictly ONLY ONE admin in group
+    group.members.forEach((m) => {
+      if (m.email === cleanNewAdminEmail) {
+        m.role = 'admin';
+      } else {
+        m.role = 'member';
+      }
+    });
+    group.adminEmail = cleanNewAdminEmail;
+
+    await group.save();
+
+    return res.status(200).json({
+      message: `Admin privileges successfully transferred to ${targetMember.name} (${cleanNewAdminEmail}).`,
+      group
+    });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
@@ -262,7 +377,52 @@ router.get('/balances', requireAuth, async (req, res) => {
       receiver.net -= st.amount;
     });
 
-    const simplifiedTransactions = simplifyDebts(balanceMap);
+    let simplifiedTransactions = [];
+    if (groups.length === 1) {
+      const g = groups[0];
+      const adminMember = g.members.find((m) => m.role === 'admin' || m.role === 'owner') || g.members[0];
+      simplifiedTransactions = simplifyDebtsAdminHub(balanceMap, adminMember);
+    } else if (groups.length > 1) {
+      // Calculate Admin-Hub transactions for each group
+      groups.forEach((g) => {
+        const groupBalanceMap = {};
+        const ensureGroupMember = (email, name) => {
+          const key = String(email).toLowerCase().trim();
+          if (!groupBalanceMap[key]) {
+            groupBalanceMap[key] = { email: key, name: name || key, paid: 0, owed: 0, net: 0 };
+          }
+          return groupBalanceMap[key];
+        };
+
+        g.members.forEach((m) => ensureGroupMember(m.email, m.name));
+
+        const grpExpenses = expenses.filter((e) => String(e.groupId) === String(g._id));
+        const grpSettlements = settlements.filter((s) => String(s.groupId) === String(g._id));
+
+        grpExpenses.forEach((exp) => {
+          const payer = ensureGroupMember(exp.paidByEmail, exp.paidByName);
+          payer.paid += exp.amount;
+          payer.net += exp.amount;
+          exp.splits.forEach((s) => {
+            const p = ensureGroupMember(s.memberEmail, s.memberName);
+            p.owed += s.amount;
+            p.net -= s.amount;
+          });
+        });
+
+        grpSettlements.forEach((st) => {
+          const payer = ensureGroupMember(st.fromEmail, st.fromName);
+          const receiver = ensureGroupMember(st.toEmail, st.toName);
+          payer.net += st.amount;
+          receiver.net -= st.amount;
+        });
+
+        const adminMember = g.members.find((m) => m.role === 'admin' || m.role === 'owner') || g.members[0];
+        simplifiedTransactions.push(...simplifyDebtsAdminHub(groupBalanceMap, adminMember));
+      });
+    } else {
+      simplifiedTransactions = simplifyDebtsGreedy(balanceMap);
+    }
 
     return res.status(200).json({
       balances: Object.values(balanceMap),
