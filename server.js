@@ -35,7 +35,7 @@ app.get('/api/health', async (req, res) => {
     status: 'ok',
     version: '2.0.0',
     mongodb: dbStatus,
-    googleOAuthConfigured: Boolean(process.env.GOOGLE_CLIENT_ID),
+    googleOAuthConfigured: Boolean(process.env.VASOOL_GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID),
     infisicalConfigured: Boolean(process.env.MONGO_URI || process.env.MONGODB_URI),
     timestamp: new Date().toISOString()
   });

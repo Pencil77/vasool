@@ -7,7 +7,8 @@ const User = require('../models/User');
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-fallback-secret-override-in-infisical';
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const GOOGLE_CLIENT_ID = process.env.VASOOL_GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID;
+const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 function signAuthToken(user) {
   return jwt.sign(
@@ -143,10 +144,10 @@ router.post('/google', async (req, res) => {
     const { credential, profileFallback } = req.body;
 
     let googlePayload = null;
-    if (credential && process.env.GOOGLE_CLIENT_ID) {
+    if (credential && GOOGLE_CLIENT_ID) {
       const ticket = await googleClient.verifyIdToken({
         idToken: credential,
-        audience: process.env.GOOGLE_CLIENT_ID
+        audience: GOOGLE_CLIENT_ID
       });
       googlePayload = ticket.getPayload();
     } else if (profileFallback && profileFallback.email) {
@@ -222,7 +223,7 @@ router.get('/me', requireAuth, async (req, res) => {
  */
 router.get('/config', (req, res) => {
   return res.status(200).json({
-    googleClientId: process.env.GOOGLE_CLIENT_ID || null,
+    googleClientId: GOOGLE_CLIENT_ID || null,
     environment: process.env.NODE_ENV || 'production'
   });
 });
