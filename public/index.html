@@ -1520,10 +1520,14 @@ exec node server.js`
       const appSec = document.getElementById('appWorkspaceSection');
       const toggleBtn = document.getElementById('btnToggleViewMode');
       const authBanner = document.getElementById('authActiveUserBanner');
+      const mobileNav = document.getElementById('mobileBottomNav');
+      const mobileFab = document.getElementById('mobileFabAddExpense');
 
       if (showingAuthPortal || !appState.currentUser) {
         authSec.classList.remove('hidden');
         appSec.classList.add('hidden');
+        if (mobileNav) mobileNav.classList.add('hidden');
+        if (mobileFab) mobileFab.classList.add('hidden');
         if (toggleBtn) {
           toggleBtn.textContent = appState.currentUser ? 'Back to Dashboard' : 'Auth Portal Active';
         }
@@ -1539,6 +1543,8 @@ exec node server.js`
       } else {
         authSec.classList.add('hidden');
         appSec.classList.remove('hidden');
+        if (mobileNav) mobileNav.classList.remove('hidden');
+        if (mobileFab) mobileFab.classList.remove('hidden');
         if (toggleBtn) {
           toggleBtn.textContent = 'Switch to Auth Portal';
         }
@@ -1831,6 +1837,7 @@ exec node server.js`
           });
 
           const container = document.getElementById('googleGsiBtnContainer');
+          const customBtn = document.getElementById('btnGoogleOAuth');
           if (container) {
             window.google.accounts.id.renderButton(container, {
               theme: 'outline',
@@ -1838,6 +1845,9 @@ exec node server.js`
               width: 320,
               shape: 'pill'
             });
+            if (customBtn) {
+              customBtn.classList.add('hidden');
+            }
           }
           const modalContainer = document.getElementById('modalGoogleGsiBtn');
           if (modalContainer) {
