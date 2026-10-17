@@ -88,7 +88,7 @@
         </div>
         <div class="flex items-center gap-1.5 sm:gap-2">
           <span data-testid="brand-title" class="font-extrabold text-base sm:text-lg tracking-tight text-white whitespace-nowrap">SplitFlow</span>
-          <span id="dbStatusBadge" data-testid="db-status-badge" class="hidden sm:inline-flex items-center gap-1.5 text-[10px] sm:text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 truncate max-w-[130px] sm:max-w-none">
+          <span id="dbStatusBadge" data-testid="db-status-badge" class="hidden">
             v2.0 Production · 24/24 Tests Passing
           </span>
         </div>
@@ -105,11 +105,11 @@
           <option value="GBP">£ GBP</option>
         </select>
 
-        <button id="btnToggleViewMode" data-testid="btn-toggle-view-mode" onclick="toggleAuthOrAppView()" class="hidden md:inline-flex px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">
+        <button id="btnToggleViewMode" data-testid="btn-toggle-view-mode" onclick="toggleAuthOrAppView()" class="hidden">
           <span class="hidden sm:inline">Switch to </span>Auth
         </button>
 
-        <button id="btnOpenCloudModal" data-testid="btn-open-cloud-modal" onclick="openModal('cloudModal')" class="px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-medium bg-teal-500/15 hover:bg-teal-500/25 text-teal-300 border border-teal-500/30 transition flex items-center gap-1">
+        <button id="btnOpenCloudModal" data-testid="btn-open-cloud-modal" onclick="openModal('cloudModal')" class="hidden">
           <span class="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-teal-400 animate-pulse"></span>
           <span class="hidden sm:inline">Vault &amp; DB</span>
           <span class="sm:hidden text-[10px]">Vault</span>
@@ -166,7 +166,7 @@
           <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent"></div>
           <div class="absolute bottom-4 left-4 right-4 sm:bottom-6 sm:left-6 sm:right-6">
             <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 mb-2">
-              Full-Stack MongoDB + OAuth 2.0 + Infisical Vault + CI/CD Tested
+              Smart Group Expense Splitting &amp; Debt Simplification
             </span>
             <h1 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
               Split group bills effortlessly. Settle up in one tap.
@@ -179,16 +179,16 @@
 
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div class="glass-panel glass-card-hover rounded-xl p-4">
-            <div class="text-emerald-400 font-semibold text-xs uppercase tracking-wider mb-1">Dual Authentication</div>
-            <p class="text-xs text-slate-300">Salted password signup/login &amp; Google Identity Services OAuth 2.0 automatic account linking.</p>
+            <div class="text-emerald-400 font-semibold text-xs uppercase tracking-wider mb-1">Seamless Sign-In</div>
+            <p class="text-xs text-slate-300">Fast, secure access using your Email &amp; Password or 1-click Google Sign-In with automatic account sync.</p>
           </div>
           <div class="glass-panel glass-card-hover rounded-xl p-4">
             <div class="text-teal-400 font-semibold text-xs uppercase tracking-wider mb-1">4 Split Modes</div>
             <p class="text-xs text-slate-300">Split bills Equally, by Exact Amounts, by Percentages (%), or by Relative Shares/Weights.</p>
           </div>
           <div class="glass-panel glass-card-hover rounded-xl p-4">
-            <div class="text-cyan-400 font-semibold text-xs uppercase tracking-wider mb-1">100% Tested &amp; CI/CD</div>
-            <p class="text-xs text-slate-300">Unit, Integration &amp; Headless Chromium UI E2E suites + GitHub Actions &amp; GitLab CI pipelines.</p>
+            <div class="text-cyan-400 font-semibold text-xs uppercase tracking-wider mb-1">Smart Settle-Up</div>
+            <p class="text-xs text-slate-300">Smart debt simplification algorithm calculates the minimum transfers needed to clear all group IOUs via UPI or Cash.</p>
           </div>
         </div>
       </div>
@@ -320,7 +320,7 @@
           </span>
         </div>
         <p class="text-xs sm:text-sm text-slate-400 mt-1 hidden sm:block">
-          Track shared bills, split by equal/exact/percentage/shares, run live UI &amp; unit tests, and settle minimum-cash-flow balances.
+          Track shared group bills, split expenses (equal, exact, %, or shares), and easily settle balances with one tap.
         </p>
       </div>
       <div class="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 sm:gap-2.5">
@@ -339,9 +339,11 @@
         <button data-testid="btn-quick-settle-up" onclick="switchMainTab('settle')" class="col-span-1 px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl bg-teal-500/15 hover:bg-teal-500/25 text-teal-300 font-semibold text-xs sm:text-sm border border-teal-500/30 text-center justify-center transition truncate">
           Settle Up
         </button>
-        <button data-testid="btn-quick-qa-suite" onclick="switchMainTab('tests')" class="col-span-1 px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 font-semibold text-xs sm:text-sm border border-cyan-500/30 flex items-center justify-center gap-1.5 transition">
-          <span class="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-cyan-400 flex-shrink-0"></span>
-          <span class="truncate">QA Tests</span>
+        <button data-testid="btn-quick-qa-suite" onclick="switchMainTab('expenses')" class="col-span-1 px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 font-semibold text-xs sm:text-sm border border-cyan-500/30 flex items-center justify-center gap-1.5 transition">
+          <svg class="w-4 h-4 text-cyan-400 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+          </svg>
+          <span class="truncate">View Bills</span>
         </button>
       </div>
     </div>
@@ -400,7 +402,7 @@
         <button id="navTabSettle" data-testid="nav-tab-settle" onclick="switchMainTab('settle')" class="whitespace-nowrap px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-slate-300 hover:bg-slate-800 transition">
           Smart Settle-Up
         </button>
-        <button id="navTabTests" data-testid="nav-tab-tests" onclick="switchMainTab('tests')" class="whitespace-nowrap px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-slate-300 hover:bg-slate-800 transition flex items-center gap-1.5">
+        <button id="navTabTests" data-testid="nav-tab-tests" onclick="switchMainTab('tests')" class="hidden">
           <span>QA &amp; Pipelines</span>
           <span id="navTabTestsBadge" class="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">24/24</span>
         </button>
@@ -619,6 +621,18 @@
       </div>
     </div>
 
+    <!-- Clean, Subdued Footer for Functional Specifications & Developer Tools -->
+    <footer class="mt-12 py-6 border-t border-slate-900 text-center text-xs text-slate-500">
+      <div class="flex flex-wrap items-center justify-center gap-4 mb-2">
+        <span>SplitFlow · Smart Expense Splitting &amp; Debt Simplification</span>
+        <span class="text-slate-700">|</span>
+        <button onclick="switchMainTab('tests')" class="text-slate-600 hover:text-slate-400 transition underline underline-offset-2">QA Test Runner</button>
+        <span class="text-slate-700">|</span>
+        <button onclick="openModal('cloudModal')" class="text-slate-600 hover:text-slate-400 transition underline underline-offset-2">System Status</button>
+      </div>
+      <p class="text-[11px] text-slate-600">Built for seamless group sharing with 4 split modes and automatic minimum cash flow settlement.</p>
+    </footer>
+
   </main>
 
   <!-- ===================================================================== -->
@@ -635,7 +649,7 @@
 
   <!-- Mobile Fixed Bottom Navigation Bar (Android Thumb-Friendly Viewport) -->
   <nav id="mobileBottomNav" data-testid="mobile-bottom-nav" class="md:hidden fixed bottom-0 inset-x-0 bg-slate-950/95 border-t border-slate-800/90 z-40 backdrop-blur-xl pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-1 px-1">
-    <div class="grid grid-cols-5 items-center justify-around">
+    <div class="grid grid-cols-4 items-center justify-around">
       <button id="mobileNavDashboard" data-testid="mobile-nav-dashboard" onclick="switchMainTab('dashboard')" class="flex flex-col items-center justify-center py-1 px-1 text-emerald-400 font-bold transition-colors">
         <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
@@ -664,7 +678,7 @@
         <span class="text-[10px] tracking-tight">Settle</span>
       </button>
 
-      <button id="mobileNavTests" data-testid="mobile-nav-tests" onclick="switchMainTab('tests')" class="flex flex-col items-center justify-center py-1 px-1 text-slate-400 hover:text-slate-200 transition-colors relative">
+      <button id="mobileNavTests" data-testid="mobile-nav-tests" onclick="switchMainTab('tests')" class="hidden">
         <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z" />
         </svg>
@@ -1068,8 +1082,8 @@
 
         const badge = document.getElementById('dbStatusBadge');
         if (badge) {
-          badge.className = 'hidden sm:inline-flex text-[11px] font-semibold px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 items-center gap-1.5';
-          badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> MongoDB Atlas: Live Sync';
+          badge.className = 'hidden';
+          badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-400"></span> Live';
         }
         saveState();
         refreshAllViews();
@@ -1620,7 +1634,7 @@ exec node server.js`
       const originalText = submitBtn ? submitBtn.textContent : '';
       if (submitBtn) {
         submitBtn.disabled = true;
-        submitBtn.textContent = 'Authenticating with MongoDB...';
+        submitBtn.textContent = 'Signing in...';
       }
 
       try {
@@ -1637,7 +1651,7 @@ exec node server.js`
         showingAuthPortal = false;
         saveState();
         refreshAllViews();
-        showToast(`Logged in as ${res.user.name}. MongoDB Atlas sync active.`);
+        showToast(`Welcome back, ${res.user.name}!`);
         await syncWithBackend();
       } catch (err) {
         // Fallback for demo mode if backend is not reachable
@@ -1675,7 +1689,7 @@ exec node server.js`
       const originalText = submitBtn ? submitBtn.textContent : '';
       if (submitBtn) {
         submitBtn.disabled = true;
-        submitBtn.textContent = 'Registering in MongoDB Atlas...';
+        submitBtn.textContent = 'Creating account...';
       }
 
       try {
@@ -1729,7 +1743,7 @@ exec node server.js`
 
     async function handleGoogleCredentialResponse(response) {
       try {
-        showToast('Verifying Google OAuth 2.0 credential with server...');
+        showToast('Signing in with Google...');
         const res = await apiFetch('/api/auth/google', {
           method: 'POST',
           body: JSON.stringify({ credential: response.credential })
@@ -2068,14 +2082,18 @@ exec node server.js`
           }
         }
         if (btn) {
-          if (t === tab) {
+          if (t === 'tests') {
+            btn.className = 'hidden';
+          } else if (t === tab) {
             btn.className = 'whitespace-nowrap px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-emerald-500 text-slate-950 transition flex items-center gap-1.5';
           } else {
             btn.className = 'whitespace-nowrap px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-slate-300 hover:bg-slate-800 transition flex items-center gap-1.5';
           }
         }
         if (mobileBtn) {
-          if (t === tab) {
+          if (t === 'tests') {
+            mobileBtn.className = 'hidden';
+          } else if (t === tab) {
             mobileBtn.className = 'flex flex-col items-center justify-center py-1 px-1 text-emerald-400 font-bold transition-colors';
           } else {
             mobileBtn.className = 'flex flex-col items-center justify-center py-1 px-1 text-slate-400 hover:text-slate-200 transition-colors';
