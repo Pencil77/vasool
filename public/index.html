@@ -116,15 +116,15 @@
         </button>
 
         <!-- Active User Pill -->
-        <div id="headerUserArea" data-testid="header-user-area" class="flex items-center gap-1.5 sm:gap-2 pl-1 sm:pl-2 border-l border-slate-800">
+        <div id="headerUserArea" data-testid="header-user-area" class="hidden items-center gap-1.5 sm:gap-2 pl-1 sm:pl-2 border-l border-slate-800">
           <div id="headerUserAvatar" data-testid="header-user-avatar" class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-emerald-500/30 to-teal-500/30 border border-emerald-400/40 flex items-center justify-center text-[11px] sm:text-xs font-bold text-emerald-300 flex-shrink-0">
-            ZM
+            --
           </div>
           <div class="hidden lg:block text-left">
-            <div id="headerUserName" data-testid="header-user-name" class="text-xs font-semibold text-slate-100 leading-tight">Zubair Mohammed</div>
-            <div id="headerUserProvider" data-testid="header-user-provider" class="text-[10px] text-emerald-400 leading-tight">Google + Email Linked</div>
+            <div id="headerUserName" data-testid="header-user-name" class="text-xs font-semibold text-slate-100 leading-tight"></div>
+            <div id="headerUserProvider" data-testid="header-user-provider" class="text-[10px] text-emerald-400 leading-tight"></div>
           </div>
-          <button id="btnHeaderLogout" data-testid="btn-header-logout" onclick="handleLogout()" title="Sign out / Test Auth Screen" class="p-1 sm:p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800/80 transition flex-shrink-0">
+          <button id="btnHeaderLogout" data-testid="btn-header-logout" onclick="handleLogout()" title="Sign out" class="p-1 sm:p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800/80 transition flex-shrink-0">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
             </svg>
@@ -230,7 +230,7 @@
           <form id="loginForm" data-testid="login-form" onsubmit="handleEmailLogin(event)" class="space-y-4">
             <div>
               <label for="loginEmail" class="block text-xs font-medium text-slate-300 mb-1">Email Address</label>
-              <input id="loginEmail" data-testid="input-login-email" type="email" required value="mrzoromit3@gmail.com" placeholder="you@example.com" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500" />
+              <input id="loginEmail" data-testid="input-login-email" type="email" required placeholder="you@example.com" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500" />
             </div>
             <div>
               <div class="flex items-center justify-between mb-1">
@@ -238,7 +238,7 @@
                 <button type="button" data-testid="btn-forgot-password" onclick="triggerPasswordResetPrompt()" class="text-xs text-emerald-400 hover:underline">Forgot password?</button>
               </div>
               <div class="relative">
-                <input id="loginPassword" data-testid="input-login-password" type="password" required value="SplitFlow#2026" placeholder="••••••••" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500 pr-16" />
+                <input id="loginPassword" data-testid="input-login-password" type="password" required placeholder="••••••••" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500 pr-16" />
                 <button type="button" onclick="togglePasswordVisibility('loginPassword', 'loginPwdToggle')" id="loginPwdToggle" data-testid="btn-toggle-login-pwd" class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-200">
                   Show
                 </button>
@@ -253,7 +253,7 @@
           <form id="signupForm" data-testid="signup-form" onsubmit="handleEmailSignup(event)" class="space-y-4 hidden">
             <div>
               <label for="signupName" class="block text-xs font-medium text-slate-300 mb-1">Full Name</label>
-              <input id="signupName" data-testid="input-signup-name" type="text" required placeholder="e.g. Zubair Mohammed" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500" />
+              <input id="signupName" data-testid="input-signup-name" type="text" required placeholder="e.g. Alex Morgan" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500" />
             </div>
             <div>
               <label for="signupEmail" class="block text-xs font-medium text-slate-300 mb-1">Email Address</label>
@@ -276,30 +276,12 @@
             </div>
             <div>
               <label for="signupUpi" class="block text-xs font-medium text-slate-300 mb-1">UPI ID / Payment Handle (Optional)</label>
-              <input id="signupUpi" data-testid="input-signup-upi" type="text" placeholder="e.g. zubair@okaxis" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500" />
+              <input id="signupUpi" data-testid="input-signup-upi" type="text" placeholder="e.g. yourname@okaxis" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500" />
             </div>
             <button type="submit" data-testid="btn-submit-signup" class="w-full py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm shadow-lg shadow-emerald-500/20 transition">
               Create Account &amp; Start Splitting
             </button>
           </form>
-
-          <!-- Registered Accounts Quick Switcher -->
-          <div class="mt-6 pt-4 border-t border-slate-800/80">
-            <div class="flex items-center justify-between text-xs text-slate-400 mb-2">
-              <span>Instant Demo Accounts:</span>
-              <span class="text-[11px] text-emerald-400">1-Click Switch</span>
-            </div>
-            <div class="grid grid-cols-2 gap-2">
-              <button type="button" data-testid="btn-quick-demo-zubair" onclick="quickLoginDemo('Zubair Mohammed', 'mrzoromit3@gmail.com', ['email', 'google'])" class="px-3 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-left transition">
-                <div class="text-xs font-semibold text-white truncate">Zubair Mohammed</div>
-                <div class="text-[10px] text-slate-400 truncate">mrzoromit3@gmail.com</div>
-              </button>
-              <button type="button" data-testid="btn-quick-demo-omkar" onclick="quickLoginDemo('Omkar Chinnam', 'omkar.chinnam@gmail.com', ['google'])" class="px-3 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-left transition">
-                <div class="text-xs font-semibold text-white truncate">Omkar Chinnam</div>
-                <div class="text-[10px] text-slate-400 truncate">Google OAuth User</div>
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </div>
@@ -314,7 +296,7 @@
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 bg-gradient-to-r from-slate-900/95 via-slate-900/90 to-emerald-950/50 p-4 sm:p-6 rounded-2xl border border-slate-800 shadow-xl">
       <div>
         <div class="flex flex-wrap items-center gap-2">
-          <h2 class="text-lg sm:text-2xl font-extrabold text-white tracking-tight">Welcome back, <span id="welcomeUserName" data-testid="welcome-user-name" class="text-emerald-400">Zubair</span></h2>
+          <h2 class="text-lg sm:text-2xl font-extrabold text-white tracking-tight">Welcome back, <span id="welcomeUserName" data-testid="welcome-user-name" class="text-emerald-400">Friend</span></h2>
           <span id="activeGroupPill" data-testid="active-group-pill" class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
             All Groups
           </span>
@@ -861,31 +843,13 @@
       </div>
 
       <div class="mt-4">
-        <h4 class="text-base font-bold text-slate-900">Choose an account</h4>
+        <h4 class="text-base font-bold text-slate-900">Sign in with Google</h4>
         <p class="text-xs text-slate-500 mt-0.5">to continue to <span class="font-semibold text-emerald-700">SplitFlow</span> (OAuth 2.0 / Google Identity Services)</p>
 
         <div id="modalGoogleGsiBtn" class="flex justify-center my-3"></div>
 
-        <div class="mt-4 space-y-2">
-          <button type="button" data-testid="google-account-zubair" onclick="completeGoogleAuth('Zubair Mohammed', 'mrzoromit3@gmail.com')" class="w-full flex items-center gap-3 p-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-left transition">
-            <div class="w-9 h-9 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-xs">ZM</div>
-            <div class="flex-1 min-w-0">
-              <div class="text-sm font-semibold text-slate-900">Zubair Mohammed</div>
-              <div class="text-xs text-slate-500 truncate">mrzoromit3@gmail.com</div>
-            </div>
-          </button>
-
-          <button type="button" data-testid="google-account-omkar" onclick="completeGoogleAuth('Omkar Chinnam', 'omkar.chinnam@gmail.com')" class="w-full flex items-center gap-3 p-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-left transition">
-            <div class="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs">OC</div>
-            <div class="flex-1 min-w-0">
-              <div class="text-sm font-semibold text-slate-900">Omkar Chinnam</div>
-              <div class="text-xs text-slate-500 truncate">omkar.chinnam@gmail.com</div>
-            </div>
-          </button>
-        </div>
-
         <form onsubmit="handleCustomGoogleAccount(event)" class="mt-4 pt-3 border-t border-slate-200 space-y-2.5">
-          <div class="text-xs font-semibold text-slate-600">Or use another Google account:</div>
+          <div class="text-xs font-semibold text-slate-600">Enter your Google account details:</div>
           <input id="customGoogleName" data-testid="input-custom-google-name" type="text" required placeholder="Full Name" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs text-slate-900" />
           <input id="customGoogleEmail" data-testid="input-custom-google-email" type="email" required placeholder="your.email@gmail.com" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs text-slate-900" />
           <button type="submit" data-testid="btn-submit-custom-google" class="w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition">
@@ -987,7 +951,7 @@
   <!-- APPLICATION LOGIC & AUTOMATED QA TEST RUNNER                          -->
   <!-- ===================================================================== -->
   <script>
-    const STORAGE_KEY = 'splitflow_mongodb_state_v1';
+    const STORAGE_KEY = 'splitflow_clean_state_v3';
     const AUTH_TOKEN_KEY = 'vasool_jwt_token';
 
     async function apiFetch(path, options = {}) {
@@ -1020,7 +984,7 @@
       if (!token) return;
       try {
         const groupsRes = await apiFetch('/api/groups');
-        if (groupsRes && Array.isArray(groupsRes.groups) && groupsRes.groups.length > 0) {
+        if (groupsRes && Array.isArray(groupsRes.groups)) {
           appState.groups = groupsRes.groups.map((g) => ({
             id: g._id ? g._id.toString() : g.id,
             name: g.name,
@@ -1095,7 +1059,7 @@
     let currentSplitMode = 'equal';
     let activeMainTab = 'dashboard';
     let selectedGroupId = 'ALL';
-    let showingAuthPortal = false;
+    let showingAuthPortal = typeof localStorage !== 'undefined' ? !localStorage.getItem(AUTH_TOKEN_KEY) : true;
     let activeCurrency = 'INR';
     let activePipelineTab = 'github';
     let categoryChartInstance = null;
@@ -1209,6 +1173,16 @@ exec node server.js`
     };
 
     function createDefaultState() {
+      return {
+        currentUser: null,
+        users: [],
+        groups: [],
+        expenses: [],
+        settlements: []
+      };
+    }
+
+    function getMockSampleState() {
       return {
         currentUser: {
           id: 'usr_zubair_01',
@@ -1395,13 +1369,16 @@ exec node server.js`
         const raw = localStorage.getItem(STORAGE_KEY);
         if (raw) {
           const parsed = JSON.parse(raw);
-          if (parsed && parsed.groups && parsed.expenses) {
+          if (parsed && Array.isArray(parsed.groups) && Array.isArray(parsed.expenses)) {
             appState = parsed;
             if (typeof window !== 'undefined') window.appState = appState;
           }
         }
       } catch (err) {
         // Fallback to in-memory default state
+      }
+      if (typeof localStorage !== 'undefined' && !localStorage.getItem(AUTH_TOKEN_KEY)) {
+        appState.currentUser = null;
       }
     }
 
@@ -1553,20 +1530,34 @@ exec node server.js`
         }
       }
 
+      const headerArea = document.getElementById('headerUserArea');
       if (appState.currentUser) {
-        const initials = appState.currentUser.name
+        if (headerArea) {
+          headerArea.classList.remove('hidden');
+          headerArea.classList.add('flex');
+        }
+        const initials = (appState.currentUser.name || 'User')
           .split(' ')
           .map((w) => w[0])
           .join('')
           .slice(0, 2)
           .toUpperCase();
-        document.getElementById('headerUserAvatar').textContent = initials;
-        document.getElementById('headerUserName').textContent = appState.currentUser.name;
+        const avatarEl = document.getElementById('headerUserAvatar');
+        if (avatarEl) avatarEl.textContent = initials;
+        const nameEl = document.getElementById('headerUserName');
+        if (nameEl) nameEl.textContent = appState.currentUser.name;
         const providers = (appState.currentUser.authProviders || ['email']).map((p) =>
           p === 'google' ? 'Google OAuth' : 'Email'
         );
-        document.getElementById('headerUserProvider').textContent = providers.join(' + ');
-        document.getElementById('welcomeUserName').textContent = appState.currentUser.name.split(' ')[0];
+        const provEl = document.getElementById('headerUserProvider');
+        if (provEl) provEl.textContent = providers.join(' + ');
+        const welcomeEl = document.getElementById('welcomeUserName');
+        if (welcomeEl) welcomeEl.textContent = (appState.currentUser.name || 'Friend').split(' ')[0];
+      } else {
+        if (headerArea) {
+          headerArea.classList.add('hidden');
+          headerArea.classList.remove('flex');
+        }
       }
     }
 
@@ -1864,24 +1855,13 @@ exec node server.js`
       }
     }
 
-    function quickLoginDemo(name, email, providers) {
-      appState.currentUser = {
-        id: 'usr_demo',
-        name,
-        email: email.toLowerCase(),
-        authProviders: providers
-      };
-      showingAuthPortal = false;
-      saveState();
-      refreshAllViews();
-      showToast(`Switched active account to ${name}.`);
-    }
-
     function handleLogout() {
       localStorage.removeItem(AUTH_TOKEN_KEY);
-      appState.currentUser = null;
+      localStorage.removeItem(STORAGE_KEY);
+      appState = createDefaultState();
       showingAuthPortal = true;
       renderTopLevelView();
+      refreshAllViews();
       showToast('Signed out. Please log in or sign up to continue.');
     }
 
@@ -2144,7 +2124,7 @@ exec node server.js`
       const { balanceList, simplified, filteredExpenses, filteredSettlements, totalSpend } =
         computeBalancesAndSimplifications(selectedGroupId);
 
-      const myEmail = (appState.currentUser?.email || 'mrzoromit3@gmail.com').toLowerCase();
+      const myEmail = (appState.currentUser?.email || '').toLowerCase();
       const myEntry = balanceList.find((b) => b.email === myEmail) || { net: 0 };
 
       let owedToMe = 0;
@@ -2410,6 +2390,11 @@ exec node server.js`
     function renderGroupsGrid() {
       const container = document.getElementById('groupsGridContainer');
       if (!container) return;
+
+      if (!appState.groups || !appState.groups.length) {
+        container.innerHTML = '<div class="col-span-full glass-panel rounded-2xl p-8 text-center text-xs text-slate-400">No groups created yet. Click "+ New Group" above to start.</div>';
+        return;
+      }
 
       const currentEmail = (appState.currentUser?.email || '').toLowerCase().trim();
 
@@ -3078,7 +3063,7 @@ exec node server.js`
       const category = document.getElementById('newGroupCategory').value;
       const rawMembers = document.getElementById('newGroupMembersInput').value;
 
-      const creator = appState.currentUser || { name: 'Zubair Mohammed', email: 'mrzoromit3@gmail.com' };
+      const creator = appState.currentUser || { name: 'Guest User', email: 'guest@splitflow.app' };
       const members = [{ name: creator.name, email: creator.email.toLowerCase(), role: 'admin' }];
       const seen = new Set([creator.email.toLowerCase()]);
 
@@ -3183,7 +3168,7 @@ exec node server.js`
       document.getElementById('settleToEmail').value = toEmail;
       document.getElementById('settleToName').value = toName;
       document.getElementById('settleGroupId').value =
-        selectedGroupId === 'ALL' ? appState.groups[0]?.id || 'grp_goa_trip' : selectedGroupId;
+        selectedGroupId === 'ALL' ? appState.groups[0]?.id || '' : selectedGroupId;
       document.getElementById('settleAmountInput').value = amount;
       document.getElementById('settleNoteInput').value = '';
 
@@ -3458,17 +3443,17 @@ exec node server.js`
       });
 
       // --- 7 INTEGRATION TESTS ---
-      runCase('Integration', 'IT-01: Default MongoDB State seeds 4 Users, 3 Groups, Expenses & Settlements', () => {
-        const def = createDefaultState();
+      runCase('Integration', 'IT-01: Mock Sample Fixture contains 4 Users, 3 Groups, Expenses & Settlements', () => {
+        const def = getMockSampleState();
         if (def.users.length < 4 || def.groups.length < 3 || def.expenses.length < 4) {
           throw new Error('Seed state incomplete');
         }
         return `${def.users.length} users, ${def.groups.length} groups, ${def.expenses.length} bills`;
       });
 
-      runCase('Integration', 'IT-02: Dual Auth links Email + Google OAuth 2.0 on mrzoromit3@gmail.com', () => {
-        const def = createDefaultState();
-        const z = appState.users.find((u) => u.email === 'mrzoromit3@gmail.com') || def.users.find((u) => u.email === 'mrzoromit3@gmail.com');
+      runCase('Integration', 'IT-02: Dual Auth links Email + Google OAuth 2.0 on user profile', () => {
+        const def = getMockSampleState();
+        const z = (appState.users && appState.users.find((u) => u.email === 'mrzoromit3@gmail.com')) || def.users.find((u) => u.email === 'mrzoromit3@gmail.com');
         if (!z || !z.authProviders.includes('email') || !z.authProviders.includes('google')) {
           throw new Error('Dual provider link missing');
         }
@@ -3476,19 +3461,19 @@ exec node server.js`
       });
 
       runCase('Integration', 'IT-03: Group Filter isolates "Goa Weekend Getaway" spend & balances', () => {
-        const goa = computeBalancesAndSimplifications('grp_goa_trip', createDefaultState());
+        const goa = computeBalancesAndSimplifications('grp_goa_trip', getMockSampleState());
         if (goa.totalSpend !== 17600) throw new Error(`Expected 17600, got ${goa.totalSpend}`);
         return 'Goa spend verified: ₹17,600.00';
       });
 
       runCase('Integration', 'IT-04: Group Filter isolates "Hyderabad Flat 402 Utilities" percentage split', () => {
-        const hyd = computeBalancesAndSimplifications('grp_hyd_flat', createDefaultState());
+        const hyd = computeBalancesAndSimplifications('grp_hyd_flat', getMockSampleState());
         if (hyd.totalSpend !== 2700) throw new Error('Flat 402 spend mismatch');
         return 'Flat 402 spend verified: ₹2,700.00';
       });
 
       runCase('Integration', 'IT-05: Partial Settlement (₹1,500 Amazon Pay) reduces Anshuman net debt accurately', () => {
-        const goa = computeBalancesAndSimplifications('grp_goa_trip', createDefaultState());
+        const goa = computeBalancesAndSimplifications('grp_goa_trip', getMockSampleState());
         const ansh = goa.balanceList.find((b) => b.email === 'anshuman.barik@gmail.com');
         // Anshuman owed 3600 + 800 = 4400, paid 1500 settlement -> net -2900
         if (!ansh || Math.round(ansh.net) !== -2900) throw new Error(`Expected -2900, got ${ansh?.net}`);
@@ -3594,9 +3579,11 @@ exec node server.js`
       });
 
       runCase('UI E2E', 'UI-06: Group Cards & Invite Code Copy Controls rendered with data-testid', () => {
+        const container = document.getElementById('groupsGridContainer');
+        if (!container) throw new Error('Groups container missing');
         const grpCard = document.querySelector('[data-testid^="group-card-"]');
-        if (!grpCard) throw new Error('No group cards rendered');
-        return `${appState.groups.length} group cards rendered in grid`;
+        if (appState.groups.length > 0 && !grpCard) throw new Error('No group cards rendered');
+        return appState.groups.length > 0 ? `${appState.groups.length} group cards rendered in grid` : 'Empty groups grid rendered cleanly';
       });
 
       runCase('UI E2E', 'UI-07: CI/CD Pipeline Viewer (GitHub Actions, GitLab CI, Dockerfile, Infisical) interactive', () => {
@@ -3782,12 +3769,18 @@ exec node server.js`
             if (!appState.users.some((u) => u.email === me.user.email)) {
               appState.users.push(me.user);
             }
+            showingAuthPortal = false;
+            renderTopLevelView();
             refreshAllViews();
             await syncWithBackend();
           }
         } catch (err) {
           console.warn('[Auth Me] Session expired or invalid, clearing token:', err.message);
           localStorage.removeItem(AUTH_TOKEN_KEY);
+          appState.currentUser = null;
+          showingAuthPortal = true;
+          renderTopLevelView();
+          refreshAllViews();
         }
       }
 
