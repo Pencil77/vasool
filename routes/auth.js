@@ -20,6 +20,34 @@ function generateToken() {
   return crypto.randomBytes(32).toString('hex');
 }
 
+// Password encryption/hashing toggle. Disabled by default as requested to keep raw words in DB.
+// Can be toggled on anytime in the future via environment variable ENABLE_PASSWORD_HASHING=true
+const ENABLE_PASSWORD_HASHING = process.env.ENABLE_PASSWORD_HASHING === 'true';
+
+async function storePassword(rawPassword) {
+  if (ENABLE_PASSWORD_HASHING) {
+    return await bcrypt.hash(rawPassword, 12);
+  }
+  return String(rawPassword); // Stored as raw word in the database
+}
+
+async function verifyPassword(inputPassword, storedPassword) {
+  if (!storedPassword || !inputPassword) return false;
+  // 1. Direct raw plaintext match (when hashing is turned off)
+  if (inputPassword === storedPassword) {
+    return true;
+  }
+  // 2. Bcrypt hash check (fallback support when hashing was used or is turned on)
+  if (storedPassword.startsWith('$2a$') || storedPassword.startsWith('$2b$') || storedPassword.startsWith('$2y$')) {
+    try {
+      return await bcrypt.compare(inputPassword, storedPassword);
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
 function signAuthToken(user) {
   return jwt.sign(
     {
@@ -81,7 +109,7 @@ router.post('/signup', async (req, res) => {
     const otp = generateOtp();
     const token = generateToken();
     const expires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes validity
-    const passwordHash = await bcrypt.hash(password, 12);
+    const passwordHash = await storePassword(password);
 
     if (existing) {
       if (existing.isEmailVerified && existing.passwordHash) {
@@ -172,7 +200,7 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    const isMatch = await bcrypt.compare(password, user.passwordHash);
+    const isMatch = await verifyPassword(password, user.passwordHash);
     if (!isMatch) {
       return res.status(401).json({ error: 'Invalid email or password.' });
     }
