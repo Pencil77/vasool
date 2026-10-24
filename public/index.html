@@ -773,9 +773,10 @@
               % Percent
             </button>
             <button type="button" id="splitBtn_shares" data-testid="split-mode-shares" onclick="setSplitMode('shares')" class="py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition">
-              × Shares
+              × Ratio (Parts)
             </button>
           </div>
+          <p id="splitModeHintText" class="text-[11px] text-slate-400 mt-1.5 px-0.5">Split bill equally among all checked members.</p>
         </div>
 
         <!-- Dynamic Member Split Rows -->
@@ -3507,14 +3508,17 @@ exec node server.js`
             <span class="truncate font-medium">${escapeHtml(m.name)}</span>
           </label>
           <div class="flex items-center gap-2">
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value="${currentSplitMode === 'shares' ? (m.defaultWeight || 1) : currentSplitMode === 'percentage' ? equalPct : 0}"
-              oninput="recalculateSplitPreview()"
-              class="exp-member-input w-24 px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-700 text-xs text-right text-white ${currentSplitMode === 'equal' ? 'hidden' : ''}"
-            />
+            <div class="flex items-center gap-1">
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value="${currentSplitMode === 'shares' ? (m.defaultWeight || 1) : currentSplitMode === 'percentage' ? equalPct : 0}"
+                oninput="recalculateSplitPreview()"
+                class="exp-member-input w-20 px-2 py-1 rounded-lg bg-slate-950 border border-slate-700 text-xs text-right text-white ${currentSplitMode === 'equal' ? 'hidden' : ''}"
+              />
+              <span class="exp-member-unit text-[10px] text-slate-400 font-medium w-8 ${currentSplitMode === 'equal' ? 'hidden' : ''}">${currentSplitMode === 'percentage' ? '%' : currentSplitMode === 'shares' ? 'part' : '₹'}</span>
+            </div>
             <span class="exp-member-computed text-xs font-mono-code font-semibold text-emerald-400 w-20 text-right">₹0.00</span>
           </div>
         </div>
@@ -3536,17 +3540,31 @@ exec node server.js`
         }
       });
 
+      const hintEl = document.getElementById('splitModeHintText');
+      if (hintEl) {
+        if (mode === 'equal') hintEl.textContent = 'Split bill equally among all checked members.';
+        else if (mode === 'exact') hintEl.textContent = 'Enter exact amounts per member. The sum must match the total bill.';
+        else if (mode === 'percentage') hintEl.textContent = 'Enter percentages per member (e.g. 50%, 25%, 25%). Vasool computes the exact split.';
+        else if (mode === 'shares') hintEl.textContent = 'Enter relative ratio / parts (e.g. 1 part, 2 parts for a couple, 0.5 for child). Proportionately calculated.';
+      }
+
       const rows = Array.from(document.querySelectorAll('#expMemberSplitsContainer > div'));
       const total = Number(document.getElementById('expAmountInput').value) || 0;
       const checkedCount = rows.filter((r) => r.querySelector('.exp-member-check').checked).length || 1;
 
       rows.forEach((row) => {
         const inp = row.querySelector('.exp-member-input');
+        const unit = row.querySelector('.exp-member-unit');
         const checked = row.querySelector('.exp-member-check').checked;
         if (mode === 'equal') {
           inp.classList.add('hidden');
+          if (unit) unit.classList.add('hidden');
         } else {
           inp.classList.remove('hidden');
+          if (unit) {
+            unit.classList.remove('hidden');
+            unit.textContent = mode === 'percentage' ? '%' : mode === 'shares' ? 'part' : '₹';
+          }
           if (!checked) {
             inp.value = '0';
           } else if (mode === 'exact') {
@@ -3569,9 +3587,14 @@ exec node server.js`
 
       let allocatedSum = 0;
       let totalShares = 0;
+      let totalPercent = 0;
       if (currentSplitMode === 'shares') {
         activeRows.forEach((r) => {
           totalShares += Math.max(0, Number(r.querySelector('.exp-member-input').value) || 0);
+        });
+      } else if (currentSplitMode === 'percentage') {
+        activeRows.forEach((r) => {
+          totalPercent += Math.max(0, Number(r.querySelector('.exp-member-input').value) || 0);
         });
       }
 
@@ -3606,7 +3629,13 @@ exec node server.js`
 
       const banner = document.getElementById('splitValidationBanner');
       const summary = document.getElementById('splitAllocationSummary');
-      summary.textContent = `${formatINR(allocatedSum)} / ${formatINR(total)}`;
+      if (currentSplitMode === 'percentage') {
+        summary.textContent = `${formatINR(allocatedSum)} / ${formatINR(total)} (${Math.round(totalPercent * 10) / 10}%)`;
+      } else if (currentSplitMode === 'shares') {
+        summary.textContent = `${formatINR(allocatedSum)} / ${formatINR(total)} (${Math.round(totalShares * 10) / 10} parts)`;
+      } else {
+        summary.textContent = `${formatINR(allocatedSum)} / ${formatINR(total)}`;
+      }
 
       const diff = Math.abs(total - allocatedSum);
       if (diff <= 0.05 && activeRows.length > 0) {
