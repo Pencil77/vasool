@@ -5,6 +5,8 @@ const Group = require('../models/Group');
 const Expense = require('../models/Expense');
 const Settlement = require('../models/Settlement');
 const { requireAuth } = require('./auth');
+const { sendGroupInviteEmail } = require('../lib/mailer');
+const logger = require('../lib/logger');
 
 const router = express.Router();
 
@@ -208,9 +210,13 @@ function calculateDirectDebts(expenses, settlements) {
 router.get('/groups', requireAuth, async (req, res) => {
   try {
     await connectToDatabase();
-    const groups = await Group.find({ 'members.email': req.user.email }).sort({ updatedAt: -1 });
+    const userEmail = (req.user.email || '').toLowerCase().trim();
+    const groups = await Group.find({
+      'members.email': { $regex: new RegExp('^' + userEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') }
+    }).sort({ updatedAt: -1 });
     return res.status(200).json({ groups });
   } catch (err) {
+    logger.error('[splits:groups] Error fetching user groups:', err);
     return res.status(500).json({ error: err.message });
   }
 });
@@ -260,8 +266,73 @@ router.post('/groups', requireAuth, async (req, res) => {
       members: finalMembers
     });
 
+    // Asynchronously dispatch group invitation emails to all added members
+    const creatorName = req.user.name || normalizedCreator.name || normalizedCreator.email.split('@')[0];
+    finalMembers.forEach((m) => {
+      if (m.email !== normalizedCreator.email) {
+        sendGroupInviteEmail({
+          toEmail: m.email,
+          toName: m.name,
+          groupName: group.name,
+          inviteCode: group.inviteCode,
+          adminName: creatorName,
+          adminEmail: normalizedCreator.email
+        }).catch((err) => {
+          logger.error(`[splits:invite] Background invite dispatch failed for ${m.email}:`, err);
+        });
+      }
+    });
+
+    logger.info(`[splits:groups] Created group "${group.name}" with code ${inviteCode} by ${normalizedCreator.email}`);
     return res.status(201).json({ group });
   } catch (err) {
+    logger.error('[splits:groups] Error creating group:', err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/groups/join - Join a group using an invite code
+router.post('/groups/join', requireAuth, async (req, res) => {
+  try {
+    await connectToDatabase();
+    const { inviteCode } = req.body;
+    if (!inviteCode) {
+      return res.status(400).json({ error: 'Invite code is required.' });
+    }
+
+    const cleanCode = String(inviteCode).trim().toUpperCase();
+    const group = await Group.findOne({ inviteCode: cleanCode });
+    if (!group) {
+      return res.status(404).json({ error: `No group found with invite code "${cleanCode}".` });
+    }
+
+    const userEmail = (req.user.email || '').toLowerCase().trim();
+    const userName = req.user.name || userEmail.split('@')[0];
+
+    const existingMember = group.members.find(
+      (m) => m.email.toLowerCase().trim() === userEmail
+    );
+
+    if (!existingMember) {
+      group.members.push({
+        userId: req.user.sub || null,
+        name: userName,
+        email: userEmail,
+        role: 'member',
+        defaultWeight: 1
+      });
+      await group.save();
+      logger.info(`[splits:join] User ${userEmail} (${userName}) joined group "${group.name}" via code ${cleanCode}`);
+    } else {
+      logger.info(`[splits:join] User ${userEmail} is already a member of "${group.name}"`);
+    }
+
+    return res.status(200).json({
+      message: `Successfully joined group "${group.name}".`,
+      group
+    });
+  } catch (err) {
+    logger.error('[splits:join] Error joining group:', err);
     return res.status(500).json({ error: err.message });
   }
 });
@@ -430,14 +501,37 @@ router.post('/groups/:id/members', requireAuth, async (req, res) => {
     }
 
     const cleanEmail = String(email).toLowerCase().trim();
+    const cleanName = String(name).trim();
     if (group.members.some((m) => m.email === cleanEmail)) {
       return res.status(409).json({ error: 'Member is already in this group.' });
     }
 
-    group.members.push({ name: String(name).trim(), email: cleanEmail, role: 'member' });
+    group.members.push({ name: cleanName, email: cleanEmail, role: 'member' });
     await group.save();
+
+    // Dispatch invitation email asynchronously
+    const currentAdmin = group.members.find((m) => m.role === 'admin') ||
+      (group.adminEmail ? group.members.find((m) => m.email.toLowerCase() === group.adminEmail.toLowerCase()) : null) ||
+      req.user;
+
+    const inviterName = req.user.name || (currentAdmin ? currentAdmin.name : 'Group Admin');
+    const inviterEmail = req.user.email || (currentAdmin ? currentAdmin.email : group.createdByEmail);
+
+    sendGroupInviteEmail({
+      toEmail: cleanEmail,
+      toName: cleanName,
+      groupName: group.name,
+      inviteCode: group.inviteCode,
+      adminName: inviterName,
+      adminEmail: inviterEmail
+    }).catch((err) => {
+      logger.error(`[splits:invite] Background member invite dispatch failed for ${cleanEmail}:`, err);
+    });
+
+    logger.info(`[splits:members] Added member ${cleanName} (${cleanEmail}) to group "${group.name}"`);
     return res.status(200).json({ group });
   } catch (err) {
+    logger.error('[splits:members] Error adding member to group:', err);
     return res.status(500).json({ error: err.message });
   }
 });

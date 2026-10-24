@@ -196,6 +196,15 @@
       <!-- Right Column: Auth Card (Login / Signup / Google Sign-In) -->
       <div class="lg:col-span-5">
         <div class="glass-panel rounded-2xl p-6 sm:p-8 shadow-2xl border border-slate-800">
+          <!-- Pending Group Invite Banner -->
+          <div id="authPendingInviteBanner" class="hidden mb-5 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-200 flex items-start gap-2.5">
+            <span class="text-base flex-shrink-0">📩</span>
+            <div>
+              <div class="font-bold text-white mb-0.5">You've been invited to join a group!</div>
+              <div class="text-slate-300">Sign in with Google or your email below to automatically accept the invitation.</div>
+            </div>
+          </div>
+
           <!-- Mode Tabs -->
           <div class="grid grid-cols-2 gap-1 p-1 rounded-xl bg-slate-900/90 border border-slate-800 mb-6">
             <button id="tabAuthLogin" data-testid="tab-auth-login" onclick="switchAuthTab('login')" class="py-2.5 text-xs sm:text-sm font-semibold rounded-lg bg-emerald-500 text-slate-950 shadow transition">
@@ -531,9 +540,14 @@
           <h3 class="text-base font-bold text-white">Your Expense Groups</h3>
           <p class="text-xs text-slate-400">Manage group members, invite codes, and per-group balances</p>
         </div>
-        <button onclick="openModal('newGroupModal')" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs sm:text-sm transition flex-shrink-0 self-start sm:self-auto">
-          + Create Group
-        </button>
+        <div class="flex items-center gap-2 flex-wrap flex-shrink-0 self-start sm:self-auto">
+          <button onclick="openModal('joinGroupModal')" data-testid="btn-open-join-group-modal" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/30 font-semibold text-xs sm:text-sm transition">
+            🔗 Join with Code
+          </button>
+          <button onclick="openModal('newGroupModal')" data-testid="btn-open-new-group-modal" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs sm:text-sm transition">
+            + Create Group
+          </button>
+        </div>
       </div>
       <div id="groupsGridContainer" data-testid="groups-grid-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5"></div>
     </div>
@@ -864,6 +878,30 @@
         <div class="flex justify-end gap-2 pt-2">
           <button type="button" onclick="closeModal('addMemberModal')" class="px-4 py-2 rounded-xl bg-slate-800 text-xs font-semibold text-slate-300">Cancel</button>
           <button type="submit" data-testid="btn-submit-add-member" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-xs font-bold text-slate-950">Add Member</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 3B: JOIN GROUP WITH INVITE CODE (MOBILE BOTTOM SHEET)           -->
+  <!-- ===================================================================== -->
+  <div id="joinGroupModal" data-testid="join-group-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
+    <div class="glass-panel rounded-t-3xl sm:rounded-2xl max-w-md w-full p-5 sm:p-6 border border-slate-700 shadow-2xl my-0 sm:my-8 max-h-[90vh] sm:max-h-[85vh] overflow-y-auto">
+      <div class="w-12 h-1.5 bg-slate-700/80 rounded-full mx-auto mb-3 sm:hidden"></div>
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <h3 class="text-base font-bold text-white">Join Group with Invite Code</h3>
+        <button type="button" onclick="closeModal('joinGroupModal')" class="text-slate-400 hover:text-white text-sm px-2 py-1 rounded">✕</button>
+      </div>
+      <form onsubmit="handleJoinGroupSubmit(event)" class="space-y-4 mt-4">
+        <div>
+          <label for="joinGroupCodeInput" class="block text-xs font-medium text-slate-300 mb-1">Group Invite Code</label>
+          <input id="joinGroupCodeInput" data-testid="input-join-group-code" type="text" required placeholder="e.g. SPL-DE81B4" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm font-mono text-emerald-400 placeholder-slate-500 focus:outline-none focus:border-emerald-500 uppercase tracking-wider" />
+          <p class="text-[11px] text-slate-400 mt-1">Paste the 6-character invite code (or invite link) from the group admin.</p>
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="closeModal('joinGroupModal')" class="px-4 py-2 rounded-xl bg-slate-800 text-xs font-semibold text-slate-300">Cancel</button>
+          <button type="submit" id="btnJoinGroupSubmit" data-testid="btn-submit-join-group" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-xs font-bold text-slate-950">Join Group</button>
         </div>
       </form>
     </div>
@@ -1205,6 +1243,33 @@
   <script>
     const STORAGE_KEY = 'vasool_clean_state_v1';
     const AUTH_TOKEN_KEY = 'vasool_jwt_token';
+
+    // Stream uncaught client runtime errors to Grafana Cloud Loki via /api/logs/client
+    function forwardLogToBackend(level, message, meta = {}) {
+      try {
+        fetch('/api/logs/client', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ level, message, meta })
+        }).catch(() => {});
+      } catch {}
+    }
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('error', (event) => {
+        forwardLogToBackend('error', `[Frontend Error] ${event.message}`, {
+          filename: event.filename,
+          lineno: event.lineno,
+          colno: event.colno
+        });
+      });
+
+      window.addEventListener('unhandledrejection', (event) => {
+        forwardLogToBackend('error', `[Unhandled Promise] ${event.reason?.message || event.reason}`, {
+          stack: event.reason?.stack
+        });
+      });
+    }
 
     async function apiFetch(path, options = {}) {
       const token = localStorage.getItem(AUTH_TOKEN_KEY);
@@ -1986,6 +2051,7 @@ exec node server.js`
         refreshAllViews();
         showToast(`Welcome back, ${res.user.name}!`);
         await syncWithBackend();
+        await checkAndProcessPendingJoin();
       } catch (err) {
         if (err.data && err.data.requiresVerification) {
           openEmailVerificationModal(err.data.email || email);
@@ -2154,6 +2220,7 @@ exec node server.js`
         refreshAllViews();
         showToast(`🎉 ${res.message || 'Email verified successfully! Welcome to Vasool.'}`);
         await syncWithBackend();
+        await checkAndProcessPendingJoin();
       } catch (err) {
         showToast(err.message || 'Verification failed. Please check the code.', 'error');
         if (otpInput) {
@@ -2210,6 +2277,7 @@ exec node server.js`
             refreshAllViews();
             showToast('🎉 Email verified successfully via Magic Link! Welcome to Vasool.');
             await syncWithBackend();
+            await checkAndProcessPendingJoin();
           }
         } catch (err) {
           console.warn('[Magic Link Auth] Error loading user profile:', err);
@@ -2256,6 +2324,7 @@ exec node server.js`
         refreshAllViews();
         showToast(`Signed in with Google as ${res.user.name}!`);
         await syncWithBackend();
+        await checkAndProcessPendingJoin();
       } catch (err) {
         showToast('Google OAuth verification: ' + err.message, 'error');
       }
@@ -2285,6 +2354,7 @@ exec node server.js`
         refreshAllViews();
         showToast(`Signed in with Google as ${res.user.name} (${res.user.email}).`);
         await syncWithBackend();
+        await checkAndProcessPendingJoin();
       } catch (err) {
         // Fallback local
         let user = appState.users.find((u) => u.email.toLowerCase() === normalizedEmail);
@@ -3176,10 +3246,13 @@ exec node server.js`
             <div data-testid="group-card-${escapeHtml(g.id)}" class="glass-panel glass-card-hover rounded-2xl p-5 flex flex-col justify-between space-y-4">
               <div>
                 <div class="flex items-center justify-between gap-2 flex-wrap">
-                  <div class="flex items-center gap-1.5">
+                  <div class="flex items-center gap-1.5 flex-wrap">
                     <span class="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-teal-500/15 text-teal-300 border border-teal-500/30">${escapeHtml(g.category)}</span>
                     <button onclick="copyTextToClipboard('${escapeHtml(g.inviteCode)}', 'Invite code ${escapeHtml(g.inviteCode)} copied!')" class="text-[11px] font-mono-code text-slate-400 hover:text-emerald-300">
                       Code: ${escapeHtml(g.inviteCode)} 📋
+                    </button>
+                    <button onclick="copyInviteLink('${escapeHtml(g.inviteCode)}', '${escapeHtml(g.name)}')" title="Copy Direct Invite Link" class="text-[10px] text-emerald-400 hover:text-emerald-300 font-semibold px-2 py-0.5 rounded-lg bg-emerald-500/10 border border-emerald-500/25 transition">
+                      🔗 Share Link
                     </button>
                   </div>
                   <div class="flex items-center gap-1.5 flex-wrap">
@@ -3943,6 +4016,10 @@ exec node server.js`
           if (match) {
             mName = match[1].trim();
             mEmail = match[2].trim().toLowerCase();
+          } else if (token.includes('@')) {
+            mEmail = token.trim().toLowerCase();
+            const prefix = mEmail.split('@')[0];
+            mName = prefix.charAt(0).toUpperCase() + prefix.slice(1);
           } else {
             mName = token.trim();
             mEmail = mName.toLowerCase().replace(/[^a-z0-9]/g, '.') + '@gmail.com';
@@ -4024,7 +4101,81 @@ exec node server.js`
       closeModal('addMemberModal');
       saveState();
       refreshAllViews();
-      showToast(`Added ${name} to ${grp.name}.`);
+      showToast(`Added ${name} to ${grp.name} & sent invitation email.`);
+    }
+
+    function copyInviteLink(inviteCode, groupName) {
+      const baseUrl = window.location.origin;
+      const link = `${baseUrl}/?join=${encodeURIComponent(inviteCode)}`;
+      copyTextToClipboard(link, `Invite link for "${groupName}" copied to clipboard!`);
+    }
+
+    async function handleJoinGroupSubmit(e) {
+      e.preventDefault();
+      const inputEl = document.getElementById('joinGroupCodeInput');
+      let raw = (inputEl ? inputEl.value : '').trim();
+      if (raw.includes('join=')) {
+        raw = raw.split('join=')[1].split('&')[0];
+      } else if (raw.includes('/')) {
+        raw = raw.split('/').pop();
+      }
+      const inviteCode = raw.toUpperCase().trim();
+      if (!inviteCode) return;
+
+      const btn = document.getElementById('btnJoinGroupSubmit');
+      if (btn) { btn.disabled = true; btn.textContent = 'Joining...'; }
+
+      try {
+        const res = await apiFetch('/api/groups/join', {
+          method: 'POST',
+          body: JSON.stringify({ inviteCode })
+        });
+
+        closeModal('joinGroupModal');
+        if (inputEl) inputEl.value = '';
+
+        showToast(res.message || `Joined group "${res.group?.name || inviteCode}"!`);
+        await syncWithBackend();
+        refreshAllViews();
+        if (res.group?._id) {
+          selectGroupAndOpenExpenses(res.group._id);
+        }
+      } catch (err) {
+        showToast(err.message || 'Failed to join group. Check the invite code and try again.', 'error');
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Join Group'; }
+      }
+    }
+
+    async function checkAndProcessPendingJoin() {
+      const code = sessionStorage.getItem('pending_join_code');
+      const token = localStorage.getItem(AUTH_TOKEN_KEY);
+      if (!code || !token) return;
+
+      try {
+        const res = await apiFetch('/api/groups/join', {
+          method: 'POST',
+          body: JSON.stringify({ inviteCode: code })
+        });
+        sessionStorage.removeItem('pending_join_code');
+        const banner = document.getElementById('authPendingInviteBanner');
+        if (banner) banner.classList.add('hidden');
+
+        if (window.history && window.history.replaceState) {
+          const cleanUrl = window.location.origin + window.location.pathname;
+          window.history.replaceState({}, document.title, cleanUrl);
+        }
+
+        showToast(res.message || `Joined group "${res.group?.name || code}"!`);
+        await syncWithBackend();
+        refreshAllViews();
+        if (res.group?._id) {
+          selectGroupAndOpenExpenses(res.group._id);
+        }
+      } catch (err) {
+        sessionStorage.removeItem('pending_join_code');
+        showToast(err.message || 'Could not join group with invite code ' + code, 'error');
+      }
     }
 
     function updateSettlementUpiData() {
@@ -4651,11 +4802,28 @@ exec node server.js`
       window.closeModal = closeModal;
       window.handleOtpVerificationSubmit = handleOtpVerificationSubmit;
       window.handleResendOtp = handleResendOtp;
+      window.handleJoinGroupSubmit = handleJoinGroupSubmit;
+      window.copyInviteLink = copyInviteLink;
+      window.checkAndProcessPendingJoin = checkAndProcessPendingJoin;
     }
 
     window.onload = async function () {
+      // Check for group invite parameter in URL (?join=CODE or ?invite=CODE)
+      const urlParams = new URLSearchParams(window.location.search);
+      const joinParam = urlParams.get('join') || urlParams.get('invite');
+      if (joinParam) {
+        sessionStorage.setItem('pending_join_code', joinParam.trim().toUpperCase());
+      }
+
       loadState();
       await checkVerificationUrlParams();
+
+      const pendingCode = sessionStorage.getItem('pending_join_code');
+      const inviteBanner = document.getElementById('authPendingInviteBanner');
+      if (inviteBanner && pendingCode) {
+        inviteBanner.classList.remove('hidden');
+      }
+
       renderTopLevelView();
       refreshAllViews();
       runAutomatedTestSuite(false);
@@ -4674,6 +4842,7 @@ exec node server.js`
             renderTopLevelView();
             refreshAllViews();
             await syncWithBackend();
+            await checkAndProcessPendingJoin();
           }
         } catch (err) {
           console.warn('[Auth Me] Session expired or invalid, clearing token:', err.message);
