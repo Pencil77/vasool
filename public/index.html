@@ -2555,7 +2555,7 @@ exec node server.js`
       renderTopLevelView();
       populateGroupFilterDropdown();
 
-      const { balanceList, simplified, filteredExpenses, filteredSettlements, totalSpend } =
+      const { balanceList, simplified, filteredExpenses, filteredSettlements, totalSpend, whoShouldPay } =
         computeBalancesAndSimplifications(selectedGroupId);
 
       const myEmail = (appState.currentUser?.email || '').toLowerCase();
