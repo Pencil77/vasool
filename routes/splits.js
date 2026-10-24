@@ -805,12 +805,16 @@ router.post('/settlements', requireAuth, async (req, res) => {
       group.members[0];
 
     const isAdmin = adminMember && adminMember.email.toLowerCase().trim() === requesterEmail;
+    const isTargetCreditor = String(toEmail).toLowerCase().trim() === requesterEmail;
 
-    // Handshake: payee marks as settled -> pending_admin_approval
-    // If admin is creating or confirming directly -> confirmed
-    const status = isAdmin ? 'confirmed' : 'pending_admin_approval';
-    const confirmedAt = isAdmin ? new Date() : null;
-    const confirmedByEmail = isAdmin ? requesterEmail : null;
+    // Dual Confirmation Handshake:
+    // If admin OR the receiving creditor is recording the transaction -> directly confirmed
+    // Otherwise -> pending_admin_approval (confirmable by either admin or creditor)
+    const isDirectlyConfirmed = isAdmin || isTargetCreditor;
+    const status = isDirectlyConfirmed ? 'confirmed' : 'pending_admin_approval';
+    const confirmedAt = isDirectlyConfirmed ? new Date() : null;
+    const confirmedByEmail = isDirectlyConfirmed ? requesterEmail : null;
+    const confirmedRole = isTargetCreditor ? 'creditor' : (isAdmin ? 'admin' : '');
 
     const settlement = await Settlement.create({
       groupId,
@@ -822,14 +826,16 @@ router.post('/settlements', requireAuth, async (req, res) => {
       currency: currency || 'INR',
       method: method || 'UPI',
       referenceNote: referenceNote || '',
+      utrNumber: req.body.utrNumber ? String(req.body.utrNumber).trim() : '',
+      confirmedRole,
       status,
       confirmedAt,
       confirmedByEmail
     });
 
-    const message = isAdmin
-      ? 'Settlement recorded and confirmed by admin.'
-      : 'Payment marked as settled by payee. Awaiting admin confirmation.';
+    const message = isDirectlyConfirmed
+      ? `Settlement recorded and confirmed by ${isTargetCreditor ? 'receiving creditor' : 'group admin'}.`
+      : 'Payment marked as settled by payer. Awaiting creditor or admin confirmation.';
 
     return res.status(201).json({ settlement, message });
   } catch (err) {
@@ -837,7 +843,7 @@ router.post('/settlements', requireAuth, async (req, res) => {
   }
 });
 
-// POST /api/settlements/:id/confirm - Admin confirms receipt of payment
+// POST /api/settlements/:id/confirm - Creditor or Admin confirms receipt of payment
 router.post('/settlements/:id/confirm', requireAuth, async (req, res) => {
   try {
     await connectToDatabase();
@@ -857,17 +863,20 @@ router.post('/settlements/:id/confirm', requireAuth, async (req, res) => {
       group.members[0];
 
     const isAdmin = adminMember && adminMember.email.toLowerCase().trim() === requesterEmail;
-    if (!isAdmin) {
-      return res.status(403).json({ error: 'Only the group admin can confirm payment receipt.' });
+    const isTargetCreditor = settlement.toEmail && settlement.toEmail.toLowerCase().trim() === requesterEmail;
+
+    if (!isAdmin && !isTargetCreditor) {
+      return res.status(403).json({ error: 'Only the receiving creditor or group admin can confirm payment receipt.' });
     }
 
     settlement.status = 'confirmed';
     settlement.confirmedAt = new Date();
     settlement.confirmedByEmail = requesterEmail;
+    settlement.confirmedRole = isTargetCreditor ? 'creditor' : 'admin';
     await settlement.save();
 
     return res.status(200).json({
-      message: `Payment of ₹${settlement.amount} confirmed by admin. Transaction is now settled.`,
+      message: `Payment of ₹${settlement.amount} confirmed by ${isTargetCreditor ? 'creditor' : 'group admin'}. Transaction is now settled.`,
       settlement
     });
   } catch (err) {
@@ -875,7 +884,7 @@ router.post('/settlements/:id/confirm', requireAuth, async (req, res) => {
   }
 });
 
-// POST /api/settlements/:id/reject - Admin rejects an unconfirmed settlement claim
+// POST /api/settlements/:id/reject - Creditor or Admin rejects an unconfirmed settlement claim
 router.post('/settlements/:id/reject', requireAuth, async (req, res) => {
   try {
     await connectToDatabase();
@@ -892,12 +901,14 @@ router.post('/settlements/:id/reject', requireAuth, async (req, res) => {
       group.members[0];
 
     const isAdmin = adminMember && adminMember.email.toLowerCase().trim() === requesterEmail;
-    if (!isAdmin) {
-      return res.status(403).json({ error: 'Only the group admin can reject payment claims.' });
+    const isTargetCreditor = settlement.toEmail && settlement.toEmail.toLowerCase().trim() === requesterEmail;
+
+    if (!isAdmin && !isTargetCreditor) {
+      return res.status(403).json({ error: 'Only the receiving creditor or group admin can reject payment claims.' });
     }
 
     settlement.status = 'rejected';
-    settlement.rejectedReason = reason || 'Payment not verified by admin.';
+    settlement.rejectedReason = reason || `Payment claim rejected by ${isTargetCreditor ? 'creditor' : 'group admin'}.`;
     await settlement.save();
 
     return res.status(200).json({

@@ -105,6 +105,16 @@
           <option value="GBP">£ GBP</option>
         </select>
 
+        <!-- 1-Click Demo Persona Switcher Dropdown -->
+        <select id="personaQuickSelect" data-testid="persona-quick-select" onchange="switchPersonaInApp(this.value)" aria-label="Quick Demo Persona Switcher" class="px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 hover:border-emerald-400 focus:outline-none focus:border-emerald-500 cursor-pointer transition">
+          <option value="" disabled selected>👤 Switch Persona...</option>
+          <option value="admin.aarav@vasool.test">👑 Aarav (Admin)</option>
+          <option value="vikram.spender@vasool.test">💰 Vikram (Spender)</option>
+          <option value="rohan.debtor@vasool.test">💸 Rohan (Debtor)</option>
+          <option value="neha.couple@vasool.test">⚖️ Neha (2x Weight)</option>
+          <option value="priya.settler@vasool.test">🔄 Priya (Settler)</option>
+        </select>
+
         <button id="btnToggleViewMode" data-testid="btn-toggle-view-mode" onclick="toggleAuthOrAppView()" class="hidden">
           <span class="hidden sm:inline">Switch to </span>Auth
         </button>
@@ -229,6 +239,38 @@
             <div class="flex-grow border-t border-slate-800"></div>
             <span class="flex-shrink mx-3 text-xs uppercase tracking-wider text-slate-500">or with email &amp; password</span>
             <div class="flex-grow border-t border-slate-800"></div>
+          </div>
+
+          <!-- 1-CLICK DEMO PERSONA SELECTOR -->
+          <div class="mb-5 p-3.5 rounded-xl bg-slate-900/95 border border-emerald-500/30 shadow-lg">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-semibold text-emerald-400 flex items-center gap-1.5">
+                <span>⚡</span> 1-Click Demo Persona Login
+              </span>
+              <span class="text-[10px] text-slate-400">Goa Villa Adventure 2026</span>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-left">
+              <button type="button" data-testid="demo-login-aarav" onclick="quickLoginDemo('admin.aarav@vasool.test')" class="px-2.5 py-2 rounded-lg bg-slate-800/80 hover:bg-emerald-500/20 border border-slate-700 hover:border-emerald-500/50 transition text-left group">
+                <div class="text-xs font-bold text-white group-hover:text-emerald-300">👑 Aarav</div>
+                <div class="text-[10px] text-slate-400">Admin (Paid ₹6.5k)</div>
+              </button>
+              <button type="button" data-testid="demo-login-vikram" onclick="quickLoginDemo('vikram.spender@vasool.test')" class="px-2.5 py-2 rounded-lg bg-slate-800/80 hover:bg-emerald-500/20 border border-slate-700 hover:border-emerald-500/50 transition text-left group">
+                <div class="text-xs font-bold text-white group-hover:text-emerald-300">💰 Vikram</div>
+                <div class="text-[10px] text-slate-400">Spender (+₹4.9k)</div>
+              </button>
+              <button type="button" data-testid="demo-login-rohan" onclick="quickLoginDemo('rohan.debtor@vasool.test')" class="px-2.5 py-2 rounded-lg bg-slate-800/80 hover:bg-emerald-500/20 border border-slate-700 hover:border-emerald-500/50 transition text-left group">
+                <div class="text-xs font-bold text-white group-hover:text-emerald-300">💸 Rohan</div>
+                <div class="text-[10px] text-slate-400">Debtor (-₹4.3k)</div>
+              </button>
+              <button type="button" data-testid="demo-login-neha" onclick="quickLoginDemo('neha.couple@vasool.test')" class="px-2.5 py-2 rounded-lg bg-slate-800/80 hover:bg-emerald-500/20 border border-slate-700 hover:border-emerald-500/50 transition text-left group">
+                <div class="text-xs font-bold text-white group-hover:text-emerald-300">⚖️ Neha &amp; P.</div>
+                <div class="text-[10px] text-slate-400">Couple (2x Weight)</div>
+              </button>
+              <button type="button" data-testid="demo-login-priya" onclick="quickLoginDemo('priya.settler@vasool.test')" class="px-2.5 py-2 rounded-lg bg-slate-800/80 hover:bg-emerald-500/20 border border-slate-700 hover:border-emerald-500/50 transition text-left group col-span-2 sm:col-span-1">
+                <div class="text-xs font-bold text-white group-hover:text-emerald-300">🔄 Priya</div>
+                <div class="text-[10px] text-slate-400">Refund/Settler</div>
+              </button>
+            </div>
           </div>
 
           <!-- LOGIN FORM -->
@@ -511,6 +553,9 @@
           </select>
           <button data-testid="btn-export-csv" onclick="exportExpensesCsv()" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold text-xs sm:text-sm whitespace-nowrap transition">
             Export CSV
+          </button>
+          <button data-testid="btn-export-statement" onclick="exportGroupStatement()" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-teal-300 border border-teal-500/30 font-semibold text-xs sm:text-sm whitespace-nowrap transition">
+            📄 Full Statement
           </button>
           <button onclick="openAddExpenseModal()" class="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs sm:text-sm whitespace-nowrap transition">
             + Add Bill
@@ -918,7 +963,10 @@
     <div class="glass-panel rounded-t-3xl sm:rounded-2xl max-w-md w-full p-5 sm:p-6 border border-slate-700 shadow-2xl my-0 sm:my-8 max-h-[90vh] sm:max-h-[85vh] overflow-y-auto">
       <div class="w-12 h-1.5 bg-slate-700/80 rounded-full mx-auto mb-3 sm:hidden"></div>
       <div class="flex items-center justify-between pb-3 border-b border-slate-800">
-        <h3 class="text-base font-bold text-white">Record Settlement Payment</h3>
+        <div>
+          <h3 class="text-base font-bold text-white">Record Settlement Payment</h3>
+          <p class="text-[11px] text-slate-400">Verifiable UPI payment handshake</p>
+        </div>
         <button type="button" onclick="closeModal('settleConfirmModal')" class="text-slate-400 hover:text-white text-sm px-2">✕</button>
       </div>
       <form onsubmit="confirmSettlementSubmit(event)" class="space-y-4 mt-4">
@@ -930,29 +978,64 @@
 
         <div id="settleModalSummaryBox" class="p-3.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-200"></div>
 
-        <div>
-          <label for="settleAmountInput" class="block text-xs font-medium text-slate-300 mb-1">Settlement Amount</label>
-          <input id="settleAmountInput" data-testid="input-settle-amount" type="number" step="0.01" min="1" inputmode="decimal" required class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white" />
+        <!-- Dynamic UPI Payment Card & Deep Link -->
+        <div id="settleUpiSection" class="p-3.5 rounded-xl bg-emerald-950/40 border border-emerald-500/30 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
+              <span>⚡</span> Fast UPI Pay &amp; QR
+            </span>
+            <span id="settleUpiBadge" class="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Auto Deep-link</span>
+          </div>
+
+          <div class="flex flex-col sm:flex-row items-center gap-3">
+            <div id="settleQrContainer" class="bg-white p-1.5 rounded-xl border border-slate-700 flex-shrink-0 shadow-md">
+              <img id="settleQrImage" src="" alt="UPI QR Code" class="w-28 h-28 object-contain" />
+            </div>
+            <div class="space-y-2 w-full text-center sm:text-left">
+              <div class="text-[11px] text-slate-300">
+                Scan with any UPI App or tap button below on mobile:
+              </div>
+              <a id="settleUpiDeepLink" href="#" class="w-full inline-flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow-md transition">
+                <span>⚡ Pay via UPI App</span>
+                <span class="text-[10px] opacity-80">(GPay, PhonePe, Paytm)</span>
+              </a>
+              <div class="text-[10px] text-slate-400 flex items-center justify-center sm:justify-start gap-1">
+                <span>Payee VPA:</span>
+                <input id="settleUpiIdInput" type="text" oninput="updateSettlementUpiData()" class="bg-slate-900 px-1.5 py-0.5 rounded border border-slate-700 text-[11px] text-emerald-300 font-mono-code focus:outline-none focus:border-emerald-500" />
+              </div>
+            </div>
+          </div>
         </div>
 
         <div>
-          <label for="settleMethodSelect" class="block text-xs font-medium text-slate-300 mb-1">Payment Method</label>
-          <select id="settleMethodSelect" data-testid="select-settle-method" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white">
-            <option value="UPI">UPI (GPay / PhonePe / Paytm)</option>
-            <option value="Amazon Pay">Amazon Pay Wallet</option>
-            <option value="Bank Transfer">IMPS / NEFT Bank Transfer</option>
-            <option value="Cash">Cash</option>
-          </select>
+          <label for="settleAmountInput" class="block text-xs font-medium text-slate-300 mb-1">Settlement Amount (₹)</label>
+          <input id="settleAmountInput" data-testid="input-settle-amount" oninput="updateSettlementUpiData()" type="number" step="0.01" min="1" inputmode="decimal" required class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white" />
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label for="settleMethodSelect" class="block text-xs font-medium text-slate-300 mb-1">Payment Method</label>
+            <select id="settleMethodSelect" data-testid="select-settle-method" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs sm:text-sm text-white">
+              <option value="UPI">UPI (GPay / PhonePe / Paytm)</option>
+              <option value="Amazon Pay">Amazon Pay Wallet</option>
+              <option value="Bank Transfer">IMPS / NEFT Bank Transfer</option>
+              <option value="Cash">Cash</option>
+            </select>
+          </div>
+          <div>
+            <label for="settleUtrInput" class="block text-xs font-medium text-slate-300 mb-1">12-Digit UPI UTR / Ref</label>
+            <input id="settleUtrInput" data-testid="input-settle-utr" type="text" maxlength="12" placeholder="e.g. 428901234567" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs sm:text-sm text-white font-mono-code placeholder:text-slate-600 focus:outline-none focus:border-emerald-500" />
+          </div>
         </div>
 
         <div>
-          <label for="settleNoteInput" class="block text-xs font-medium text-slate-300 mb-1">Reference / UTR Note (Optional)</label>
-          <input id="settleNoteInput" data-testid="input-settle-note" type="text" placeholder="e.g. Paid via Amazon Pay UPI" class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs sm:text-sm text-white" />
+          <label for="settleNoteInput" class="block text-xs font-medium text-slate-300 mb-1">Reference Note (Optional)</label>
+          <input id="settleNoteInput" data-testid="input-settle-note" type="text" placeholder="e.g. Paid via GPay UPI for dinner" class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs sm:text-sm text-white" />
         </div>
 
         <div class="flex justify-end gap-2 pt-2">
           <button type="button" onclick="closeModal('settleConfirmModal')" class="px-4 py-2 rounded-xl bg-slate-800 text-xs font-semibold text-slate-300">Cancel</button>
-          <button type="submit" data-testid="btn-confirm-settle-submit" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-xs font-bold text-slate-950">Confirm Settlement</button>
+          <button type="submit" data-testid="btn-confirm-settle-submit" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-xs font-bold text-slate-950">Record &amp; Submit Settlement</button>
         </div>
       </form>
     </div>
@@ -1885,6 +1968,36 @@ exec node server.js`
     function triggerPasswordResetPrompt() {
       const email = document.getElementById('loginEmail').value || 'your email';
       showToast(`Password reset instructions queued for ${email} via Wydia SMTP relay.`);
+    }
+
+    async function quickLoginDemo(email) {
+      const password = 'VasoolTest2026!';
+      try {
+        showToast(`⚡ Switching persona to ${email.split('@')[0]}...`);
+        const res = await apiFetch('/api/auth/login', {
+          method: 'POST',
+          body: JSON.stringify({ email, password })
+        });
+        localStorage.setItem(AUTH_TOKEN_KEY, res.token);
+        appState.currentUser = res.user;
+        if (!appState.users.some((u) => u.email === res.user.email)) {
+          appState.users.push(res.user);
+        }
+        showingAuthPortal = false;
+        saveState();
+        refreshAllViews();
+        showToast(`👑 Active Persona: ${res.user.name}`);
+        const selectEl = document.getElementById('personaQuickSelect');
+        if (selectEl) selectEl.value = email;
+        await syncWithBackend();
+      } catch (err) {
+        showToast('Demo persona login failed: ' + err.message, 'error');
+      }
+    }
+
+    async function switchPersonaInApp(email) {
+      if (!email) return;
+      await quickLoginDemo(email);
     }
 
     async function handleEmailLogin(e) {
@@ -2919,8 +3032,18 @@ exec node server.js`
         .join('');
     }
 
+    function triggerFileDownload(filename, content, mimeType) {
+      const blob = new Blob([content], { type: mimeType || 'text/plain;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
     function exportExpensesCsv() {
-      const rows = [['ID', 'Date', 'Group', 'Description', 'Category', 'Amount (INR)', 'Paid By', 'Split Mode']];
+      const rows = [['ID', 'Date', 'Group', 'Description', 'Category', 'Type', 'Amount (INR)', 'Paid By', 'Split Mode']];
       appState.expenses.forEach((e) => {
         const grp = appState.groups.find((g) => g.id === e.groupId);
         rows.push([
@@ -2929,13 +3052,104 @@ exec node server.js`
           grp ? grp.name : e.groupId,
           `"${String(e.description).replace(/"/g, '""')}"`,
           e.category,
+          e.type || 'expense',
           e.amount,
           e.paidByName,
           e.splitType
         ]);
       });
       const csvContent = rows.map((r) => r.join(',')).join('\n');
-      copyTextToClipboard(csvContent, 'Expenses CSV exported to clipboard!');
+      triggerFileDownload('vasool_expenses.csv', csvContent, 'text/csv');
+      copyTextToClipboard(csvContent, 'Expenses CSV copied to clipboard and downloaded!');
+    }
+
+    function exportGroupStatement() {
+      const activeGroups = selectedGroupId === 'ALL'
+        ? appState.groups
+        : appState.groups.filter((g) => g.id === selectedGroupId);
+
+      const targetGroup = activeGroups[0] || appState.groups[0];
+      if (!targetGroup) {
+        showToast('No active group to export.', 'error');
+        return;
+      }
+
+      const { totalSpend, balances, simplified } = computeBalancesAndSimplifications(targetGroup.id);
+      const groupExpenses = appState.expenses.filter((e) => e.groupId === targetGroup.id);
+      const groupSettlements = appState.settlements.filter((s) => s.groupId === targetGroup.id);
+
+      let report = `================================================================================\n`;
+      report += `                  VASOOL OFFICIAL GROUP TRIP STATEMENT & AUDIT LEDGER          \n`;
+      report += `================================================================================\n\n`;
+      report += `Group Name:       ${targetGroup.name}\n`;
+      report += `Invite Code:      ${targetGroup.inviteCode}\n`;
+      report += `Category:         ${targetGroup.category}\n`;
+      report += `Active Currency:  ${activeCurrency}\n`;
+      report += `Generated On:     ${new Date().toISOString()}\n`;
+      report += `Total Spend:      ${formatINR(totalSpend)}\n`;
+      report += `Debt Algorithm:   ${targetGroup.minimizeDebts !== false ? 'Fewest Transfers (Min-Cash-Flow)' : 'Direct Debts'}\n\n`;
+
+      report += `--------------------------------------------------------------------------------\n`;
+      report += `1. MEMBER ROLES & WEIGHT DIRECTORY\n`;
+      report += `--------------------------------------------------------------------------------\n`;
+      targetGroup.members.forEach((m) => {
+        const netBal = balances[m.email] || 0;
+        const balStr = netBal > 0.01
+          ? `+${formatINR(netBal)} (to receive)`
+          : netBal < -0.01
+          ? `-${formatINR(Math.abs(netBal))} (owes)`
+          : `Settled (₹0.00)`;
+        report += `• ${m.name.padEnd(26)} [${m.email.padEnd(30)}] Role: ${(m.role || 'member').toUpperCase().padEnd(7)} Weight: ${m.defaultWeight || 1}x | Net: ${balStr}\n`;
+      });
+
+      report += `\n--------------------------------------------------------------------------------\n`;
+      report += `2. ITEMIZED BILLS & REFUNDS (${groupExpenses.length})\n`;
+      report += `--------------------------------------------------------------------------------\n`;
+      groupExpenses.forEach((e, idx) => {
+        report += `#${idx + 1} [${e.date || 'Recent'}] ${e.description} (${e.category})\n`;
+        report += `   Amount: ${e.type === 'income' ? '+' : ''}${formatINR(e.amount)} | Paid By: ${e.paidByName} | Split: ${e.splitType.toUpperCase()}\n`;
+        if (e.splits && e.splits.length) {
+          const splitsStr = e.splits.map((s) => `${s.memberName}: ${formatINR(s.amount)}`).join(', ');
+          report += `   Shares: ${splitsStr}\n`;
+        }
+        report += `\n`;
+      });
+
+      report += `--------------------------------------------------------------------------------\n`;
+      report += `3. VERIFIED SETTLEMENTS & AUDIT LOG (${groupSettlements.length})\n`;
+      report += `--------------------------------------------------------------------------------\n`;
+      if (!groupSettlements.length) {
+        report += `No settlements recorded yet for this group.\n`;
+      } else {
+        groupSettlements.forEach((s, idx) => {
+          report += `#${idx + 1} [${s.settledAt || 'Recent'}] ${s.fromName} -> ${s.toName} : ${formatINR(s.amount)} (${s.method})\n`;
+          report += `   Status: ${(s.status || 'confirmed').toUpperCase()}`;
+          if (s.utrNumber) report += ` | UTR: ${s.utrNumber}`;
+          if (s.confirmedRole) report += ` | Confirmed by: ${s.confirmedRole.toUpperCase()}`;
+          if (s.referenceNote) report += ` | Note: "${s.referenceNote}"`;
+          report += `\n`;
+        });
+      }
+
+      report += `\n--------------------------------------------------------------------------------\n`;
+      report += `4. OPEN SETTLEMENT RECOMMENDATIONS (${simplified.length})\n`;
+      report += `--------------------------------------------------------------------------------\n`;
+      if (!simplified.length) {
+        report += `All member balances are fully settled! No pending transfers required.\n`;
+      } else {
+        simplified.forEach((t, idx) => {
+          const rem = typeof t.remainingDue === 'number' ? t.remainingDue : t.amount;
+          report += `(${idx + 1}) ${t.fromName} owes ${t.toName} : ${formatINR(rem)} (${t.type || 'direct'})\n`;
+        });
+      }
+
+      report += `\n================================================================================\n`;
+      report += `                       END OF VASOOL TRIP STATEMENT                            \n`;
+      report += `================================================================================\n`;
+
+      const safeName = targetGroup.name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+      triggerFileDownload(`vasool_statement_${safeName}.txt`, report, 'text/plain');
+      copyTextToClipboard(report, `Full statement for "${targetGroup.name}" copied to clipboard and downloaded!`);
     }
 
     async function deleteExpenseById(expId) {
@@ -2988,7 +3202,8 @@ exec node server.js`
                     ${isAdmin ? '👑' : escapeHtml(ini)}
                   </span>
                   <span class="font-medium">${escapeHtml(m.name)}</span>
-                  ${isAdmin ? '<span class="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-400/25 text-amber-300 border border-amber-400/30">Admin</span>' : ''}
+                  ${isAdmin ? '<span class="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-400/25 text-amber-300 border border-amber-400/30">👑 Admin</span>' : ''}
+                  ${(m.defaultWeight && m.defaultWeight !== 1) ? `<span class="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-teal-400/20 text-teal-300 border border-teal-400/30">⚖️ ${m.defaultWeight}x Weight</span>` : ''}
                   ${canTransfer ? `
                     <button data-testid="btn-transfer-admin-${escapeHtml(m.email)}" onclick="promptTransferAdmin('${escapeHtml(g.id)}', '${escapeHtml(m.email)}', '${escapeHtml(m.name)}')" title="Transfer Adminship to ${escapeHtml(m.name)}" class="ml-1 text-[10px] text-amber-300/80 hover:text-amber-200 underline font-semibold">
                       Make Admin
@@ -3274,29 +3489,40 @@ exec node server.js`
         `;
       }
 
-      // 2. Admin Pending Confirmation Action Inbox
-      if (isViewerAdminOfAny && pendingApprovalList.length > 0) {
+      // 2. Actionable Pending Confirmation Action Inbox (for Admin OR receiving Creditor)
+      const actionablePendingList = pendingApprovalList.filter((s) => {
+        const isCreditor = s.toEmail && s.toEmail.toLowerCase().trim() === currentEmail;
+        return isViewerAdminOfAny || isCreditor;
+      });
+
+      if (actionablePendingList.length > 0) {
         html += `
           <div data-testid="admin-approval-inbox" class="mb-5 p-4 rounded-2xl bg-gradient-to-br from-amber-500/15 to-slate-900 border border-amber-500/40 space-y-3">
             <div class="flex items-center justify-between gap-2 flex-wrap">
               <div class="flex items-center gap-2">
-                <span class="text-lg">👑</span>
-                <h4 class="text-sm font-bold text-amber-200">Admin Action Required: Pending Payment Confirmations (${pendingApprovalList.length})</h4>
+                <span class="text-lg">🤝</span>
+                <h4 class="text-sm font-bold text-amber-200">Action Required: Pending Payment Confirmations (${actionablePendingList.length})</h4>
               </div>
-              <span class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-amber-400/25 text-amber-300 border border-amber-400/40">Handshake Step 2</span>
+              <span class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-amber-400/25 text-amber-300 border border-amber-400/40">Dual Confirmation Handshake</span>
             </div>
             <p class="text-xs text-slate-300">
-              Members have marked these shares as paid. Verify payment in your UPI / bank account, then confirm to officially close the debt, or reject if unreceived:
+              Payments awaiting verification. If you are the receiving creditor or group admin, verify your bank/UPI account and confirm receipt to permanently close the debt:
             </p>
             <div class="space-y-2">
-              ${pendingApprovalList.map((s) => `
+              ${actionablePendingList.map((s) => {
+                const isCreditor = s.toEmail && s.toEmail.toLowerCase().trim() === currentEmail;
+                return `
                 <div data-testid="pending-approval-card-${escapeHtml(s.id)}" class="p-3.5 rounded-xl bg-slate-950/80 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
-                    <div class="text-xs text-white">
+                    <div class="text-xs text-white flex items-center gap-1.5 flex-wrap">
                       <strong class="text-rose-300">${escapeHtml(s.fromName)}</strong> claims paid <strong class="text-emerald-300 text-sm">${formatINR(s.amount)}</strong> via <span class="text-teal-300 font-semibold">${escapeHtml(s.method)}</span>
+                      <span class="px-2 py-0.5 rounded text-[10px] font-bold ${isCreditor ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'}">
+                        ${isCreditor ? 'You are Creditor 💰' : 'Group Admin 👑'}
+                      </span>
                     </div>
                     <div class="text-[11px] text-slate-400 mt-1">
                       ${escapeHtml(s.fromEmail)} &rarr; ${escapeHtml(s.toEmail)} · ${escapeHtml(s.settledAt || 'Recent')}
+                      ${s.utrNumber ? ` · <span class="text-emerald-300 font-mono-code font-bold">UTR: ${escapeHtml(s.utrNumber)}</span>` : ''}
                       ${s.referenceNote ? ` · Note: "<span class="text-slate-200">${escapeHtml(s.referenceNote)}</span>"` : ''}
                     </div>
                   </div>
@@ -3309,7 +3535,7 @@ exec node server.js`
                     </button>
                   </div>
                 </div>
-              `).join('')}
+              `;}).join('')}
             </div>
           </div>
         `;
@@ -3395,9 +3621,10 @@ exec node server.js`
 
             let statusBadge = '';
             if (isConfirmed) {
-              statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">✅ Confirmed by Admin</span>`;
+              const roleTitle = s.confirmedRole === 'creditor' ? 'Creditor' : 'Admin';
+              statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">✅ Confirmed by ${roleTitle}</span>`;
             } else if (isPending) {
-              statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">⏳ Awaiting Admin Confirmation</span>`;
+              statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">⏳ Awaiting Confirmation</span>`;
             } else if (isRejected) {
               statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">❌ Rejected: ${escapeHtml(s.rejectedReason || 'Unverified')}</span>`;
             }
@@ -3411,6 +3638,7 @@ exec node server.js`
                   </div>
                   <div class="text-[11px] text-slate-400 mt-0.5">
                     ${escapeHtml(s.method)} · ${escapeHtml(s.settledAt || 'Recent')}
+                    ${s.utrNumber ? `· <span class="text-emerald-300 font-mono-code font-semibold">UTR: ${escapeHtml(s.utrNumber)}</span>` : ''}
                     ${s.referenceNote ? '· ' + escapeHtml(s.referenceNote) : ''}
                     ${s.confirmedByEmail ? `· Confirmed by ${escapeHtml(s.confirmedByEmail)}` : ''}
                   </div>
@@ -3506,6 +3734,8 @@ exec node server.js`
           <label class="flex items-center gap-2 text-xs text-slate-200 cursor-pointer flex-1 min-w-0">
             <input type="checkbox" checked onchange="recalculateSplitPreview()" class="exp-member-check rounded text-emerald-500 focus:ring-0" />
             <span class="truncate font-medium">${escapeHtml(m.name)}</span>
+            ${m.role === 'admin' || (group.adminEmail && group.adminEmail.toLowerCase() === m.email.toLowerCase()) ? '<span class="px-1.5 py-0.5 rounded text-[10px] bg-amber-500/20 text-amber-300 font-semibold border border-amber-500/30">👑 Admin</span>' : ''}
+            ${(m.defaultWeight && m.defaultWeight !== 1) ? `<span class="px-1.5 py-0.5 rounded text-[10px] bg-teal-500/20 text-teal-300 font-semibold border border-teal-500/30">⚖️ ${m.defaultWeight}x Weight</span>` : ''}
           </label>
           <div class="flex items-center gap-2">
             <div class="flex items-center gap-1">
@@ -3839,6 +4069,23 @@ exec node server.js`
       showToast(`Added ${name} to ${grp.name}.`);
     }
 
+    function updateSettlementUpiData() {
+      const upiInput = document.getElementById('settleUpiIdInput');
+      const toName = document.getElementById('settleToName')?.value || 'Vasool Member';
+      const amount = Number(document.getElementById('settleAmountInput')?.value) || 0;
+      const upiId = (upiInput ? upiInput.value.trim() : '') || 'vasool.settle@upi';
+
+      const upiUri = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(toName)}&am=${amount.toFixed(2)}&cu=INR&tn=${encodeURIComponent('Vasool Settlement')}`;
+
+      const linkEl = document.getElementById('settleUpiDeepLink');
+      if (linkEl) linkEl.href = upiUri;
+
+      const qrImg = document.getElementById('settleQrImage');
+      if (qrImg) {
+        qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(upiUri)}`;
+      }
+    }
+
     function openSettleConfirm(fromEmail, fromName, toEmail, toName, amount) {
       document.getElementById('settleFromEmail').value = fromEmail;
       document.getElementById('settleFromName').value = fromName;
@@ -3848,10 +4095,18 @@ exec node server.js`
         selectedGroupId === 'ALL' ? appState.groups[0]?.id || '' : selectedGroupId;
       document.getElementById('settleAmountInput').value = amount;
       document.getElementById('settleNoteInput').value = '';
+      if (document.getElementById('settleUtrInput')) document.getElementById('settleUtrInput').value = '';
+
+      const handle = toEmail.split('@')[0].replace(/[^a-zA-Z0-9]/g, '');
+      const defaultUpi = `${handle}@okhdfcbank`;
+      const upiInput = document.getElementById('settleUpiIdInput');
+      if (upiInput) upiInput.value = defaultUpi;
 
       document.getElementById('settleModalSummaryBox').innerHTML = `
         Recording payment from <strong class="text-rose-300">${escapeHtml(fromName)}</strong> to <strong class="text-emerald-300">${escapeHtml(toName)}</strong>
       `;
+
+      updateSettlementUpiData();
       openModal('settleConfirmModal');
     }
 
@@ -3864,17 +4119,21 @@ exec node server.js`
       const groupId = document.getElementById('settleGroupId').value;
       const amount = Number(document.getElementById('settleAmountInput').value) || 0;
       const method = document.getElementById('settleMethodSelect').value;
+      const utrNumber = document.getElementById('settleUtrInput') ? document.getElementById('settleUtrInput').value.trim() : '';
       const referenceNote = document.getElementById('settleNoteInput').value.trim();
 
       const currentEmail = (appState.currentUser?.email || '').toLowerCase().trim();
       const grp = appState.groups.find((g) => g.id === groupId) || appState.groups[0];
       const adminMember = grp ? (grp.members?.find((m) => m.role === 'admin' || (grp.adminEmail && grp.adminEmail.toLowerCase() === m.email.toLowerCase())) || grp.members?.[0]) : null;
       const isViewerAdmin = adminMember && adminMember.email.toLowerCase().trim() === currentEmail;
+      const isTargetCreditor = toEmail.toLowerCase().trim() === currentEmail;
+      const isDirectlyConfirmed = isViewerAdmin || isTargetCreditor;
 
       let stlId = 'stl_' + Date.now();
-      let status = isViewerAdmin ? 'confirmed' : 'pending_admin_approval';
-      let confirmedAt = isViewerAdmin ? new Date().toISOString() : null;
-      let confirmedByEmail = isViewerAdmin ? currentEmail : null;
+      let status = isDirectlyConfirmed ? 'confirmed' : 'pending_admin_approval';
+      let confirmedAt = isDirectlyConfirmed ? new Date().toISOString() : null;
+      let confirmedByEmail = isDirectlyConfirmed ? currentEmail : null;
+      let confirmedRole = isTargetCreditor ? 'creditor' : (isViewerAdmin ? 'admin' : '');
 
       if (localStorage.getItem(AUTH_TOKEN_KEY)) {
         try {
@@ -3888,7 +4147,8 @@ exec node server.js`
               toName,
               amount,
               method,
-              referenceNote
+              referenceNote,
+              utrNumber
             })
           });
           if (res && res.settlement && res.settlement._id) {
@@ -3896,6 +4156,7 @@ exec node server.js`
             status = res.settlement.status || status;
             confirmedAt = res.settlement.confirmedAt || confirmedAt;
             confirmedByEmail = res.settlement.confirmedByEmail || confirmedByEmail;
+            confirmedRole = res.settlement.confirmedRole || confirmedRole;
           }
         } catch (err) {
           console.warn('[Settlement] Server notice:', err.message);
@@ -3913,9 +4174,11 @@ exec node server.js`
         currency: 'INR',
         method,
         referenceNote,
+        utrNumber,
         status,
         confirmedAt,
         confirmedByEmail,
+        confirmedRole,
         settledAt: new Date().toISOString().slice(0, 10)
       });
 
@@ -3926,7 +4189,7 @@ exec node server.js`
       if (status === 'confirmed') {
         showToast(`✅ Payment of ${formatINR(amount)} confirmed and settled.`);
       } else {
-        showToast(`⏳ Payment of ${formatINR(amount)} marked as settled by payee. Awaiting admin confirmation.`);
+        showToast(`⏳ Payment of ${formatINR(amount)} marked as paid. Awaiting creditor or admin confirmation.`);
       }
     }
 
