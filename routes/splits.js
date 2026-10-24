@@ -7,6 +7,7 @@ const Settlement = require('../models/Settlement');
 const { requireAuth } = require('./auth');
 const { sendGroupInviteEmail } = require('../lib/mailer');
 const logger = require('../lib/logger');
+const otel = require('../lib/otel');
 
 const router = express.Router();
 
@@ -284,6 +285,7 @@ router.post('/groups', requireAuth, async (req, res) => {
     });
 
     logger.info(`[splits:groups] Created group "${group.name}" with code ${inviteCode} by ${normalizedCreator.email}`);
+    otel.metrics.counter('vasool_groups_created_total', 1, { category: group.category || 'Trip', currency: group.currency || 'INR' });
     return res.status(201).json({ group });
   } catch (err) {
     logger.error('[splits:groups] Error creating group:', err);
@@ -323,8 +325,10 @@ router.post('/groups/join', requireAuth, async (req, res) => {
       });
       await group.save();
       logger.info(`[splits:join] User ${userEmail} (${userName}) joined group "${group.name}" via code ${cleanCode}`);
+      otel.metrics.counter('vasool_groups_joined_total', 1, { status: 'new_member', category: group.category || 'Trip' });
     } else {
       logger.info(`[splits:join] User ${userEmail} is already a member of "${group.name}"`);
+      otel.metrics.counter('vasool_groups_joined_total', 1, { status: 'already_member', category: group.category || 'Trip' });
     }
 
     return res.status(200).json({
@@ -529,6 +533,7 @@ router.post('/groups/:id/members', requireAuth, async (req, res) => {
     });
 
     logger.info(`[splits:members] Added member ${cleanName} (${cleanEmail}) to group "${group.name}"`);
+    otel.metrics.counter('vasool_members_added_total', 1);
     return res.status(200).json({ group });
   } catch (err) {
     logger.error('[splits:members] Error adding member to group:', err);
@@ -645,6 +650,16 @@ router.post('/expenses', requireAuth, async (req, res) => {
       notes
     });
 
+    otel.metrics.counter('vasool_expenses_created_total', 1, {
+      split_type: splitType,
+      category: expense.category,
+      type: expense.type
+    });
+    otel.metrics.histogram('vasool_expense_amount_inr', expense.amount, {
+      split_type: splitType,
+      category: expense.category
+    });
+
     return res.status(201).json({ expense });
   } catch (err) {
     return res.status(500).json({ error: err.message });
@@ -656,6 +671,7 @@ router.delete('/expenses/:id', requireAuth, async (req, res) => {
   try {
     await connectToDatabase();
     await Expense.findByIdAndDelete(req.params.id);
+    otel.metrics.counter('vasool_expenses_deleted_total', 1);
     return res.status(200).json({ deleted: true });
   } catch (err) {
     return res.status(500).json({ error: err.message });
@@ -931,6 +947,14 @@ router.post('/settlements', requireAuth, async (req, res) => {
       ? `Settlement recorded and confirmed by ${isTargetCreditor ? 'receiving creditor' : 'group admin'}.`
       : 'Payment marked as settled by payer. Awaiting creditor or admin confirmation.';
 
+    otel.metrics.counter('vasool_settlements_created_total', 1, {
+      method: settlement.method,
+      status: settlement.status
+    });
+    otel.metrics.histogram('vasool_settlement_amount_inr', Number(settlement.amount), {
+      method: settlement.method
+    });
+
     return res.status(201).json({ settlement, message });
   } catch (err) {
     return res.status(500).json({ error: err.message });
@@ -969,6 +993,10 @@ router.post('/settlements/:id/confirm', requireAuth, async (req, res) => {
     settlement.confirmedRole = isTargetCreditor ? 'creditor' : 'admin';
     await settlement.save();
 
+    otel.metrics.counter('vasool_settlements_confirmed_total', 1, {
+      confirmed_role: settlement.confirmedRole
+    });
+
     return res.status(200).json({
       message: `Payment of ₹${settlement.amount} confirmed by ${isTargetCreditor ? 'creditor' : 'group admin'}. Transaction is now settled.`,
       settlement
@@ -1004,6 +1032,8 @@ router.post('/settlements/:id/reject', requireAuth, async (req, res) => {
     settlement.status = 'rejected';
     settlement.rejectedReason = reason || `Payment claim rejected by ${isTargetCreditor ? 'creditor' : 'group admin'}.`;
     await settlement.save();
+
+    otel.metrics.counter('vasool_settlements_rejected_total', 1);
 
     return res.status(200).json({
       message: 'Settlement payment claim rejected.',

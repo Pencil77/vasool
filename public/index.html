@@ -1244,7 +1244,68 @@
     const STORAGE_KEY = 'vasool_clean_state_v1';
     const AUTH_TOKEN_KEY = 'vasool_jwt_token';
 
-    // Stream uncaught client runtime errors to Grafana Cloud Loki via /api/logs/client
+    // =========================================================================
+    // OPENTELEMETRY RUM (REAL USER MONITORING) & DISTRIBUTED TRACE CONTEXT
+    // =========================================================================
+    function generateHex(len) {
+      let result = '';
+      const chars = '0123456789abcdef';
+      for (let i = 0; i < len; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return result;
+    }
+
+    const sessionTraceId = generateHex(32);
+
+    function createTraceParent() {
+      const spanId = generateHex(16);
+      return {
+        traceId: sessionTraceId,
+        spanId,
+        traceparent: `00-${sessionTraceId}-${spanId}-01`
+      };
+    }
+
+    function reportRumTelemetry(data = {}) {
+      try {
+        const origin = (typeof window !== 'undefined' && window.location?.origin) || '';
+        const target = origin ? `${origin}/api/telemetry/rum` : '/api/telemetry/rum';
+        fetch(target, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        }).catch(() => {});
+      } catch {}
+    }
+
+    function recordRumAction(name, attributes = {}, durationMs = null) {
+      const { traceId, spanId } = createTraceParent();
+      reportRumTelemetry({
+        spans: [
+          {
+            name,
+            traceId,
+            spanId,
+            durationMs,
+            attributes: {
+              ...attributes,
+              user_email: (appState && appState.currentUser) ? appState.currentUser.email : 'unauthenticated',
+              screen: (typeof window !== 'undefined' && window.innerWidth < 640) ? 'mobile' : 'desktop'
+            }
+          }
+        ],
+        metrics: [
+          {
+            name: `vasool_rum_${name.toLowerCase().replace(/[^a-z0-9]/g, '_')}_total`,
+            value: 1,
+            attributes
+          }
+        ]
+      });
+    }
+
+    // Stream uncaught client runtime errors to Grafana Cloud Loki & OTel
     function forwardLogToBackend(level, message, meta = {}) {
       try {
         fetch('/api/logs/client', {
@@ -1252,6 +1313,25 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ level, message, meta })
         }).catch(() => {});
+
+        if (level === 'error') {
+          const { traceId, spanId } = createTraceParent();
+          reportRumTelemetry({
+            spans: [
+              {
+                name: 'Client Error',
+                traceId,
+                spanId,
+                status: 'ERROR',
+                error: message,
+                attributes: meta
+              }
+            ],
+            metrics: [
+              { name: 'vasool_rum_errors_total', value: 1, attributes: { error: message.slice(0, 50) } }
+            ]
+          });
+        }
       } catch {}
     }
 
@@ -1273,8 +1353,10 @@
 
     async function apiFetch(path, options = {}) {
       const token = localStorage.getItem(AUTH_TOKEN_KEY);
+      const { traceparent } = createTraceParent();
       const headers = {
         'Content-Type': 'application/json',
+        'traceparent': traceparent,
         ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
         ...(options.headers || {})
       };
@@ -3989,6 +4071,7 @@ exec node server.js`
       closeModal('addExpenseModal');
       saveState();
       refreshAllViews();
+      recordRumAction('Save Expense', { category, split_type: currentSplitMode, amount });
       showToast(`Added "${description}" (${formatINR(amount)}) to ${group ? group.name : 'group'}.`);
     }
 
@@ -4108,6 +4191,7 @@ exec node server.js`
       const baseUrl = window.location.origin;
       const link = `${baseUrl}/?join=${encodeURIComponent(inviteCode)}`;
       copyTextToClipboard(link, `Invite link for "${groupName}" copied to clipboard!`);
+      recordRumAction('Share Invite Link', { group: groupName, code: inviteCode });
     }
 
     async function handleJoinGroupSubmit(e) {
@@ -4134,6 +4218,7 @@ exec node server.js`
         closeModal('joinGroupModal');
         if (inputEl) inputEl.value = '';
 
+        recordRumAction('Join Group', { code: inviteCode });
         showToast(res.message || `Joined group "${res.group?.name || inviteCode}"!`);
         await syncWithBackend();
         refreshAllViews();
@@ -4855,6 +4940,40 @@ exec node server.js`
       }
 
       await initGoogleOAuth();
+
+      // Report Navigation Timings & Performance to OpenTelemetry RUM
+      setTimeout(() => {
+        try {
+          if (typeof window !== 'undefined' && window.performance && window.performance.timing) {
+            const t = window.performance.timing;
+            const pageLoadTime = t.loadEventEnd > 0 ? (t.loadEventEnd - t.navigationStart) : (Date.now() - t.navigationStart);
+            const ttfb = t.responseStart > 0 ? (t.responseStart - t.requestStart) : 0;
+            const domInteractive = t.domInteractive > 0 ? (t.domInteractive - t.responseEnd) : 0;
+
+            reportRumTelemetry({
+              spans: [
+                {
+                  name: 'Navigation & Core Web Vitals',
+                  traceId: sessionTraceId,
+                  spanId: generateHex(16),
+                  durationMs: pageLoadTime,
+                  attributes: {
+                    'page.url': window.location.href,
+                    'page.load_time_ms': pageLoadTime,
+                    'page.ttfb_ms': ttfb,
+                    'page.dom_interactive_ms': domInteractive,
+                    'client.screen': window.innerWidth < 640 ? 'mobile' : 'desktop'
+                  }
+                }
+              ],
+              metrics: [
+                { name: 'vasool_rum_page_load_ms', type: 'histogram', value: pageLoadTime },
+                { name: 'vasool_rum_ttfb_ms', type: 'histogram', value: ttfb }
+              ]
+            });
+          }
+        } catch {}
+      }, 1500);
     };
   </script>
 </body>

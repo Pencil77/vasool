@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
 const { connectToDatabase } = require('../lib/mongodb');
 const { sendVerificationEmail } = require('../lib/mailer');
+const otel = require('../lib/otel');
 const User = require('../models/User');
 
 const router = express.Router();
@@ -166,6 +167,7 @@ router.post('/signup', async (req, res) => {
     });
 
     await sendVerificationEmail({ email: normalizedEmail, name: user.name, otp, token });
+    otel.metrics.counter('vasool_auth_operations_total', 1, { provider: 'email', action: 'signup' });
 
     return res.status(201).json({
       requiresVerification: true,
@@ -228,6 +230,7 @@ router.post('/login', async (req, res) => {
     user.lastLoginAt = new Date();
     await user.save();
     const token = signAuthToken(user);
+    otel.metrics.counter('vasool_auth_operations_total', 1, { provider: 'email', action: 'login' });
     return res.status(200).json({ token, user: sanitizeUser(user) });
   } catch (err) {
     return res.status(500).json({ error: err.message || 'Login failed.' });
@@ -292,6 +295,7 @@ router.post('/google', async (req, res) => {
     }
 
     const token = signAuthToken(user);
+    otel.metrics.counter('vasool_auth_operations_total', 1, { provider: 'google', action: 'oauth' });
     return res.status(200).json({ token, user: sanitizeUser(user) });
   } catch (err) {
     const isAuthError = err.message && (
@@ -380,6 +384,7 @@ router.post('/verify-otp', async (req, res) => {
     await user.save();
 
     const token = signAuthToken(user);
+    otel.metrics.counter('vasool_auth_operations_total', 1, { provider: 'email', action: 'verify_otp' });
     return res.status(200).json({
       token,
       user: sanitizeUser(user),
