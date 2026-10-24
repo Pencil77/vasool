@@ -105,16 +105,6 @@
           <option value="GBP">£ GBP</option>
         </select>
 
-        <!-- 1-Click Demo Persona Switcher Dropdown -->
-        <select id="personaQuickSelect" data-testid="persona-quick-select" onchange="switchPersonaInApp(this.value)" aria-label="Quick Demo Persona Switcher" class="px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 hover:border-emerald-400 focus:outline-none focus:border-emerald-500 cursor-pointer transition">
-          <option value="" disabled selected>👤 Switch Persona...</option>
-          <option value="admin.aarav@vasool.test">👑 Aarav (Admin)</option>
-          <option value="vikram.spender@vasool.test">💰 Vikram (Spender)</option>
-          <option value="rohan.debtor@vasool.test">💸 Rohan (Debtor)</option>
-          <option value="neha.couple@vasool.test">⚖️ Neha (2x Weight)</option>
-          <option value="priya.settler@vasool.test">🔄 Priya (Settler)</option>
-        </select>
-
         <button id="btnToggleViewMode" data-testid="btn-toggle-view-mode" onclick="toggleAuthOrAppView()" class="hidden">
           <span class="hidden sm:inline">Switch to </span>Auth
         </button>
@@ -239,38 +229,6 @@
             <div class="flex-grow border-t border-slate-800"></div>
             <span class="flex-shrink mx-3 text-xs uppercase tracking-wider text-slate-500">or with email &amp; password</span>
             <div class="flex-grow border-t border-slate-800"></div>
-          </div>
-
-          <!-- 1-CLICK DEMO PERSONA SELECTOR -->
-          <div class="mb-5 p-3.5 rounded-xl bg-slate-900/95 border border-emerald-500/30 shadow-lg">
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-xs font-semibold text-emerald-400 flex items-center gap-1.5">
-                <span>⚡</span> 1-Click Demo Persona Login
-              </span>
-              <span class="text-[10px] text-slate-400">Goa Villa Adventure 2026</span>
-            </div>
-            <div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-left">
-              <button type="button" data-testid="demo-login-aarav" onclick="quickLoginDemo('admin.aarav@vasool.test')" class="px-2.5 py-2 rounded-lg bg-slate-800/80 hover:bg-emerald-500/20 border border-slate-700 hover:border-emerald-500/50 transition text-left group">
-                <div class="text-xs font-bold text-white group-hover:text-emerald-300">👑 Aarav</div>
-                <div class="text-[10px] text-slate-400">Admin (Paid ₹6.5k)</div>
-              </button>
-              <button type="button" data-testid="demo-login-vikram" onclick="quickLoginDemo('vikram.spender@vasool.test')" class="px-2.5 py-2 rounded-lg bg-slate-800/80 hover:bg-emerald-500/20 border border-slate-700 hover:border-emerald-500/50 transition text-left group">
-                <div class="text-xs font-bold text-white group-hover:text-emerald-300">💰 Vikram</div>
-                <div class="text-[10px] text-slate-400">Spender (+₹4.9k)</div>
-              </button>
-              <button type="button" data-testid="demo-login-rohan" onclick="quickLoginDemo('rohan.debtor@vasool.test')" class="px-2.5 py-2 rounded-lg bg-slate-800/80 hover:bg-emerald-500/20 border border-slate-700 hover:border-emerald-500/50 transition text-left group">
-                <div class="text-xs font-bold text-white group-hover:text-emerald-300">💸 Rohan</div>
-                <div class="text-[10px] text-slate-400">Debtor (-₹4.3k)</div>
-              </button>
-              <button type="button" data-testid="demo-login-neha" onclick="quickLoginDemo('neha.couple@vasool.test')" class="px-2.5 py-2 rounded-lg bg-slate-800/80 hover:bg-emerald-500/20 border border-slate-700 hover:border-emerald-500/50 transition text-left group">
-                <div class="text-xs font-bold text-white group-hover:text-emerald-300">⚖️ Neha &amp; P.</div>
-                <div class="text-[10px] text-slate-400">Couple (2x Weight)</div>
-              </button>
-              <button type="button" data-testid="demo-login-priya" onclick="quickLoginDemo('priya.settler@vasool.test')" class="px-2.5 py-2 rounded-lg bg-slate-800/80 hover:bg-emerald-500/20 border border-slate-700 hover:border-emerald-500/50 transition text-left group col-span-2 sm:col-span-1">
-                <div class="text-xs font-bold text-white group-hover:text-emerald-300">🔄 Priya</div>
-                <div class="text-[10px] text-slate-400">Refund/Settler</div>
-              </button>
-            </div>
           </div>
 
           <!-- LOGIN FORM -->
