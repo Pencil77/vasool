@@ -124,7 +124,7 @@
             <div id="headerUserName" data-testid="header-user-name" class="text-xs font-semibold text-slate-100 leading-tight"></div>
             <div id="headerUserProvider" data-testid="header-user-provider" class="text-[10px] text-emerald-400 leading-tight"></div>
           </div>
-          <button id="btnHeaderLogout" data-testid="btn-header-logout" onclick="handleLogout()" title="Sign out" class="p-1 sm:p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800/80 transition flex-shrink-0">
+          <button id="btnHeaderLogout" data-testid="btn-header-logout" onclick="promptLogout()" title="Sign out" class="p-1 sm:p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800/80 transition flex-shrink-0">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
             </svg>
@@ -1069,6 +1069,88 @@
             class="text-emerald-400 hover:text-emerald-300 font-semibold hover:underline disabled:text-slate-600 disabled:no-underline"
           >
             Resend Code
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 8: LOGOUT CONFIRMATION SCREEN (BOTTOM SHEET / MODAL)            -->
+  <!-- ===================================================================== -->
+  <div
+    id="logoutConfirmModal"
+    data-testid="logout-confirm-modal"
+    class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto"
+  >
+    <div
+      class="glass-panel rounded-t-3xl sm:rounded-2xl max-w-md w-full p-5 sm:p-6 border border-slate-700 shadow-2xl my-0 sm:my-8 max-h-[90vh] sm:max-h-[85vh] overflow-y-auto"
+    >
+      <div class="w-12 h-1.5 bg-slate-700/80 rounded-full mx-auto mb-3 sm:hidden"></div>
+      
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400 flex-shrink-0">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+            </svg>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-white">Confirm Sign Out</h3>
+            <p class="text-xs text-slate-400">Leave your current session</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          data-testid="btn-close-logout-modal"
+          onclick="closeModal('logoutConfirmModal')"
+          class="text-slate-400 hover:text-white text-sm p-1.5 rounded-lg hover:bg-slate-800 transition"
+        >
+          ✕
+        </button>
+      </div>
+
+      <div class="space-y-4 mt-4">
+        <p class="text-xs sm:text-sm text-slate-300 leading-relaxed">
+          Are you sure you want to log out of your Vasool account?
+        </p>
+
+        <!-- Current User Info Card -->
+        <div id="logoutUserPreview" class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center gap-3">
+          <div id="logoutModalAvatar" class="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500/30 to-teal-500/30 border border-emerald-400/40 flex items-center justify-center text-xs font-bold text-emerald-300 flex-shrink-0">
+            --
+          </div>
+          <div class="min-w-0 flex-1">
+            <div id="logoutModalName" class="text-sm font-semibold text-white truncate">User</div>
+            <div id="logoutModalEmail" class="text-xs text-slate-400 truncate">user@example.com</div>
+          </div>
+        </div>
+
+        <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800/80 text-[11px] text-slate-400 flex items-start gap-2">
+          <span class="text-amber-400 text-sm leading-none mt-0.5">ℹ️</span>
+          <span>Your local session will be closed on this device. Your groups, bills, and settlements remain safely backed up in the cloud database.</span>
+        </div>
+
+        <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+          <button
+            type="button"
+            data-testid="btn-cancel-logout"
+            onclick="closeModal('logoutConfirmModal')"
+            class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            id="btnConfirmLogoutSubmit"
+            data-testid="btn-confirm-logout-submit"
+            onclick="executeLogout()"
+            class="px-5 py-2.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-xs font-bold text-white shadow-lg shadow-rose-500/20 transition flex items-center gap-1.5"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+            </svg>
+            <span>Yes, Sign Out</span>
           </button>
         </div>
       </div>
@@ -2182,6 +2264,33 @@ exec node server.js`
       } catch (err) {
         console.log('[Google GIS] Setup note:', err.message);
       }
+    }
+
+    function promptLogout() {
+      const user = appState.currentUser;
+      const avatarEl = document.getElementById('logoutModalAvatar');
+      const nameEl = document.getElementById('logoutModalName');
+      const emailEl = document.getElementById('logoutModalEmail');
+
+      if (user) {
+        if (nameEl) nameEl.textContent = user.name || 'User';
+        if (emailEl) emailEl.textContent = user.email || '';
+        if (avatarEl) {
+          const initials = (user.name || user.email || 'U')
+            .split(' ')
+            .map((w) => w[0])
+            .join('')
+            .slice(0, 2)
+            .toUpperCase();
+          avatarEl.textContent = initials;
+        }
+      }
+      openModal('logoutConfirmModal');
+    }
+
+    function executeLogout() {
+      closeModal('logoutConfirmModal');
+      handleLogout();
     }
 
     function handleLogout() {
