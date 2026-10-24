@@ -335,6 +335,28 @@
       </div>
     </div>
 
+    <!-- Settle Up Feature: "Who Should Pay Next?" Banner -->
+    <div id="whoPaysNextBanner" data-testid="who-pays-next-banner" class="hidden p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-amber-500/10 to-yellow-500/15 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg shadow-amber-500/5">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-300 flex items-center justify-center font-bold text-lg flex-shrink-0 border border-amber-500/30">
+          👑
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-bold uppercase tracking-wider text-amber-400">Who Should Pay Next?</span>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-semibold border border-amber-500/30">Balance Heatmap</span>
+          </div>
+          <p id="whoPaysNextText" class="text-xs sm:text-sm text-slate-200 mt-0.5">
+            Loading payer recommendation...
+          </p>
+        </div>
+      </div>
+      <button id="btnPayNextBill" onclick="openExpenseWithSuggestedPayer()" class="px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs sm:text-sm whitespace-nowrap shadow-md shadow-amber-500/20 transition flex items-center justify-center gap-1.5 flex-shrink-0">
+        <span>Add Bill for <span id="whoPaysNextBtnName">Member</span></span>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
+      </button>
+    </div>
+
     <!-- 4 KPI Cards: 2x2 on Mobile, 4-col on Large Screens -->
     <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
       <div class="glass-panel glass-card-hover rounded-2xl p-3.5 sm:p-5">
@@ -476,13 +498,16 @@
         <div class="flex flex-wrap items-center gap-2">
           <select id="expenseCategoryFilter" data-testid="select-expense-category-filter" onchange="renderExpensesList()" class="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs sm:text-sm text-white focus:outline-none focus:border-emerald-500">
             <option value="ALL">All Categories</option>
-            <option value="Food & Dining">Food &amp; Dining</option>
-            <option value="Travel & Stay">Travel &amp; Stay</option>
-            <option value="Rent & Utilities">Rent &amp; Utilities</option>
-            <option value="Groceries">Groceries</option>
-            <option value="Entertainment">Entertainment</option>
-            <option value="Shopping">Shopping</option>
-            <option value="Other">Other</option>
+            <option value="🍔 Food & Dining">🍔 Food &amp; Dining</option>
+            <option value="☕ Drinks & Coffee">☕ Drinks &amp; Coffee</option>
+            <option value="🚗 Travel & Fuel">🚗 Travel &amp; Fuel</option>
+            <option value="🏠 Rent & Stay">🏠 Rent &amp; Stay</option>
+            <option value="🛒 Groceries">🛒 Groceries</option>
+            <option value="🎉 Entertainment">🎉 Entertainment</option>
+            <option value="🛍️ Shopping">🛍️ Shopping</option>
+            <option value="💡 Bills & Utilities">💡 Bills &amp; Utilities</option>
+            <option value="💵 Income & Refunds">💵 Income &amp; Refunds</option>
+            <option value="📦 Other">📦 Other</option>
           </select>
           <button data-testid="btn-export-csv" onclick="exportExpensesCsv()" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold text-xs sm:text-sm whitespace-nowrap transition">
             Export CSV
@@ -685,6 +710,17 @@
       </div>
 
       <form id="addExpenseForm" data-testid="add-expense-form" onsubmit="handleSaveExpense(event)" class="space-y-4 mt-4">
+        <!-- Settle Up Feature: Expense vs Income/Refund Toggle -->
+        <div class="flex items-center gap-1.5 p-1 rounded-xl bg-slate-900 border border-slate-800">
+          <button type="button" id="txTypeBtn_expense" onclick="setExpenseType('expense')" class="flex-1 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500 text-slate-950 transition">
+            💳 Expense (Bill)
+          </button>
+          <button type="button" id="txTypeBtn_income" onclick="setExpenseType('income')" class="flex-1 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition">
+            💵 Income / Refund
+          </button>
+        </div>
+        <p id="txTypeNotice" class="text-[11px] text-slate-400 hidden"></p>
+
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label for="expGroupSelect" class="block text-xs font-medium text-slate-300 mb-1">Group</label>
@@ -693,13 +729,16 @@
           <div>
             <label for="expCategorySelect" class="block text-xs font-medium text-slate-300 mb-1">Category</label>
             <select id="expCategorySelect" data-testid="select-expense-category" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs sm:text-sm text-white focus:outline-none focus:border-emerald-500">
-              <option value="Food & Dining">Food &amp; Dining</option>
-              <option value="Travel & Stay">Travel &amp; Stay</option>
-              <option value="Rent & Utilities">Rent &amp; Utilities</option>
-              <option value="Groceries">Groceries</option>
-              <option value="Entertainment">Entertainment</option>
-              <option value="Shopping">Shopping</option>
-              <option value="Other">Other</option>
+              <option value="🍔 Food & Dining">🍔 Food &amp; Dining</option>
+              <option value="☕ Drinks & Coffee">☕ Drinks &amp; Coffee</option>
+              <option value="🚗 Travel & Fuel">🚗 Travel &amp; Fuel</option>
+              <option value="🏠 Rent & Stay">🏠 Rent &amp; Stay</option>
+              <option value="🛒 Groceries">🛒 Groceries</option>
+              <option value="🎉 Entertainment">🎉 Entertainment</option>
+              <option value="🛍️ Shopping">🛍️ Shopping</option>
+              <option value="💡 Bills & Utilities">💡 Bills &amp; Utilities</option>
+              <option value="💵 Income & Refunds">💵 Income &amp; Refunds</option>
+              <option value="📦 Other">📦 Other</option>
             </select>
           </div>
         </div>
@@ -1084,11 +1123,15 @@
             currency: g.currency || 'INR',
             inviteCode: g.inviteCode,
             splitsVisibility: g.splitsVisibility || 'personal_only',
+            minimizeDebts: g.minimizeDebts !== false,
+            isArchived: Boolean(g.isArchived),
             adminEmail: g.adminEmail || (g.members?.find((m) => m.role === 'admin' || m.role === 'owner')?.email),
             members: (g.members || []).map((m) => ({
               name: m.name,
               email: m.email,
-              role: m.role === 'owner' ? 'admin' : (m.role || 'member')
+              role: m.role === 'owner' ? 'admin' : (m.role || 'member'),
+              defaultWeight: m.defaultWeight || 1,
+              upiId: m.upiId || ''
             }))
           }));
         }
@@ -1100,6 +1143,7 @@
             groupId: e.groupId ? e.groupId.toString() : e.groupId,
             description: e.description,
             amount: e.amount,
+            type: e.type || 'expense',
             category: e.category,
             paidByEmail: e.paidByEmail,
             paidByName: e.paidByName,
@@ -1149,6 +1193,7 @@
     }
 
     let currentSplitMode = 'equal';
+    let currentExpenseType = 'expense';
     let activeMainTab = 'dashboard';
     let selectedGroupId = 'ALL';
     let showingAuthPortal = typeof localStorage !== 'undefined' ? !localStorage.getItem(AUTH_TOKEN_KEY) : true;
@@ -2178,16 +2223,29 @@ exec node server.js`
 
       let totalSpend = 0;
       filteredExpenses.forEach((exp) => {
-        totalSpend += Number(exp.amount) || 0;
+        const isIncome = exp.type === 'income';
+        const amt = Number(exp.amount) || 0;
         const payer = ensurePerson(exp.paidByEmail, exp.paidByName);
-        payer.paid += Number(exp.amount);
-        payer.net += Number(exp.amount);
 
-        (exp.splits || []).forEach((s) => {
-          const part = ensurePerson(s.memberEmail, s.memberName);
-          part.owed += Number(s.amount);
-          part.net -= Number(s.amount);
-        });
+        if (isIncome) {
+          totalSpend -= amt;
+          payer.paid -= amt;
+          payer.net -= amt;
+          (exp.splits || []).forEach((s) => {
+            const part = ensurePerson(s.memberEmail, s.memberName);
+            part.owed -= Number(s.amount);
+            part.net += Number(s.amount);
+          });
+        } else {
+          totalSpend += amt;
+          payer.paid += amt;
+          payer.net += amt;
+          (exp.splits || []).forEach((s) => {
+            const part = ensurePerson(s.memberEmail, s.memberName);
+            part.owed += Number(s.amount);
+            part.net -= Number(s.amount);
+          });
+        }
       });
 
       filteredSettlements.forEach((st) => {
@@ -2199,87 +2257,161 @@ exec node server.js`
         }
       });
 
-      // Admin-Hub Debt Calibration:
-      // Everyone pays to the group Admin, and the Admin settles back to all creditors.
-      // The Admin is also a normal person in the group who may share splits and owe or be owed.
-      let activeAdmin = null;
-      if (activeGroups.length >= 1) {
-        const primary = activeGroups[0];
-        activeAdmin = primary.members?.find((m) => m.role === 'admin' || (primary.adminEmail && primary.adminEmail.toLowerCase() === m.email.toLowerCase())) || primary.members?.[0];
-      }
-
+      // Settle Up Feature: Debt Minimization Mode Toggle
+      const isMinimized = activeGroups.every((g) => g.minimizeDebts !== false);
       const simplified = [];
-      if (activeAdmin && activeAdmin.email) {
-        const adminEmail = String(activeAdmin.email).toLowerCase().trim();
-        const adminName = activeAdmin.name || 'Admin';
 
-        Object.values(balanceMap).forEach((p) => {
-          const pEmail = String(p.email).toLowerCase().trim();
-          if (pEmail === adminEmail) return;
+      if (!isMinimized) {
+        // Direct pair-wise debts mode: members only settle with the exact person who paid
+        const netPairMap = {};
+        filteredExpenses.forEach((exp) => {
+          const payerEmail = String(exp.paidByEmail).toLowerCase().trim();
+          const payerName = exp.paidByName;
+          const isIncome = exp.type === 'income';
 
-          const rounded = Math.round(p.net * 100) / 100;
-          if (rounded < -0.01) {
-            // Debtor pays the group Admin
+          (exp.splits || []).forEach((s) => {
+            const debtorEmail = String(s.memberEmail).toLowerCase().trim();
+            const debtorName = s.memberName;
+            if (debtorEmail === payerEmail) return;
+
+            const key = isIncome ? `${payerEmail}->${debtorEmail}` : `${debtorEmail}->${payerEmail}`;
+            if (!netPairMap[key]) {
+              netPairMap[key] = {
+                fromEmail: isIncome ? payerEmail : debtorEmail,
+                fromName: isIncome ? payerName : debtorName,
+                toEmail: isIncome ? debtorEmail : payerEmail,
+                toName: isIncome ? debtorName : payerName,
+                amount: 0,
+                isAdminTransfer: false,
+                type: 'direct_pairwise'
+              };
+            }
+            netPairMap[key].amount += Number(s.amount);
+          });
+        });
+
+        filteredSettlements.forEach((st) => {
+          if (st.status === 'confirmed' || (!st.status && !st.isPending)) {
+            const key = `${String(st.fromEmail).toLowerCase().trim()}->${String(st.toEmail).toLowerCase().trim()}`;
+            if (netPairMap[key]) netPairMap[key].amount -= Number(st.amount);
+          }
+        });
+
+        const processed = new Set();
+        Object.keys(netPairMap).forEach((key) => {
+          if (processed.has(key)) return;
+          const [from, to] = key.split('->');
+          const revKey = `${to}->${from}`;
+          const direct = netPairMap[key]?.amount || 0;
+          const reverse = netPairMap[revKey]?.amount || 0;
+          const net = Math.round((direct - reverse) * 100) / 100;
+
+          processed.add(key);
+          processed.add(revKey);
+
+          if (net > 0.01) {
             simplified.push({
-              fromEmail: p.email,
-              fromName: p.name,
-              toEmail: adminEmail,
-              toName: adminName,
-              amount: Math.round(Math.abs(rounded) * 100) / 100,
-              isAdminTransfer: true,
-              type: 'pay_to_admin'
+              fromEmail: from,
+              fromName: netPairMap[key]?.fromName || from,
+              toEmail: to,
+              toName: netPairMap[key]?.toName || to,
+              amount: net,
+              isAdminTransfer: false,
+              type: 'direct_pairwise'
             });
-          } else if (rounded > 0.01) {
-            // Group Admin settles to the creditor
+          } else if (net < -0.01) {
             simplified.push({
-              fromEmail: adminEmail,
-              fromName: adminName,
-              toEmail: p.email,
-              toName: p.name,
-              amount: Math.round(rounded * 100) / 100,
-              isAdminTransfer: true,
-              type: 'admin_payout'
+              fromEmail: to,
+              fromName: netPairMap[revKey]?.fromName || to,
+              toEmail: from,
+              toName: netPairMap[key]?.fromName || from,
+              amount: Math.abs(net),
+              isAdminTransfer: false,
+              type: 'direct_pairwise'
             });
           }
         });
 
-        simplified.sort((a, b) => {
-          if (a.toEmail === adminEmail && b.toEmail !== adminEmail) return -1;
-          if (a.toEmail !== adminEmail && b.toEmail === adminEmail) return 1;
-          return b.amount - a.amount;
-        });
+        simplified.sort((a, b) => b.amount - a.amount);
       } else {
-        // Fallback greedy simplification
-        const debtors = [];
-        const creditors = [];
-        Object.values(balanceMap).forEach((p) => {
-          const rounded = Math.round(p.net * 100) / 100;
-          if (rounded < -0.01) debtors.push({ ...p, amount: Math.abs(rounded) });
-          else if (rounded > 0.01) creditors.push({ ...p, amount: rounded });
-        });
+        // Admin-Hub Debt Calibration:
+        // Everyone pays to the group Admin, and the Admin settles back to all creditors.
+        let activeAdmin = null;
+        if (activeGroups.length >= 1) {
+          const primary = activeGroups[0];
+          activeAdmin = primary.members?.find((m) => m.role === 'admin' || (primary.adminEmail && primary.adminEmail.toLowerCase() === m.email.toLowerCase())) || primary.members?.[0];
+        }
 
-        debtors.sort((a, b) => b.amount - a.amount);
-        creditors.sort((a, b) => b.amount - a.amount);
+        if (activeAdmin && activeAdmin.email) {
+          const adminEmail = String(activeAdmin.email).toLowerCase().trim();
+          const adminName = activeAdmin.name || 'Admin';
 
-        let i = 0;
-        let j = 0;
-        while (i < debtors.length && j < creditors.length) {
-          const d = debtors[i];
-          const c = creditors[j];
-          const amt = Math.round(Math.min(d.amount, c.amount) * 100) / 100;
-          if (amt > 0) {
-            simplified.push({
-              fromEmail: d.email,
-              fromName: d.name,
-              toEmail: c.email,
-              toName: c.name,
-              amount: amt
-            });
+          Object.values(balanceMap).forEach((p) => {
+            const pEmail = String(p.email).toLowerCase().trim();
+            if (pEmail === adminEmail) return;
+
+            const rounded = Math.round(p.net * 100) / 100;
+            if (rounded < -0.01) {
+              simplified.push({
+                fromEmail: p.email,
+                fromName: p.name,
+                toEmail: adminEmail,
+                toName: adminName,
+                amount: Math.round(Math.abs(rounded) * 100) / 100,
+                isAdminTransfer: true,
+                type: 'pay_to_admin'
+              });
+            } else if (rounded > 0.01) {
+              simplified.push({
+                fromEmail: adminEmail,
+                fromName: adminName,
+                toEmail: p.email,
+                toName: p.name,
+                amount: Math.round(rounded * 100) / 100,
+                isAdminTransfer: true,
+                type: 'admin_payout'
+              });
+            }
+          });
+
+          simplified.sort((a, b) => {
+            if (a.toEmail === adminEmail && b.toEmail !== adminEmail) return -1;
+            if (a.toEmail !== adminEmail && b.toEmail === adminEmail) return 1;
+            return b.amount - a.amount;
+          });
+        } else {
+          // Fallback greedy simplification
+          const debtors = [];
+          const creditors = [];
+          Object.values(balanceMap).forEach((p) => {
+            const rounded = Math.round(p.net * 100) / 100;
+            if (rounded < -0.01) debtors.push({ ...p, amount: Math.abs(rounded) });
+            else if (rounded > 0.01) creditors.push({ ...p, amount: rounded });
+          });
+
+          debtors.sort((a, b) => b.amount - a.amount);
+          creditors.sort((a, b) => b.amount - a.amount);
+
+          let i = 0;
+          let j = 0;
+          while (i < debtors.length && j < creditors.length) {
+            const d = debtors[i];
+            const c = creditors[j];
+            const amt = Math.round(Math.min(d.amount, c.amount) * 100) / 100;
+            if (amt > 0) {
+              simplified.push({
+                fromEmail: d.email,
+                fromName: d.name,
+                toEmail: c.email,
+                toName: c.name,
+                amount: amt
+              });
+            }
+            d.amount = Math.round((d.amount - amt) * 100) / 100;
+            c.amount = Math.round((c.amount - amt) * 100) / 100;
+            if (d.amount <= 0.01) i++;
+            if (c.amount <= 0.01) j++;
           }
-          d.amount = Math.round((d.amount - amt) * 100) / 100;
-          c.amount = Math.round((c.amount - amt) * 100) / 100;
-          if (d.amount <= 0.01) i++;
-          if (c.amount <= 0.01) j++;
         }
       }
 
@@ -2325,6 +2457,23 @@ exec node server.js`
 
       const isFullyClosed = finalSimplified.length === 0 && pendingSettlements.length === 0;
 
+      // Settle Up "Who Should Pay Next?" Algorithm:
+      let whoShouldPay = null;
+      const allBalances = Object.values(balanceMap);
+      if (allBalances.length > 0) {
+        const minNet = Math.min(...allBalances.map((b) => b.net));
+        if (minNet < -0.01) {
+          const debtor = allBalances.find((b) => Math.abs(b.net - minNet) < 0.001);
+          if (debtor) {
+            whoShouldPay = {
+              email: debtor.email,
+              name: debtor.name,
+              netDebt: Math.round(Math.abs(minNet) * 100) / 100
+            };
+          }
+        }
+      }
+
       return {
         balanceList: finalBalanceList,
         simplified: finalSimplified,
@@ -2332,7 +2481,8 @@ exec node server.js`
         filteredSettlements,
         pendingSettlements,
         isFullyClosed,
-        totalSpend
+        totalSpend,
+        whoShouldPay
       };
     }
 
@@ -2427,6 +2577,26 @@ exec node server.js`
       document.getElementById('kpiTotalSpend').textContent = formatINR(totalSpend);
       document.getElementById('kpiExpenseCountBadge').textContent = `${filteredExpenses.length} bills`;
       document.getElementById('kpiSimplifiedCount').textContent = `${simplified.length} simplified transfer(s) needed`;
+
+      // Update Settle Up "Who Should Pay Next?" recommendation banner
+      const whoBanner = document.getElementById('whoPaysNextBanner');
+      const whoText = document.getElementById('whoPaysNextText');
+      const whoBtnName = document.getElementById('whoPaysNextBtnName');
+      if (whoBanner) {
+        if (whoShouldPay) {
+          appState.suggestedPayer = whoShouldPay;
+          whoBanner.classList.remove('hidden');
+          if (whoText) {
+            whoText.innerHTML = `<span class="font-bold text-amber-300">${escapeHtml(whoShouldPay.name)}</span> owes the most (<span class="font-mono-code font-bold text-rose-300">-${formatINR(whoShouldPay.netDebt)}</span>) and should pay the next bill to balance the group.`;
+          }
+          if (whoBtnName) {
+            whoBtnName.textContent = whoShouldPay.name.split(' ')[0];
+          }
+        } else {
+          appState.suggestedPayer = null;
+          whoBanner.classList.add('hidden');
+        }
+      }
 
       renderDashboardWidgets(filteredExpenses, simplified, balanceList);
       renderExpensesList();
@@ -2618,16 +2788,17 @@ exec node server.js`
               <div class="space-y-1">
                 <div class="flex items-center gap-2 flex-wrap">
                   <span class="font-bold text-sm text-white">${escapeHtml(e.description)}</span>
+                  ${e.type === 'income' ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">💵 Income / Refund</span>' : ''}
                   <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">${escapeHtml(e.category)}</span>
                   <span class="px-2 py-0.5 rounded text-[10px] uppercase bg-slate-800 text-slate-300">${escapeHtml(e.splitType)} split</span>
                 </div>
                 <div class="text-xs text-slate-400">
-                  Paid by <strong class="text-slate-200">${escapeHtml(e.paidByName)}</strong> in <span class="text-teal-300">${escapeHtml(grp ? grp.name : 'Group')}</span> · ${escapeHtml(e.date || 'Today')}
+                  ${e.type === 'income' ? 'Received by' : 'Paid by'} <strong class="text-slate-200">${escapeHtml(e.paidByName)}</strong> in <span class="text-teal-300">${escapeHtml(grp ? grp.name : 'Group')}</span> · ${escapeHtml(e.date || 'Today')}
                 </div>
                 <div class="flex flex-wrap gap-1.5 pt-1">${splitsPills}</div>
               </div>
               <div class="flex sm:flex-col items-center sm:items-end justify-between gap-2">
-                <div class="text-lg font-extrabold text-white">${formatINR(e.amount)}</div>
+                <div class="text-lg font-extrabold ${e.type === 'income' ? 'text-cyan-400' : 'text-white'}">${e.type === 'income' ? '+' : ''}${formatINR(e.amount)}</div>
                 <button data-testid="btn-delete-expense-${escapeHtml(e.id)}" onclick="deleteExpenseById('${escapeHtml(e.id)}')" class="text-xs text-rose-400 hover:text-rose-300 px-2.5 py-1 rounded-lg bg-rose-500/10 border border-rose-500/20 transition">
                   Delete
                 </button>
@@ -2728,12 +2899,18 @@ exec node server.js`
                       Code: ${escapeHtml(g.inviteCode)} 📋
                     </button>
                   </div>
-                  <div>
+                  <div class="flex items-center gap-1.5 flex-wrap">
                     ${isCurrentUserAdmin ? `
+                      <button data-testid="btn-toggle-minimize-${escapeHtml(g.id)}" onclick="toggleGroupMinimizeDebts('${escapeHtml(g.id)}')" title="Toggle Settle Up Debt Minimization mode" class="text-[10px] font-semibold px-2 py-0.5 rounded-lg border transition ${g.minimizeDebts !== false ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'}">
+                        ${g.minimizeDebts !== false ? '⚡ Fewest Transfers' : '🤝 Direct Debts'}
+                      </button>
                       <button data-testid="btn-toggle-visibility-${escapeHtml(g.id)}" onclick="toggleGroupSplitVisibility('${escapeHtml(g.id)}')" title="Admin control: Toggle member split visibility" class="text-[10px] font-semibold px-2 py-0.5 rounded-lg border transition ${isPersonalOnly ? 'bg-purple-500/20 text-purple-300 border-purple-500/40 hover:bg-purple-500/30' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'}">
                         ${isPersonalOnly ? '🔒 Privacy: Personal Only' : '🌐 Privacy: Show All'}
                       </button>
                     ` : `
+                      <span class="text-[10px] font-medium px-2 py-0.5 rounded-lg border ${g.minimizeDebts !== false ? 'bg-amber-500/15 text-amber-300 border-amber-500/30' : 'bg-slate-800/80 text-slate-400 border-slate-700/50'}">
+                        ${g.minimizeDebts !== false ? '⚡ Minimized' : '🤝 Direct'}
+                      </span>
                       <span class="text-[10px] font-medium px-2 py-0.5 rounded-lg border ${isPersonalOnly ? 'bg-purple-500/15 text-purple-300 border-purple-500/30' : 'bg-slate-800/80 text-slate-400 border-slate-700/50'}">
                         ${isPersonalOnly ? '🔒 Personal Only' : '🌐 All Visible'}
                       </span>
@@ -2793,6 +2970,35 @@ exec node server.js`
         );
       } catch (err) {
         alert('Error updating split visibility: ' + err.message);
+      }
+    }
+
+    async function toggleGroupMinimizeDebts(groupId) {
+      const grp = appState.groups.find((g) => g.id === groupId);
+      if (!grp) return;
+      const current = grp.minimizeDebts !== false;
+      const next = !current;
+      try {
+        if (localStorage.getItem(AUTH_TOKEN_KEY)) {
+          const res = await apiFetch(`/api/groups/${groupId}/minimize-debts`, {
+            method: 'PATCH',
+            body: JSON.stringify({ minimizeDebts: next })
+          });
+          if (res && res.error) {
+            alert('Failed to update debt mode: ' + res.error);
+            return;
+          }
+        }
+        grp.minimizeDebts = next;
+        saveState();
+        refreshAllViews();
+        showToast(
+          next
+            ? '⚡ Debt Minimization ON: Transactions simplified to fewest transfers.'
+            : '🤝 Debt Minimization OFF: Showing direct bilateral pairwise debts.'
+        );
+      } catch (err) {
+        alert('Error updating debt mode: ' + err.message);
       }
     }
 
@@ -3019,6 +3225,8 @@ exec node server.js`
           .map((t, idx) => {
             const pendingAmt = t.pendingApprovalAmount || 0;
             const remDue = typeof t.remainingDue === 'number' ? t.remainingDue : Math.max(0, t.amount - pendingAmt);
+            const remMsg = `Hey ${t.fromName}! Friendly reminder from Vasool: your remaining split share for the group is ${formatINR(remDue)}. Please settle via UPI or mark as paid. Link: ${window.location.origin}`;
+            const waLink = `https://wa.me/?text=${encodeURIComponent(remMsg)}`;
 
             return `
               <div data-testid="settle-card-${idx}" class="p-4 rounded-xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2.5">
@@ -3038,11 +3246,15 @@ exec node server.js`
                     </div>
                   ` : ''}
                 </div>
-                <div class="flex items-center gap-3">
+                <div class="flex items-center gap-2 sm:gap-3 flex-wrap">
                   <div class="text-right">
                     <div class="text-base font-extrabold text-white">${formatINR(t.amount)}</div>
                     ${pendingAmt > 0 ? `<div class="text-[10px] text-slate-400">Remaining Due: <strong class="text-rose-300">${formatINR(remDue)}</strong></div>` : ''}
                   </div>
+                  <a href="${waLink}" target="_blank" rel="noopener noreferrer" title="Send WhatsApp reminder" class="px-2.5 py-1.5 rounded-xl bg-teal-500/15 hover:bg-teal-500/25 text-teal-300 border border-teal-500/30 font-semibold text-xs transition flex items-center gap-1 flex-shrink-0">
+                    <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z"/></svg>
+                    <span>Remind</span>
+                  </a>
                   ${remDue <= 0.01 && pendingAmt > 0 ? `
                     <span class="px-3.5 py-2 rounded-xl bg-amber-500/15 text-amber-300 border border-amber-500/30 font-semibold text-xs">
                       ⏳ Pending Approval
@@ -3114,10 +3326,51 @@ exec node server.js`
       }
       document.getElementById('expDescInput').value = '';
       document.getElementById('expAmountInput').value = '1200';
+      setExpenseType('expense');
       currentSplitMode = 'equal';
       populateExpenseModalMembers();
       setSplitMode('equal');
       openModal('addExpenseModal');
+    }
+
+    function openExpenseWithSuggestedPayer() {
+      openAddExpenseModal();
+      if (appState.suggestedPayer && appState.suggestedPayer.email) {
+        const paidBySel = document.getElementById('expPaidBySelect');
+        if (paidBySel) {
+          const options = Array.from(paidBySel.options);
+          const match = options.find((opt) => opt.value.toLowerCase() === appState.suggestedPayer.email.toLowerCase());
+          if (match) {
+            paidBySel.value = match.value;
+          }
+        }
+      }
+    }
+
+    function setExpenseType(type) {
+      currentExpenseType = type;
+      const btnExpense = document.getElementById('txTypeBtn_expense');
+      const btnIncome = document.getElementById('txTypeBtn_income');
+      const notice = document.getElementById('txTypeNotice');
+      const catSelect = document.getElementById('expCategorySelect');
+
+      if (type === 'income') {
+        if (btnIncome) btnIncome.className = 'flex-1 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500 text-slate-950 transition';
+        if (btnExpense) btnExpense.className = 'flex-1 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition';
+        if (notice) {
+          notice.textContent = '💵 Income / Refund: Credited to all selected members and deducted from total group spend.';
+          notice.classList.remove('hidden');
+        }
+        if (catSelect) catSelect.value = '💵 Income & Refunds';
+      } else {
+        if (btnExpense) btnExpense.className = 'flex-1 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500 text-slate-950 transition';
+        if (btnIncome) btnIncome.className = 'flex-1 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition';
+        if (notice) {
+          notice.textContent = '';
+          notice.classList.add('hidden');
+        }
+        if (catSelect && catSelect.value === '💵 Income & Refunds') catSelect.value = '🍔 Food & Dining';
+      }
     }
 
     function populateExpenseModalMembers() {
@@ -3139,7 +3392,7 @@ exec node server.js`
       container.innerHTML = group.members
         .map(
           (m) => `
-        <div class="flex items-center justify-between gap-2 py-1.5 border-b border-slate-800/60 last:border-none" data-member-email="${escapeHtml(m.email)}" data-member-name="${escapeHtml(m.name)}">
+        <div class="flex items-center justify-between gap-2 py-1.5 border-b border-slate-800/60 last:border-none" data-member-email="${escapeHtml(m.email)}" data-member-name="${escapeHtml(m.name)}" data-default-weight="${m.defaultWeight || 1}">
           <label class="flex items-center gap-2 text-xs text-slate-200 cursor-pointer flex-1 min-w-0">
             <input type="checkbox" checked onchange="recalculateSplitPreview()" class="exp-member-check rounded text-emerald-500 focus:ring-0" />
             <span class="truncate font-medium">${escapeHtml(m.name)}</span>
@@ -3149,7 +3402,7 @@ exec node server.js`
               type="number"
               step="0.01"
               min="0"
-              value="${currentSplitMode === 'shares' ? 1 : currentSplitMode === 'percentage' ? equalPct : 0}"
+              value="${currentSplitMode === 'shares' ? (m.defaultWeight || 1) : currentSplitMode === 'percentage' ? equalPct : 0}"
               oninput="recalculateSplitPreview()"
               class="exp-member-input w-24 px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-700 text-xs text-right text-white ${currentSplitMode === 'equal' ? 'hidden' : ''}"
             />
@@ -3192,7 +3445,7 @@ exec node server.js`
           } else if (mode === 'percentage') {
             inp.value = (Math.round((100 / checkedCount) * 100) / 100).toFixed(2);
           } else if (mode === 'shares') {
-            inp.value = '1';
+            inp.value = row.dataset.defaultWeight || '1';
           }
         }
       });
@@ -3307,6 +3560,7 @@ exec node server.js`
               category,
               paidByEmail,
               paidByName,
+              type: currentExpenseType,
               splitType: currentSplitMode,
               splits
             })
@@ -3327,6 +3581,7 @@ exec node server.js`
         category,
         paidByEmail,
         paidByName,
+        type: currentExpenseType,
         splitType: currentSplitMode,
         date: new Date().toISOString().slice(0, 10),
         splits

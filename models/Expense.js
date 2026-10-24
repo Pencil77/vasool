@@ -17,10 +17,10 @@ const ExpenseSchema = new mongoose.Schema(
     description: { type: String, required: true, trim: true },
     amount: { type: Number, required: true, min: 0.01 },
     currency: { type: String, default: 'INR' },
+    type: { type: String, enum: ['expense', 'income'], default: 'expense' },
     category: {
       type: String,
-      enum: ['Food & Dining', 'Rent & Utilities', 'Travel & Stay', 'Groceries', 'Entertainment', 'Shopping', 'Other'],
-      default: 'Food & Dining'
+      default: '🍔 Food & Dining'
     },
     paidByEmail: { type: String, required: true, lowercase: true, trim: true },
     paidByName: { type: String, required: true, trim: true },

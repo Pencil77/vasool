@@ -114,6 +114,96 @@ function simplifyDebtsAdminHub(balanceMap, adminMember) {
   return transactions;
 }
 
+/**
+ * Direct Pair-Wise Debts (When minimizeDebts is disabled):
+ * Calculates exact debts directly between each debtor and the member who paid.
+ */
+function calculateDirectDebts(expenses, settlements) {
+  const netPairMap = {};
+
+  expenses.forEach((exp) => {
+    const payerEmail = exp.paidByEmail.toLowerCase().trim();
+    const payerName = exp.paidByName;
+    const isIncome = exp.type === 'income';
+
+    exp.splits.forEach((s) => {
+      const participantEmail = s.memberEmail.toLowerCase().trim();
+      const participantName = s.memberName;
+      if (participantEmail === payerEmail) return;
+
+      if (!isIncome) {
+        // Participant owes Payer
+        const key = `${participantEmail}->${payerEmail}`;
+        if (!netPairMap[key]) {
+          netPairMap[key] = { fromEmail: participantEmail, fromName: participantName, toEmail: payerEmail, toName: payerName, amount: 0, type: 'direct_pairwise' };
+        }
+        netPairMap[key].amount += s.amount;
+      } else {
+        // Income: Payer received group funds, so Payer owes Participant
+        const key = `${payerEmail}->${participantEmail}`;
+        if (!netPairMap[key]) {
+          netPairMap[key] = { fromEmail: payerEmail, fromName: payerName, toEmail: participantEmail, toName: participantName, amount: 0, type: 'direct_pairwise' };
+        }
+        netPairMap[key].amount += s.amount;
+      }
+    });
+  });
+
+  // Subtract confirmed settlements
+  settlements.forEach((st) => {
+    if (st.status === 'confirmed') {
+      const from = st.fromEmail.toLowerCase().trim();
+      const to = st.toEmail.toLowerCase().trim();
+      const key = `${from}->${to}`;
+      if (!netPairMap[key]) {
+        netPairMap[key] = { fromEmail: from, fromName: st.fromName, toEmail: to, toName: st.toName, amount: 0, type: 'direct_pairwise' };
+      }
+      netPairMap[key].amount -= st.amount;
+    }
+  });
+
+  // Consolidate bilateral debts (A->B and B->A)
+  const transactions = [];
+  const processed = new Set();
+
+  Object.keys(netPairMap).forEach((key) => {
+    if (processed.has(key)) return;
+    const [from, to] = key.split('->');
+    const revKey = `${to}->${from}`;
+    const directAmt = netPairMap[key]?.amount || 0;
+    const revAmt = netPairMap[revKey]?.amount || 0;
+    const net = Math.round((directAmt - revAmt) * 100) / 100;
+
+    processed.add(key);
+    processed.add(revKey);
+
+    if (net > 0.01) {
+      transactions.push({
+        fromEmail: from,
+        fromName: netPairMap[key]?.fromName || from,
+        toEmail: to,
+        toName: netPairMap[key]?.toName || to,
+        amount: net,
+        isAdminTransfer: false,
+        type: 'direct_pairwise'
+      });
+    } else if (net < -0.01) {
+      transactions.push({
+        fromEmail: to,
+        fromName: netPairMap[revKey]?.fromName || to,
+        toEmail: from,
+        toName: netPairMap[key]?.toName || from,
+        amount: Math.abs(net),
+        isAdminTransfer: false,
+        type: 'direct_pairwise'
+      });
+    }
+  });
+
+  transactions.sort((a, b) => b.amount - a.amount);
+  return transactions;
+}
+
 // GET /api/groups - List groups where user is a member
 router.get('/groups', requireAuth, async (req, res) => {
   try {
@@ -268,6 +358,64 @@ router.patch('/groups/:id/visibility', requireAuth, async (req, res) => {
   }
 });
 
+// PATCH /api/groups/:id/minimize-debts - Toggle debt minimization mode (Admin only)
+router.patch('/groups/:id/minimize-debts', requireAuth, async (req, res) => {
+  try {
+    await connectToDatabase();
+    const group = await Group.findById(req.params.id);
+    if (!group) return res.status(404).json({ error: 'Group not found.' });
+
+    const requesterEmail = req.user.email.toLowerCase().trim();
+    const currentAdmin = group.members.find((m) => m.role === 'admin') ||
+      (group.adminEmail ? group.members.find((m) => m.email.toLowerCase() === group.adminEmail.toLowerCase()) : null) ||
+      group.members[0];
+
+    const isCurrentAdmin = currentAdmin && currentAdmin.email.toLowerCase().trim() === requesterEmail;
+    if (!isCurrentAdmin) {
+      return res.status(403).json({ error: 'Only the group admin can change debt minimization mode.' });
+    }
+
+    group.minimizeDebts = req.body.minimizeDebts !== undefined ? Boolean(req.body.minimizeDebts) : !group.minimizeDebts;
+    await group.save();
+
+    return res.status(200).json({
+      message: `Debt minimization set to ${group.minimizeDebts ? 'Minimized (Fewest Transfers)' : 'Direct Pair-Wise'}.`,
+      group
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/groups/:id/archive - Archive or unarchive group (Admin only)
+router.patch('/groups/:id/archive', requireAuth, async (req, res) => {
+  try {
+    await connectToDatabase();
+    const group = await Group.findById(req.params.id);
+    if (!group) return res.status(404).json({ error: 'Group not found.' });
+
+    const requesterEmail = req.user.email.toLowerCase().trim();
+    const currentAdmin = group.members.find((m) => m.role === 'admin') ||
+      (group.adminEmail ? group.members.find((m) => m.email.toLowerCase() === group.adminEmail.toLowerCase()) : null) ||
+      group.members[0];
+
+    const isCurrentAdmin = currentAdmin && currentAdmin.email.toLowerCase().trim() === requesterEmail;
+    if (!isCurrentAdmin) {
+      return res.status(403).json({ error: 'Only the group admin can archive this group.' });
+    }
+
+    group.isArchived = req.body.isArchived !== undefined ? Boolean(req.body.isArchived) : !group.isArchived;
+    await group.save();
+
+    return res.status(200).json({
+      message: `Group ${group.isArchived ? 'archived' : 'unarchived'} successfully.`,
+      group
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/groups/:id/members - Add a member to a group
 router.post('/groups/:id/members', requireAuth, async (req, res) => {
   try {
@@ -380,7 +528,8 @@ router.post('/expenses', requireAuth, async (req, res) => {
       paidByName,
       splitType = 'equal',
       splits = [],
-      notes = ''
+      notes = '',
+      type = 'expense'
     } = req.body;
 
     const totalAmount = Number(amount);
@@ -393,7 +542,8 @@ router.post('/expenses', requireAuth, async (req, res) => {
       description: String(description).trim(),
       amount: Math.round(totalAmount * 100) / 100,
       currency: currency || 'INR',
-      category: category || 'Food & Dining',
+      type: type === 'income' ? 'income' : 'expense',
+      category: category || (type === 'income' ? '💵 Income & Refunds' : '🍔 Food & Dining'),
       paidByEmail: String(paidByEmail || req.user.email).toLowerCase().trim(),
       paidByName: String(paidByName || req.user.name).trim(),
       splitType,
@@ -448,15 +598,29 @@ router.get('/balances', requireAuth, async (req, res) => {
     });
 
     expenses.forEach((exp) => {
+      const isIncome = exp.type === 'income';
       const payer = ensureMember(exp.paidByEmail, exp.paidByName);
-      payer.paid += exp.amount;
-      payer.net += exp.amount;
 
-      exp.splits.forEach((s) => {
-        const participant = ensureMember(s.memberEmail, s.memberName);
-        participant.owed += s.amount;
-        participant.net -= s.amount;
-      });
+      if (isIncome) {
+        // Income/Refund: Payer received the money (e.g. deposit returned), so Payer owes participants their split back!
+        payer.paid -= exp.amount;
+        payer.net -= exp.amount;
+
+        exp.splits.forEach((s) => {
+          const participant = ensureMember(s.memberEmail, s.memberName);
+          participant.owed -= s.amount;
+          participant.net += s.amount;
+        });
+      } else {
+        payer.paid += exp.amount;
+        payer.net += exp.amount;
+
+        exp.splits.forEach((s) => {
+          const participant = ensureMember(s.memberEmail, s.memberName);
+          participant.owed += s.amount;
+          participant.net -= s.amount;
+        });
+      }
     });
 
     settlements.forEach((st) => {
@@ -472,12 +636,17 @@ router.get('/balances', requireAuth, async (req, res) => {
     let simplifiedTransactions = [];
     if (groups.length === 1) {
       const g = groups[0];
-      const adminMember = g.members.find((m) => m.role === 'admin') ||
-        (g.adminEmail ? g.members.find((m) => m.email.toLowerCase() === g.adminEmail.toLowerCase()) : null) ||
-        g.members[0];
-      simplifiedTransactions = simplifyDebtsAdminHub(balanceMap, adminMember);
+      const isMinimized = g.minimizeDebts !== false;
+      if (!isMinimized) {
+        simplifiedTransactions = calculateDirectDebts(expenses, settlements);
+      } else {
+        const adminMember = g.members.find((m) => m.role === 'admin') ||
+          (g.adminEmail ? g.members.find((m) => m.email.toLowerCase() === g.adminEmail.toLowerCase()) : null) ||
+          g.members[0];
+        simplifiedTransactions = simplifyDebtsAdminHub(balanceMap, adminMember);
+      }
     } else if (groups.length > 1) {
-      // Calculate Admin-Hub transactions for each group
+      // Calculate transactions for each group
       groups.forEach((g) => {
         const groupBalanceMap = {};
         const ensureGroupMember = (email, name) => {
@@ -493,30 +662,46 @@ router.get('/balances', requireAuth, async (req, res) => {
         const grpExpenses = expenses.filter((e) => String(e.groupId) === String(g._id));
         const grpSettlements = settlements.filter((s) => String(s.groupId) === String(g._id));
 
-        grpExpenses.forEach((exp) => {
-          const payer = ensureGroupMember(exp.paidByEmail, exp.paidByName);
-          payer.paid += exp.amount;
-          payer.net += exp.amount;
-          exp.splits.forEach((s) => {
-            const p = ensureGroupMember(s.memberEmail, s.memberName);
-            p.owed += s.amount;
-            p.net -= s.amount;
+        const isMinimized = g.minimizeDebts !== false;
+        if (!isMinimized) {
+          simplifiedTransactions.push(...calculateDirectDebts(grpExpenses, grpSettlements));
+        } else {
+          grpExpenses.forEach((exp) => {
+            const isIncome = exp.type === 'income';
+            const payer = ensureGroupMember(exp.paidByEmail, exp.paidByName);
+            if (isIncome) {
+              payer.paid -= exp.amount;
+              payer.net -= exp.amount;
+              exp.splits.forEach((s) => {
+                const p = ensureGroupMember(s.memberEmail, s.memberName);
+                p.owed -= s.amount;
+                p.net += s.amount;
+              });
+            } else {
+              payer.paid += exp.amount;
+              payer.net += exp.amount;
+              exp.splits.forEach((s) => {
+                const p = ensureGroupMember(s.memberEmail, s.memberName);
+                p.owed += s.amount;
+                p.net -= s.amount;
+              });
+            }
           });
-        });
 
-        grpSettlements.forEach((st) => {
-          if (st.status === 'confirmed') {
-            const payer = ensureGroupMember(st.fromEmail, st.fromName);
-            const receiver = ensureGroupMember(st.toEmail, st.toName);
-            payer.net += st.amount;
-            receiver.net -= st.amount;
-          }
-        });
+          grpSettlements.forEach((st) => {
+            if (st.status === 'confirmed') {
+              const payer = ensureGroupMember(st.fromEmail, st.fromName);
+              const receiver = ensureGroupMember(st.toEmail, st.toName);
+              payer.net += st.amount;
+              receiver.net -= st.amount;
+            }
+          });
 
-        const adminMember = g.members.find((m) => m.role === 'admin') ||
-          (g.adminEmail ? g.members.find((m) => m.email.toLowerCase() === g.adminEmail.toLowerCase()) : null) ||
-          g.members[0];
-        simplifiedTransactions.push(...simplifyDebtsAdminHub(groupBalanceMap, adminMember));
+          const adminMember = g.members.find((m) => m.role === 'admin') ||
+            (g.adminEmail ? g.members.find((m) => m.email.toLowerCase() === g.adminEmail.toLowerCase()) : null) ||
+            g.members[0];
+          simplifiedTransactions.push(...simplifyDebtsAdminHub(groupBalanceMap, adminMember));
+        }
       });
     } else {
       simplifiedTransactions = simplifyDebtsGreedy(balanceMap);
@@ -569,11 +754,30 @@ router.get('/balances', requireAuth, async (req, res) => {
 
     const isFullyClosed = simplifiedTransactions.length === 0 && pendingSettlements.length === 0;
 
+    // Settle Up "Who Should Pay Next?" Algorithm:
+    // Identify member with lowest (most negative) net balance across the group
+    let whoShouldPay = null;
+    const allBalances = Object.values(balanceMap);
+    if (allBalances.length > 0) {
+      const minNet = Math.min(...allBalances.map((b) => b.net));
+      if (minNet < -0.01) {
+        const candidate = allBalances.find((b) => Math.abs(b.net - minNet) < 0.001);
+        if (candidate) {
+          whoShouldPay = {
+            email: candidate.email,
+            name: candidate.name,
+            netDebt: Math.round(Math.abs(minNet) * 100) / 100
+          };
+        }
+      }
+    }
+
     return res.status(200).json({
       balances,
       simplifiedTransactions,
       settlements,
       pendingSettlements,
+      whoShouldPay,
       isFullyClosed
     });
   } catch (err) {
