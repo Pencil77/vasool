@@ -9,6 +9,12 @@ const User = require('../models/User');
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-fallback-secret-override-in-infisical';
+const SUPER_ADMIN_EMAIL = 'mrzoromit3@gmail.com';
+
+function isSuperAdminEmail(email) {
+  if (!email) return false;
+  return String(email).trim().toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
+}
 
 function generateOtp() {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -47,11 +53,14 @@ async function verifyPassword(inputPassword, storedPassword) {
 }
 
 function signAuthToken(user) {
+  const isSuper = Boolean(user.isSuperAdmin) || isSuperAdminEmail(user.email);
   return jwt.sign(
     {
       sub: user._id.toString(),
       email: user.email,
       name: user.name,
+      role: isSuper ? 'super_admin' : (user.role || 'user'),
+      isSuperAdmin: isSuper,
       authProviders: user.authProviders
     },
     JWT_SECRET,
@@ -60,6 +69,7 @@ function signAuthToken(user) {
 }
 
 function sanitizeUser(user) {
+  const isSuper = Boolean(user.isSuperAdmin) || isSuperAdminEmail(user.email);
   return {
     id: user._id.toString(),
     name: user.name,
@@ -68,6 +78,8 @@ function sanitizeUser(user) {
     authProviders: user.authProviders,
     defaultCurrency: user.defaultCurrency,
     upiId: user.upiId,
+    role: isSuper ? 'super_admin' : (user.role || 'user'),
+    isSuperAdmin: isSuper,
     isEmailVerified: Boolean(user.isEmailVerified)
   };
 }
@@ -105,6 +117,7 @@ router.post('/signup', async (req, res) => {
     const normalizedEmail = String(email).toLowerCase().trim();
     const existing = await User.findOne({ email: normalizedEmail });
 
+    const isSuper = isSuperAdminEmail(normalizedEmail);
     const otp = generateOtp();
     const token = generateToken();
     const expires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes validity
@@ -119,6 +132,8 @@ router.post('/signup', async (req, res) => {
       existing.name = String(name).trim();
       existing.passwordHash = passwordHash;
       if (upiId) existing.upiId = String(upiId).trim();
+      existing.role = isSuper ? 'super_admin' : (existing.role || 'user');
+      existing.isSuperAdmin = isSuper;
       existing.emailVerificationOtp = otp;
       existing.emailVerificationToken = token;
       existing.emailVerificationExpires = expires;
@@ -141,6 +156,8 @@ router.post('/signup', async (req, res) => {
       passwordHash,
       authProviders: ['email'],
       upiId: upiId ? String(upiId).trim() : '',
+      role: isSuper ? 'super_admin' : 'user',
+      isSuperAdmin: isSuper,
       isEmailVerified: false,
       emailVerificationOtp: otp,
       emailVerificationToken: token,

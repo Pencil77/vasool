@@ -217,11 +217,39 @@ async function runTestSuite() {
     console.log('  ✓ Google endpoint properly disabled with HTTP 410 Gone.\n');
 
     // -------------------------------------------------------------------------
-    // CLEANUP
+    // STEP 9: Hardcoded Super Admin Verification (mrzoromit3@gmail.com)
     // -------------------------------------------------------------------------
-    console.log('▶ Cleaning up test accounts from database...');
-    await User.deleteOne({ email: testEmail });
-    console.log(`  ✓ Test user ${testEmail} deleted.\n`);
+    console.log('▶ STEP 9: Verifying hardcoded Super Admin designation for mrzoromit3@gmail.com...');
+    const superAdminEmail = 'mrzoromit3@gmail.com';
+    const superSignup = await request('POST', '/api/auth/signup', {
+      name: 'Zoro',
+      email: superAdminEmail,
+      password: 'ZoroSuperSecret2026!'
+    });
+    assert.ok([200, 201].includes(superSignup.status), 'Expected 200 or 201 for signup');
+    const superDoc = await User.findOne({ email: superAdminEmail });
+    assert.ok(superDoc, 'Super Admin user must exist in DB');
+    assert.strictEqual(superDoc.role, 'super_admin', 'DB role must be hardcoded super_admin');
+    assert.strictEqual(superDoc.isSuperAdmin, true, 'DB isSuperAdmin must be hardcoded true');
+
+    // Verify OTP for super admin
+    const superVerify = await request('POST', '/api/auth/verify-otp', {
+      email: superAdminEmail,
+      otp: superDoc.emailVerificationOtp
+    });
+    assert.strictEqual(superVerify.status, 200);
+    assert.strictEqual(superVerify.body.user.role, 'super_admin');
+    assert.strictEqual(superVerify.body.user.isSuperAdmin, true);
+    console.log('  ✓ Hardcoded Super Admin role and isSuperAdmin verified in MongoDB & JWT token.\n');
+
+    // -------------------------------------------------------------------------
+    // CLEANUP (Leave DB with 0 users for Zoro fresh registration)
+    // -------------------------------------------------------------------------
+    console.log('▶ Cleaning up test accounts from database so Zoro can register fresh...');
+    await User.deleteMany({});
+    const finalCount = await User.countDocuments();
+    assert.strictEqual(finalCount, 0, 'Database must be empty for fresh registration');
+    console.log(`  ✓ All test users deleted. Database user count: ${finalCount}\n`);
 
     console.log('================================================================');
     console.log('  ✅ ALL TESTS PASSED! EMAIL & OTP AUTH SYSTEM VERIFIED 100%');

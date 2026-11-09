@@ -1173,13 +1173,17 @@
             --
           </div>
           <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-1.5">
+            <div class="flex items-center gap-1.5 flex-wrap">
               <span id="settingsProfileName" class="text-sm font-bold text-white truncate"></span>
               <span id="settingsVerifiedBadge" class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                 ✓ Verified
               </span>
+              <span id="settingsSuperAdminBadge" class="hidden inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                <span>👑</span> Super Admin
+              </span>
             </div>
             <div id="settingsProfileEmail" class="text-xs text-slate-400 truncate"></div>
+            <div id="settingsProfileRole" class="text-[11px] text-slate-400 mt-0.5 truncate"></div>
             <div id="settingsProfileUpi" class="text-[11px] text-emerald-400/90 mt-0.5 truncate font-mono"></div>
           </div>
         </div>
@@ -2242,13 +2246,27 @@ exec node server.js`
           .join('')
           .slice(0, 2)
           .toUpperCase();
+        const isSuper = appState.currentUser.isSuperAdmin || appState.currentUser.role === 'super_admin' || (appState.currentUser.email && appState.currentUser.email.toLowerCase() === 'mrzoromit3@gmail.com');
         const avatarEl = document.getElementById('headerUserAvatar');
-        if (avatarEl) avatarEl.textContent = initials;
+        if (avatarEl) {
+          avatarEl.textContent = initials;
+          if (isSuper) {
+            avatarEl.className = 'cursor-pointer w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-amber-500/30 to-yellow-500/30 border-2 border-amber-400 flex items-center justify-center text-[11px] sm:text-xs font-extrabold text-amber-300 flex-shrink-0 shadow-lg shadow-amber-500/20 hover:scale-105 transition';
+            avatarEl.title = 'Super Admin (App Owner)';
+          } else {
+            avatarEl.className = 'cursor-pointer w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-emerald-500/30 to-teal-500/30 border border-emerald-400/40 flex items-center justify-center text-[11px] sm:text-xs font-bold text-emerald-300 flex-shrink-0 hover:border-emerald-400 transition';
+            avatarEl.title = 'Account Settings & Profile';
+          }
+        }
         const nameEl = document.getElementById('headerUserName');
         if (nameEl) nameEl.textContent = appState.currentUser.name;
         const provEl = document.getElementById('headerUserProvider');
         if (provEl) {
-          provEl.textContent = appState.currentUser.isEmailVerified !== false ? '✓ Verified Account' : '⚠️ Unverified';
+          if (isSuper) {
+            provEl.innerHTML = '<span class="inline-flex items-center gap-1 text-[10px] font-extrabold text-amber-400 tracking-wide"><span>👑</span> SUPER ADMIN</span>';
+          } else {
+            provEl.textContent = appState.currentUser.isEmailVerified !== false ? '✓ Verified Account' : '⚠️ Unverified';
+          }
         }
         const welcomeEl = document.getElementById('welcomeUserName');
         if (welcomeEl) welcomeEl.textContent = (appState.currentUser.name || 'Friend').split(' ')[0];
@@ -2888,10 +2906,22 @@ exec node server.js`
       const emailEl = document.getElementById('settingsProfileEmail');
       const upiEl = document.getElementById('settingsProfileUpi');
       const badgeEl = document.getElementById('settingsVerifiedBadge');
+      const superBadgeEl = document.getElementById('settingsSuperAdminBadge');
+      const roleEl = document.getElementById('settingsProfileRole');
+
+      const isSuper = user.isSuperAdmin || user.role === 'super_admin' || (user.email && user.email.toLowerCase() === 'mrzoromit3@gmail.com');
 
       if (nameEl) nameEl.textContent = user.name || 'User';
       if (emailEl) emailEl.textContent = user.email || '';
       if (upiEl) upiEl.textContent = user.upiId ? `UPI: ${user.upiId}` : 'UPI Handle: Not configured';
+      if (roleEl) {
+        if (isSuper) {
+          roleEl.innerHTML = '<span class="text-amber-400 font-semibold">Role: Super Admin (App Owner)</span>';
+        } else {
+          roleEl.textContent = 'Role: Member';
+        }
+      }
+
       if (avatarEl) {
         const initials = (user.name || user.email || 'U')
           .split(' ')
@@ -2900,6 +2930,11 @@ exec node server.js`
           .slice(0, 2)
           .toUpperCase();
         avatarEl.textContent = initials;
+        if (isSuper) {
+          avatarEl.className = 'w-11 h-11 rounded-full bg-gradient-to-br from-amber-500/30 to-yellow-500/30 border-2 border-amber-400 flex items-center justify-center text-sm font-extrabold text-amber-300 flex-shrink-0 shadow-lg shadow-amber-500/20';
+        } else {
+          avatarEl.className = 'w-11 h-11 rounded-full bg-gradient-to-br from-emerald-500/30 to-teal-500/30 border border-emerald-400/40 flex items-center justify-center text-sm font-bold text-emerald-300 flex-shrink-0';
+        }
       }
       if (badgeEl) {
         if (user.isEmailVerified !== false) {
@@ -2908,6 +2943,13 @@ exec node server.js`
         } else {
           badgeEl.className = 'inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30';
           badgeEl.textContent = '⚠️ Unverified';
+        }
+      }
+      if (superBadgeEl) {
+        if (isSuper) {
+          superBadgeEl.classList.remove('hidden');
+        } else {
+          superBadgeEl.classList.add('hidden');
         }
       }
 

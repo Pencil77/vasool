@@ -1,5 +1,7 @@
 const mongoose = require('mongoose');
 
+const SUPER_ADMIN_EMAIL = 'mrzoromit3@gmail.com';
+
 const UserSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
@@ -10,6 +12,8 @@ const UserSchema = new mongoose.Schema(
     avatarUrl: { type: String, default: '' },
     defaultCurrency: { type: String, default: 'INR' },
     upiId: { type: String, default: '' },
+    role: { type: String, enum: ['user', 'super_admin'], default: 'user', index: true },
+    isSuperAdmin: { type: Boolean, default: false, index: true },
     isEmailVerified: { type: Boolean, default: false },
     emailVerificationOtp: { type: String, default: null },
     emailVerificationToken: { type: String, default: null, index: true },
@@ -21,5 +25,14 @@ const UserSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+// Hardcoded single Super Admin assignment for Zoro (mrzoromit3@gmail.com)
+UserSchema.pre('save', function (next) {
+  if (this.email && this.email.toLowerCase().trim() === SUPER_ADMIN_EMAIL.toLowerCase()) {
+    this.role = 'super_admin';
+    this.isSuperAdmin = true;
+  }
+  next();
+});
 
 module.exports = mongoose.models.User || mongoose.model('User', UserSchema);

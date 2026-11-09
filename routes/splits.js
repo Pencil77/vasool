@@ -11,6 +11,12 @@ const logger = require('../lib/logger');
 const otel = require('../lib/otel');
 
 const router = express.Router();
+const SUPER_ADMIN_EMAIL = 'mrzoromit3@gmail.com';
+
+function isSuperAdminUser(user) {
+  if (!user) return false;
+  return user.role === 'super_admin' || user.isSuperAdmin === true || (user.email && user.email.toLowerCase().trim() === SUPER_ADMIN_EMAIL.toLowerCase());
+}
 
 /**
  * Greedy Minimum-Cash-Flow Fallback
@@ -398,7 +404,7 @@ router.post('/groups/:id/transfer-admin', requireAuth, async (req, res) => {
       group.members.find((m) => m.role === 'owner') ||
       group.members[0];
 
-    const isCurrentAdmin = currentAdmin && currentAdmin.email.toLowerCase().trim() === requesterEmail;
+    const isCurrentAdmin = isSuperAdminUser(req.user) || (currentAdmin && currentAdmin.email.toLowerCase().trim() === requesterEmail);
 
     if (!isCurrentAdmin) {
       return res.status(403).json({ error: 'Only the current group admin can transfer admin privileges.' });
@@ -450,7 +456,7 @@ router.patch('/groups/:id/visibility', requireAuth, async (req, res) => {
       (group.adminEmail ? group.members.find((m) => m.email.toLowerCase() === group.adminEmail.toLowerCase()) : null) ||
       group.members[0];
 
-    const isCurrentAdmin = currentAdmin && currentAdmin.email.toLowerCase().trim() === requesterEmail;
+    const isCurrentAdmin = isSuperAdminUser(req.user) || (currentAdmin && currentAdmin.email.toLowerCase().trim() === requesterEmail);
     if (!isCurrentAdmin) {
       return res.status(403).json({ error: 'Only the group admin can change group splits visibility.' });
     }
@@ -479,7 +485,7 @@ router.patch('/groups/:id/minimize-debts', requireAuth, async (req, res) => {
       (group.adminEmail ? group.members.find((m) => m.email.toLowerCase() === group.adminEmail.toLowerCase()) : null) ||
       group.members[0];
 
-    const isCurrentAdmin = currentAdmin && currentAdmin.email.toLowerCase().trim() === requesterEmail;
+    const isCurrentAdmin = isSuperAdminUser(req.user) || (currentAdmin && currentAdmin.email.toLowerCase().trim() === requesterEmail);
     if (!isCurrentAdmin) {
       return res.status(403).json({ error: 'Only the group admin can change debt minimization mode.' });
     }
@@ -508,7 +514,7 @@ router.patch('/groups/:id/archive', requireAuth, async (req, res) => {
       (group.adminEmail ? group.members.find((m) => m.email.toLowerCase() === group.adminEmail.toLowerCase()) : null) ||
       group.members[0];
 
-    const isCurrentAdmin = currentAdmin && currentAdmin.email.toLowerCase().trim() === requesterEmail;
+    const isCurrentAdmin = isSuperAdminUser(req.user) || (currentAdmin && currentAdmin.email.toLowerCase().trim() === requesterEmail);
     if (!isCurrentAdmin) {
       return res.status(403).json({ error: 'Only the group admin can archive this group.' });
     }
@@ -543,7 +549,7 @@ router.post('/groups/:id/members', requireAuth, async (req, res) => {
       (group.adminEmail ? group.members.find((m) => m.email.toLowerCase() === group.adminEmail.toLowerCase()) : null) ||
       group.members[0];
 
-    const isCurrentAdmin = currentAdmin && currentAdmin.email.toLowerCase().trim() === requesterEmail;
+    const isCurrentAdmin = isSuperAdminUser(req.user) || (currentAdmin && currentAdmin.email.toLowerCase().trim() === requesterEmail);
     if (!isCurrentAdmin && !group.allowMembersToAddOthers) {
       return res.status(403).json({
         error: 'Only the group admin can add members to this group. Non-admin member invitations are disabled by default in group settings.'
@@ -667,7 +673,7 @@ router.patch('/groups/:id/settings', requireAuth, async (req, res) => {
       (group.adminEmail ? group.members.find((m) => m.email.toLowerCase() === group.adminEmail.toLowerCase()) : null) ||
       group.members[0];
 
-    const isCurrentAdmin = currentAdmin && currentAdmin.email.toLowerCase().trim() === requesterEmail;
+    const isCurrentAdmin = isSuperAdminUser(req.user) || (currentAdmin && currentAdmin.email.toLowerCase().trim() === requesterEmail);
     if (!isCurrentAdmin) {
       return res.status(403).json({ error: 'Only the group admin can update group settings.' });
     }
@@ -735,7 +741,7 @@ router.get('/expenses', requireAuth, async (req, res) => {
         (g.adminEmail ? g.members.find((m) => m.email.toLowerCase() === g.adminEmail.toLowerCase()) : null) ||
         g.members[0];
 
-      const isAdmin = adminMember && adminMember.email.toLowerCase().trim() === requesterEmail;
+      const isAdmin = isSuperAdminUser(req.user) || (adminMember && adminMember.email.toLowerCase().trim() === requesterEmail);
       const isPersonalOnly = (g.splitsVisibility || 'personal_only') === 'personal_only';
 
       if (isPersonalOnly && !isAdmin) {
@@ -1072,7 +1078,7 @@ router.post('/settlements', requireAuth, async (req, res) => {
       (group.adminEmail ? group.members.find((m) => m.email.toLowerCase() === group.adminEmail.toLowerCase()) : null) ||
       group.members[0];
 
-    const isAdmin = adminMember && adminMember.email.toLowerCase().trim() === requesterEmail;
+    const isAdmin = isSuperAdminUser(req.user) || (adminMember && adminMember.email.toLowerCase().trim() === requesterEmail);
     const isTargetCreditor = String(toEmail).toLowerCase().trim() === requesterEmail;
 
     // Dual Confirmation Handshake:
@@ -1138,7 +1144,7 @@ router.post('/settlements/:id/confirm', requireAuth, async (req, res) => {
       (group.adminEmail ? group.members.find((m) => m.email.toLowerCase() === group.adminEmail.toLowerCase()) : null) ||
       group.members[0];
 
-    const isAdmin = adminMember && adminMember.email.toLowerCase().trim() === requesterEmail;
+    const isAdmin = isSuperAdminUser(req.user) || (adminMember && adminMember.email.toLowerCase().trim() === requesterEmail);
     const isTargetCreditor = settlement.toEmail && settlement.toEmail.toLowerCase().trim() === requesterEmail;
 
     if (!isAdmin && !isTargetCreditor) {
@@ -1180,7 +1186,7 @@ router.post('/settlements/:id/reject', requireAuth, async (req, res) => {
       (group.adminEmail ? group.members.find((m) => m.email.toLowerCase() === group.adminEmail.toLowerCase()) : null) ||
       group.members[0];
 
-    const isAdmin = adminMember && adminMember.email.toLowerCase().trim() === requesterEmail;
+    const isAdmin = isSuperAdminUser(req.user) || (adminMember && adminMember.email.toLowerCase().trim() === requesterEmail);
     const isTargetCreditor = settlement.toEmail && settlement.toEmail.toLowerCase().trim() === requesterEmail;
 
     if (!isAdmin && !isTargetCreditor) {
