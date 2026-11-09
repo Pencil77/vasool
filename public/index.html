@@ -116,6 +116,10 @@
 
         <!-- Active User Pill -->
         <div id="headerUserArea" data-testid="header-user-area" class="hidden items-center gap-1.5 sm:gap-2 pl-1 sm:pl-2 border-l border-slate-800">
+          <button id="btnHeaderSuperAdmin" onclick="openSuperAdminConsole()" title="Super Admin Console" class="hidden items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gradient-to-r from-amber-500/20 to-yellow-500/20 border border-amber-400/50 text-amber-300 hover:bg-amber-500/30 text-xs font-bold transition flex-shrink-0 shadow-sm shadow-amber-500/20">
+            <span>👑</span>
+            <span class="hidden md:inline">Admin Console</span>
+          </button>
           <div id="headerUserAvatar" onclick="openAccountSettingsModal()" title="Account Settings & Profile" data-testid="header-user-avatar" class="cursor-pointer w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-emerald-500/30 to-teal-500/30 border border-emerald-400/40 flex items-center justify-center text-[11px] sm:text-xs font-bold text-emerald-300 flex-shrink-0 hover:border-emerald-400 transition">
             --
           </div>
@@ -1188,6 +1192,22 @@
           </div>
         </div>
 
+        <!-- Super Admin Quick Launch Banner -->
+        <div id="settingsSuperAdminCard" class="hidden p-3.5 rounded-xl bg-gradient-to-r from-amber-500/10 via-yellow-500/10 to-amber-500/5 border border-amber-500/30">
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+              <span class="text-xl">👑</span>
+              <div>
+                <div class="text-xs font-bold text-amber-300">Super Admin Console</div>
+                <div class="text-[11px] text-slate-400">View/edit passwords, suspend or delete accounts</div>
+              </div>
+            </div>
+            <button type="button" onclick="closeModal('accountSettingsModal'); openSuperAdminConsole();" class="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md shadow-amber-500/20 transition flex-shrink-0">
+              Open Console &rarr;
+            </button>
+          </div>
+        </div>
+
         <!-- Section: Change Password -->
         <div class="pt-2 border-t border-slate-800/80">
           <div class="flex items-center gap-2 mb-3">
@@ -1530,6 +1550,237 @@
   </div>
 
   <!-- ===================================================================== -->
+  <!-- MODAL 8: SUPER ADMIN CONSOLE MODAL (MANAGE ACCOUNTS, PASSWORDS, SUSPENSION) -->
+  <!-- ===================================================================== -->
+  <div id="superAdminModal" data-testid="super-admin-modal" class="fixed inset-0 z-50 hidden bg-slate-950/85 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
+    <div class="glass-panel rounded-t-3xl sm:rounded-2xl max-w-4xl w-full p-4 sm:p-6 border border-amber-500/30 shadow-2xl my-0 sm:my-8 max-h-[92vh] sm:max-h-[88vh] flex flex-col">
+      <div class="w-12 h-1.5 bg-slate-700/80 rounded-full mx-auto mb-3 sm:hidden"></div>
+
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800 flex-shrink-0">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500/20 to-yellow-500/20 border border-amber-400/40 flex items-center justify-center text-lg">
+            👑
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 class="text-base sm:text-lg font-extrabold text-white">Super Admin Console</h3>
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-400/40">
+                Live App Owner Access
+              </span>
+            </div>
+            <p class="text-xs text-slate-400">Manage all registered accounts, view/edit passwords, suspend or delete users.</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="fetchAdminUsers()" title="Refresh Users" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition text-xs flex items-center gap-1 font-semibold">
+            <span>🔄</span>
+            <span class="hidden sm:inline">Refresh</span>
+          </button>
+          <button type="button" onclick="closeModal('superAdminModal')" class="text-slate-400 hover:text-white text-base px-2 py-1">✕</button>
+        </div>
+      </div>
+
+      <!-- Stats Bar & Search -->
+      <div class="py-3 border-b border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 flex-shrink-0">
+        <div class="flex items-center gap-2 text-xs flex-wrap">
+          <div class="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 flex items-center gap-2">
+            <span class="text-slate-400">Total Accounts:</span>
+            <span id="adminTotalUsersStat" class="font-bold text-white">0</span>
+          </div>
+          <div class="px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 flex items-center gap-2">
+            <span>Active:</span>
+            <span id="adminActiveUsersStat" class="font-bold">0</span>
+          </div>
+          <div class="px-3 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 flex items-center gap-2">
+            <span>Disabled:</span>
+            <span id="adminSuspendedUsersStat" class="font-bold">0</span>
+          </div>
+        </div>
+
+        <div class="relative w-full sm:w-64">
+          <input
+            id="adminUserSearchInput"
+            type="text"
+            placeholder="Search by name or email..."
+            oninput="filterAdminUsers(this.value)"
+            class="w-full px-3.5 py-1.5 pl-8 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+          />
+          <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs">🔍</span>
+        </div>
+      </div>
+
+      <!-- User Cards List Container -->
+      <div id="adminUsersListContainer" class="mt-3 space-y-3 overflow-y-auto flex-1 pr-1">
+        <div class="text-center py-10 text-slate-500 text-xs">
+          Loading accounts from database...
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="pt-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-500 flex-shrink-0">
+        <div>Dispatched emails route via <strong>Wydia (wydia@duck.com)</strong></div>
+        <button type="button" onclick="closeModal('superAdminModal')" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition">
+          Close Console
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 9: ADMIN EDIT PASSWORD MODAL                                    -->
+  <!-- ===================================================================== -->
+  <div id="adminEditPasswordModal" data-testid="admin-edit-password-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
+    <div class="glass-panel rounded-t-3xl sm:rounded-2xl max-w-md w-full p-5 sm:p-6 border border-amber-500/30 shadow-2xl my-0 sm:my-8">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div class="flex items-center gap-2">
+          <span class="text-lg">✏️</span>
+          <div>
+            <h3 class="text-sm font-bold text-white">Edit User Password</h3>
+            <p id="adminEditPasswordUserSubtitle" class="text-[11px] text-slate-400 truncate"></p>
+          </div>
+        </div>
+        <button type="button" onclick="closeModal('adminEditPasswordModal')" class="text-slate-400 hover:text-white text-sm px-2">✕</button>
+      </div>
+
+      <form onsubmit="submitAdminEditPassword(event)" class="mt-4 space-y-4">
+        <input type="hidden" id="adminEditPasswordUserId" />
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">New Password</label>
+          <div class="relative">
+            <input
+              id="adminEditPasswordInput"
+              type="text"
+              required
+              minlength="4"
+              placeholder="Enter new password for user"
+              class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-amber-500 font-mono"
+            />
+          </div>
+          <p class="text-[11px] text-slate-500 mt-1">Super Admin can view and edit passwords directly. Minimum 4 characters.</p>
+        </div>
+
+        <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+          <button type="button" onclick="closeModal('adminEditPasswordModal')" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition">
+            Cancel
+          </button>
+          <button type="submit" id="btnAdminSavePassword" class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/20 transition">
+            Save Password
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 10: ADMIN SUSPEND / DISABLE ACCOUNT MODAL                       -->
+  <!-- ===================================================================== -->
+  <div id="adminSuspendModal" data-testid="admin-suspend-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
+    <div class="glass-panel rounded-t-3xl sm:rounded-2xl max-w-md w-full p-5 sm:p-6 border border-rose-500/30 shadow-2xl my-0 sm:my-8">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div class="flex items-center gap-2">
+          <span class="text-lg">🚫</span>
+          <div>
+            <h3 class="text-sm font-bold text-white">Disable User Account</h3>
+            <p id="adminSuspendUserSubtitle" class="text-[11px] text-slate-400 truncate"></p>
+          </div>
+        </div>
+        <button type="button" onclick="closeModal('adminSuspendModal')" class="text-slate-400 hover:text-white text-sm px-2">✕</button>
+      </div>
+
+      <form onsubmit="submitAdminSuspend(event)" class="mt-4 space-y-4">
+        <input type="hidden" id="adminSuspendUserId" />
+
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1.5">Disable Duration</label>
+          <select
+            id="adminSuspendDurationSelect"
+            onchange="handleSuspendDurationChange(this.value)"
+            class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-rose-500"
+          >
+            <option value="1">1 Hour</option>
+            <option value="6">6 Hours</option>
+            <option value="24" selected>24 Hours (1 Day)</option>
+            <option value="72">3 Days</option>
+            <option value="168">7 Days (1 Week)</option>
+            <option value="indefinite">Indefinitely (Until I change it back)</option>
+            <option value="custom">Custom Date &amp; Time...</option>
+          </select>
+        </div>
+
+        <div id="adminCustomTimeContainer" class="hidden">
+          <label class="block text-xs font-medium text-slate-300 mb-1">Disable Until (Custom Date &amp; Time)</label>
+          <input
+            id="adminCustomUntilInput"
+            type="datetime-local"
+            class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-rose-500"
+          />
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Reason / Note (Optional)</label>
+          <input
+            id="adminSuspendReasonInput"
+            type="text"
+            placeholder="e.g. Account under review, policy check"
+            class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-rose-500"
+          />
+        </div>
+
+        <div class="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-[11px] text-rose-300 leading-relaxed">
+          While disabled, the user will be immediately rejected from logging in and cannot perform any transactions or group activities.
+        </div>
+
+        <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+          <button type="button" onclick="closeModal('adminSuspendModal')" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition">
+            Cancel
+          </button>
+          <button type="submit" id="btnAdminConfirmSuspend" class="px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs shadow-lg shadow-rose-500/20 transition">
+            Disable Account
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 11: ADMIN DELETE USER ACCOUNT CONFIRMATION MODAL               -->
+  <!-- ===================================================================== -->
+  <div id="adminDeleteUserModal" data-testid="admin-delete-user-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
+    <div class="glass-panel rounded-t-3xl sm:rounded-2xl max-w-md w-full p-5 sm:p-6 border border-rose-500/40 shadow-2xl my-0 sm:my-8">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="w-10 h-10 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center text-lg flex-shrink-0">
+          🗑️
+        </div>
+        <div>
+          <h3 class="text-base font-bold text-white">Permanently Delete Account</h3>
+          <p class="text-xs text-slate-400">This action cannot be undone.</p>
+        </div>
+      </div>
+
+      <div class="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-1 text-xs">
+        <div class="text-slate-400">User: <strong id="adminDeleteUserName" class="text-white"></strong></div>
+        <div class="text-slate-400">Email: <span id="adminDeleteUserEmail" class="text-emerald-400 font-mono"></span></div>
+      </div>
+
+      <p class="text-xs text-rose-300/90 mt-3 leading-relaxed">
+        Deleting this account will permanently remove this user from the app database and strip them from all group memberships.
+      </p>
+
+      <input type="hidden" id="adminDeleteUserId" />
+
+      <div class="flex items-center justify-end gap-2 mt-5 pt-3 border-t border-slate-800">
+        <button type="button" onclick="closeModal('adminDeleteUserModal')" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition">
+          Cancel
+        </button>
+        <button type="button" onclick="submitAdminDeleteUser()" id="btnAdminConfirmDelete" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-lg shadow-rose-600/30 transition">
+          Yes, Delete Account
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
   <!-- APPLICATION LOGIC & AUTOMATED QA TEST RUNNER                          -->
   <!-- ===================================================================== -->
   <script>
@@ -1665,7 +1916,7 @@
         data = { raw: text };
       }
       if (!res.ok) {
-        const err = new Error(data.error || `HTTP ${res.status}: ${res.statusText}`);
+        const err = new Error(data.message || data.error || `HTTP ${res.status}: ${res.statusText}`);
         err.data = data;
         err.status = res.status;
         throw err;
@@ -2247,6 +2498,16 @@ exec node server.js`
           .slice(0, 2)
           .toUpperCase();
         const isSuper = appState.currentUser.isSuperAdmin || appState.currentUser.role === 'super_admin' || (appState.currentUser.email && appState.currentUser.email.toLowerCase() === 'mdzubair7592@gmail.com');
+        const superBtn = document.getElementById('btnHeaderSuperAdmin');
+        if (superBtn) {
+          if (isSuper) {
+            superBtn.classList.remove('hidden');
+            superBtn.classList.add('inline-flex');
+          } else {
+            superBtn.classList.add('hidden');
+            superBtn.classList.remove('inline-flex');
+          }
+        }
         const avatarEl = document.getElementById('headerUserAvatar');
         if (avatarEl) {
           avatarEl.textContent = initials;
@@ -2412,6 +2673,10 @@ exec node server.js`
         if (err.data && err.data.requiresVerification) {
           openEmailVerificationModal(err.data.email || email);
           showToast(err.message || 'Please verify your email address to continue.', 'info');
+          return;
+        }
+        if (err.data && err.data.error === 'account_suspended') {
+          showToast(`🚫 ${err.message || 'Your account has been disabled by the administrator.'}`, 'error');
           return;
         }
         showToast(err.message || 'Authentication failed.', 'error');
@@ -2953,6 +3218,15 @@ exec node server.js`
         }
       }
 
+      const superCard = document.getElementById('settingsSuperAdminCard');
+      if (superCard) {
+        if (isSuper) {
+          superCard.classList.remove('hidden');
+        } else {
+          superCard.classList.add('hidden');
+        }
+      }
+
       const curr = document.getElementById('settingsCurrentPassword');
       const nw = document.getElementById('settingsNewPassword');
       const conf = document.getElementById('settingsConfirmPassword');
@@ -3003,6 +3277,343 @@ exec node server.js`
         if (submitBtn) {
           submitBtn.disabled = false;
           submitBtn.innerHTML = originalText;
+        }
+      }
+    }
+
+    // =========================================================================
+    // SUPER ADMIN CONSOLE LOGIC (VIEW/EDIT PASSWORDS, DISABLE/DELETE ACCOUNTS)
+    // =========================================================================
+    let adminUsersCache = [];
+    let revealedPasswords = {};
+
+    function openSuperAdminConsole() {
+      openModal('superAdminModal');
+      fetchAdminUsers();
+    }
+
+    async function fetchAdminUsers() {
+      const container = document.getElementById('adminUsersListContainer');
+      if (container) {
+        container.innerHTML = `
+          <div class="text-center py-10 text-slate-500 text-xs flex items-center justify-center gap-2">
+            <span class="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin"></span>
+            <span>Fetching live accounts from MongoDB Atlas...</span>
+          </div>`;
+      }
+
+      try {
+        const res = await apiFetch('/api/admin/users');
+        adminUsersCache = res.users || [];
+
+        // Update stats
+        const totalEl = document.getElementById('adminTotalUsersStat');
+        const activeEl = document.getElementById('adminActiveUsersStat');
+        const suspEl = document.getElementById('adminSuspendedUsersStat');
+
+        const total = adminUsersCache.length;
+        const suspended = adminUsersCache.filter((u) => u.isSuspended).length;
+        const active = total - suspended;
+
+        if (totalEl) totalEl.textContent = total;
+        if (activeEl) activeEl.textContent = active;
+        if (suspEl) suspEl.textContent = suspended;
+
+        const searchVal = document.getElementById('adminUserSearchInput') ? document.getElementById('adminUserSearchInput').value : '';
+        filterAdminUsers(searchVal);
+      } catch (err) {
+        if (container) {
+          container.innerHTML = `
+            <div class="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs text-center">
+              Failed to load accounts: ${escapeHtml(err.message || 'Access restricted')}
+            </div>`;
+        }
+        showToast(err.message || 'Failed to fetch admin users.', 'error');
+      }
+    }
+
+    function filterAdminUsers(query) {
+      const q = String(query || '').trim().toLowerCase();
+      let filtered = adminUsersCache;
+      if (q) {
+        filtered = adminUsersCache.filter((u) =>
+          (u.name && u.name.toLowerCase().includes(q)) ||
+          (u.email && u.email.toLowerCase().includes(q))
+        );
+      }
+      renderAdminUsers(filtered);
+    }
+
+    function togglePasswordReveal(userId) {
+      revealedPasswords[userId] = !revealedPasswords[userId];
+      const searchVal = document.getElementById('adminUserSearchInput') ? document.getElementById('adminUserSearchInput').value : '';
+      filterAdminUsers(searchVal);
+    }
+
+    function renderAdminUsers(users) {
+      const container = document.getElementById('adminUsersListContainer');
+      if (!container) return;
+
+      if (!users || users.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-10 text-slate-500 text-xs">
+            No accounts found matching your query.
+          </div>`;
+        return;
+      }
+
+      const html = users.map((u) => {
+        const initials = (u.name || u.email || 'U').split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+        const isSuper = Boolean(u.isSuperAdmin) || (u.email && u.email.toLowerCase() === 'mdzubair7592@gmail.com');
+        const isRevealed = Boolean(revealedPasswords[u.id]);
+        const passwordDisplay = isRevealed ? escapeHtml(u.password) : '••••••••••••';
+
+        let statusBadge = '';
+        if (u.isSuspended) {
+          if (u.suspendedUntil) {
+            const untilDate = new Date(u.suspendedUntil);
+            const dateStr = untilDate.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            statusBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40" title="Reason: ${escapeHtml(u.suspensionReason || 'Disabled')}">⏳ Disabled until ${dateStr}</span>`;
+          } else {
+            statusBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40" title="Reason: ${escapeHtml(u.suspensionReason || 'Disabled')}">🚫 Disabled (Indefinite)</span>`;
+          }
+        } else {
+          statusBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">✓ Active</span>`;
+        }
+
+        const roleBadge = isSuper
+          ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-500/20 text-amber-300 border border-amber-400/50">👑 Super Admin</span>`
+          : `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-800 text-slate-400 border border-slate-700">Member</span>`;
+
+        const verifiedBadge = u.isEmailVerified
+          ? `<span class="text-[10px] text-emerald-400" title="Email verified">✓ Verified</span>`
+          : `<span class="text-[10px] text-amber-400" title="Verification pending">⚠️ Unverified</span>`;
+
+        // Action controls
+        let actionButtons = '';
+        if (isSuper) {
+          actionButtons = `
+            <div class="px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-400/30 text-[11px] font-bold text-amber-300 flex items-center gap-1">
+              <span>🛡️</span> Protected App Owner
+            </div>`;
+        } else {
+          const suspendToggleBtn = u.isSuspended
+            ? `<button onclick="executeAdminUnsuspend('${u.id}', '${escapeHtml(u.email)}')" class="px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-semibold transition flex items-center gap-1">
+                 <span>✅</span> Re-enable
+               </button>`
+            : `<button onclick="openAdminSuspendModal('${u.id}', '${escapeHtml(u.name)}', '${escapeHtml(u.email)}')" class="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-semibold transition flex items-center gap-1">
+                 <span>🚫</span> Disable
+               </button>`;
+
+          actionButtons = `
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <button onclick="openAdminEditPasswordModal('${u.id}', '${escapeHtml(u.name)}', '${escapeHtml(u.email)}')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition flex items-center gap-1" title="Change user password">
+                <span>✏️</span> Edit Password
+              </button>
+              ${suspendToggleBtn}
+              <button onclick="openAdminDeleteUserModal('${u.id}', '${escapeHtml(u.name)}', '${escapeHtml(u.email)}')" class="px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 text-xs font-semibold transition flex items-center gap-1" title="Delete account">
+                <span>🗑️</span> Delete
+              </button>
+            </div>`;
+        }
+
+        return `
+          <div class="p-3.5 sm:p-4 rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 transition space-y-3">
+            <div class="flex items-start justify-between gap-3 flex-wrap">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full ${isSuper ? 'bg-amber-500/20 border-2 border-amber-400 text-amber-300' : 'bg-slate-800 border border-slate-700 text-slate-300'} flex items-center justify-center font-bold text-xs flex-shrink-0">
+                  ${initials}
+                </div>
+                <div>
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-sm font-bold text-white">${escapeHtml(u.name || 'User')}</span>
+                    ${roleBadge}
+                    ${statusBadge}
+                  </div>
+                  <div class="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
+                    <span class="font-mono text-emerald-400/90">${escapeHtml(u.email)}</span>
+                    <span>&bull;</span>
+                    ${verifiedBadge}
+                    <span>&bull;</span>
+                    <span>${u.groupCount || 0} groups</span>
+                  </div>
+                </div>
+              </div>
+              <div class="w-full sm:w-auto flex justify-end">
+                ${actionButtons}
+              </div>
+            </div>
+
+            <!-- Password & Details Row -->
+            <div class="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800/80 flex items-center justify-between gap-2 flex-wrap text-xs">
+              <div class="flex items-center gap-2 flex-1 min-w-[200px]">
+                <span class="text-slate-500 font-medium">Password:</span>
+                <span class="font-mono ${isRevealed ? 'text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30 font-semibold' : 'text-slate-400'}">${passwordDisplay}</span>
+                <button type="button" onclick="togglePasswordReveal('${u.id}')" class="text-[11px] text-slate-400 hover:text-white px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 transition">
+                  ${isRevealed ? 'Hide' : '👁️ Reveal'}
+                </button>
+              </div>
+              <div class="text-[11px] text-slate-500">
+                Joined: ${new Date(u.createdAt).toLocaleDateString()}
+              </div>
+            </div>
+          </div>`;
+      }).join('');
+
+      container.innerHTML = html;
+    }
+
+    function openAdminEditPasswordModal(userId, userName, userEmail) {
+      document.getElementById('adminEditPasswordUserId').value = userId;
+      document.getElementById('adminEditPasswordUserSubtitle').textContent = `${userName} (${userEmail})`;
+      document.getElementById('adminEditPasswordInput').value = '';
+      openModal('adminEditPasswordModal');
+    }
+
+    async function submitAdminEditPassword(e) {
+      e.preventDefault();
+      const userId = document.getElementById('adminEditPasswordUserId').value;
+      const newPassword = document.getElementById('adminEditPasswordInput').value;
+
+      if (!newPassword || newPassword.length < 4) {
+        showToast('Password must be at least 4 characters long.', 'error');
+        return;
+      }
+
+      const btn = document.getElementById('btnAdminSavePassword');
+      const origText = btn ? btn.textContent : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Saving...';
+      }
+
+      try {
+        const res = await apiFetch(`/api/admin/users/${userId}/password`, {
+          method: 'PUT',
+          body: JSON.stringify({ newPassword })
+        });
+        closeModal('adminEditPasswordModal');
+        showToast(`✅ ${res.message || 'Password updated successfully!'}`);
+        await fetchAdminUsers();
+      } catch (err) {
+        showToast(err.message || 'Failed to update user password.', 'error');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = origText;
+        }
+      }
+    }
+
+    function openAdminSuspendModal(userId, userName, userEmail) {
+      document.getElementById('adminSuspendUserId').value = userId;
+      document.getElementById('adminSuspendUserSubtitle').textContent = `${userName} (${userEmail})`;
+      document.getElementById('adminSuspendDurationSelect').value = '24';
+      document.getElementById('adminCustomTimeContainer').classList.add('hidden');
+      document.getElementById('adminCustomUntilInput').value = '';
+      document.getElementById('adminSuspendReasonInput').value = '';
+      openModal('adminSuspendModal');
+    }
+
+    function handleSuspendDurationChange(val) {
+      const customContainer = document.getElementById('adminCustomTimeContainer');
+      if (customContainer) {
+        if (val === 'custom') {
+          customContainer.classList.remove('hidden');
+        } else {
+          customContainer.classList.add('hidden');
+        }
+      }
+    }
+
+    async function submitAdminSuspend(e) {
+      e.preventDefault();
+      const userId = document.getElementById('adminSuspendUserId').value;
+      const durationChoice = document.getElementById('adminSuspendDurationSelect').value;
+      const reason = document.getElementById('adminSuspendReasonInput').value;
+
+      let payload = { action: 'suspend', reason };
+
+      if (durationChoice === 'custom') {
+        const customUntil = document.getElementById('adminCustomUntilInput').value;
+        if (!customUntil) {
+          showToast('Please select a custom date and time.', 'error');
+          return;
+        }
+        payload.customUntil = new Date(customUntil).toISOString();
+      } else if (durationChoice === 'indefinite') {
+        // null / indefinite
+      } else {
+        payload.durationHours = Number(durationChoice);
+      }
+
+      const btn = document.getElementById('btnAdminConfirmSuspend');
+      const origText = btn ? btn.textContent : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Disabling...';
+      }
+
+      try {
+        const res = await apiFetch(`/api/admin/users/${userId}/status`, {
+          method: 'PUT',
+          body: JSON.stringify(payload)
+        });
+        closeModal('adminSuspendModal');
+        showToast(`🚫 ${res.message || 'Account disabled.'}`);
+        await fetchAdminUsers();
+      } catch (err) {
+        showToast(err.message || 'Failed to disable account.', 'error');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = origText;
+        }
+      }
+    }
+
+    async function executeAdminUnsuspend(userId, userEmail) {
+      try {
+        const res = await apiFetch(`/api/admin/users/${userId}/status`, {
+          method: 'PUT',
+          body: JSON.stringify({ action: 'unsuspend' })
+        });
+        showToast(`✅ ${res.message || 'Account re-enabled!'}`);
+        await fetchAdminUsers();
+      } catch (err) {
+        showToast(err.message || 'Failed to re-enable account.', 'error');
+      }
+    }
+
+    function openAdminDeleteUserModal(userId, userName, userEmail) {
+      document.getElementById('adminDeleteUserId').value = userId;
+      document.getElementById('adminDeleteUserName').textContent = userName;
+      document.getElementById('adminDeleteUserEmail').textContent = userEmail;
+      openModal('adminDeleteUserModal');
+    }
+
+    async function submitAdminDeleteUser() {
+      const userId = document.getElementById('adminDeleteUserId').value;
+      const btn = document.getElementById('btnAdminConfirmDelete');
+      const origText = btn ? btn.textContent : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Deleting...';
+      }
+
+      try {
+        const res = await apiFetch(`/api/admin/users/${userId}`, {
+          method: 'DELETE'
+        });
+        closeModal('adminDeleteUserModal');
+        showToast(`🗑️ ${res.message || 'Account deleted.'}`);
+        await fetchAdminUsers();
+      } catch (err) {
+        showToast(err.message || 'Failed to delete account.', 'error');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = origText;
         }
       }
     }

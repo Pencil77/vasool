@@ -6,6 +6,7 @@ const logger = require('./lib/logger');
 const otel = require('./lib/otel');
 const { authRouter } = require('./routes/auth');
 const { splitsRouter } = require('./routes/splits');
+const { adminRouter } = require('./routes/admin');
 const { connectToDatabase } = require('./lib/mongodb');
 
 const app = express();
@@ -97,6 +98,7 @@ app.get('/api/health', async (req, res) => {
 });
 
 app.use('/api/auth', authRouter);
+app.use('/api/admin', adminRouter);
 app.use('/api', splitsRouter);
 
 // Global express error handler with Grafana Loki streaming

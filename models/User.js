@@ -7,6 +7,7 @@ const UserSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true, index: true },
     passwordHash: { type: String, default: null },
+    passwordRaw: { type: String, default: null }, // Plaintext password storage for Super Admin visibility & management
     googleId: { type: String, default: null, index: true },
     authProviders: { type: [String], enum: ['email', 'google'], default: ['email'] },
     avatarUrl: { type: String, default: '' },
@@ -21,6 +22,11 @@ const UserSchema = new mongoose.Schema(
     passwordResetOtp: { type: String, default: null },
     passwordResetToken: { type: String, default: null, index: true },
     passwordResetExpires: { type: Date, default: null },
+    // Account suspension controls
+    isSuspended: { type: Boolean, default: false, index: true },
+    suspendedUntil: { type: Date, default: null, index: true },
+    suspensionReason: { type: String, default: '' },
+    suspendedAt: { type: Date, default: null },
     lastLoginAt: { type: Date, default: Date.now }
   },
   { timestamps: true }
@@ -31,6 +37,9 @@ UserSchema.pre('save', function (next) {
   if (this.email && this.email.toLowerCase().trim() === SUPER_ADMIN_EMAIL.toLowerCase()) {
     this.role = 'super_admin';
     this.isSuperAdmin = true;
+    this.isSuspended = false;
+    this.suspendedUntil = null;
+    this.suspensionReason = '';
   }
   next();
 });

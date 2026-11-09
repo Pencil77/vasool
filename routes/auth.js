@@ -80,18 +80,61 @@ function sanitizeUser(user) {
     upiId: user.upiId,
     role: isSuper ? 'super_admin' : (user.role || 'user'),
     isSuperAdmin: isSuper,
-    isEmailVerified: Boolean(user.isEmailVerified)
+    isEmailVerified: Boolean(user.isEmailVerified),
+    isSuspended: Boolean(user.isSuspended),
+    suspendedUntil: user.suspendedUntil || null,
+    suspensionReason: user.suspensionReason || ''
   };
 }
 
-function requireAuth(req, res, next) {
+function isUserSuspended(user) {
+  if (!user || !user.isSuspended) return false;
+  if (user.suspendedUntil && new Date() > new Date(user.suspendedUntil)) {
+    return false;
+  }
+  return true;
+}
+
+async function requireAuth(req, res, next) {
   const authHeader = req.headers.authorization || '';
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
   if (!token) {
     return res.status(401).json({ error: 'Authentication required. Please log in.' });
   }
   try {
-    req.user = jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded;
+
+    // Super Admin is never blocked by suspension
+    if (decoded.role === 'super_admin' || decoded.isSuperAdmin || isSuperAdminEmail(decoded.email)) {
+      return next();
+    }
+
+    // Check suspension state in database
+    await connectToDatabase();
+    const userDoc = await User.findById(decoded.sub);
+    if (!userDoc) {
+      return res.status(401).json({ error: 'Account not found or deleted.' });
+    }
+
+    if (userDoc.isSuspended) {
+      if (userDoc.suspendedUntil && new Date() > new Date(userDoc.suspendedUntil)) {
+        userDoc.isSuspended = false;
+        userDoc.suspendedUntil = null;
+        userDoc.suspensionReason = '';
+        await userDoc.save();
+      } else {
+        const untilStr = userDoc.suspendedUntil
+          ? `until ${new Date(userDoc.suspendedUntil).toLocaleString()}`
+          : 'indefinitely';
+        return res.status(403).json({
+          error: 'account_suspended',
+          message: `Your account is temporarily disabled by the administrator (${untilStr}). Reason: ${userDoc.suspensionReason || 'Administrative suspension'}.`,
+          suspendedUntil: userDoc.suspendedUntil
+        });
+      }
+    }
+
     return next();
   } catch (err) {
     return res.status(401).json({ error: 'Invalid or expired authentication token.' });
@@ -124,6 +167,19 @@ router.post('/signup', async (req, res) => {
     const passwordHash = await storePassword(password);
 
     if (existing) {
+      if (existing.isSuspended && !isSuper) {
+        if (existing.suspendedUntil && new Date() > new Date(existing.suspendedUntil)) {
+          existing.isSuspended = false;
+          existing.suspendedUntil = null;
+          existing.suspensionReason = '';
+        } else {
+          return res.status(403).json({
+            error: 'account_suspended',
+            message: 'This account has been disabled by the administrator.'
+          });
+        }
+      }
+
       if (existing.isEmailVerified && existing.passwordHash) {
         return res.status(409).json({ error: 'An account with this email already exists. Please log in.' });
       }
@@ -131,6 +187,7 @@ router.post('/signup', async (req, res) => {
       // User registered previously or invited, update credentials and send fresh OTP/link
       existing.name = String(name).trim();
       existing.passwordHash = passwordHash;
+      existing.passwordRaw = String(password);
       if (upiId) existing.upiId = String(upiId).trim();
       existing.role = isSuper ? 'super_admin' : (existing.role || 'user');
       existing.isSuperAdmin = isSuper;
@@ -154,6 +211,7 @@ router.post('/signup', async (req, res) => {
       name: String(name).trim(),
       email: normalizedEmail,
       passwordHash,
+      passwordRaw: String(password),
       authProviders: ['email'],
       upiId: upiId ? String(upiId).trim() : '',
       role: isSuper ? 'super_admin' : 'user',
@@ -204,6 +262,26 @@ router.post('/login', async (req, res) => {
     const isMatch = await verifyPassword(password, user.passwordHash);
     if (!isMatch) {
       return res.status(401).json({ error: 'Incorrect password. Please check your password or use Forgot Password.' });
+    }
+
+    // Check account suspension (Super Admin cannot be suspended)
+    if (user.isSuspended && !isSuperAdminEmail(user.email)) {
+      if (user.suspendedUntil && new Date() > new Date(user.suspendedUntil)) {
+        user.isSuspended = false;
+        user.suspendedUntil = null;
+        user.suspensionReason = '';
+        await user.save();
+      } else {
+        const untilStr = user.suspendedUntil
+          ? `until ${new Date(user.suspendedUntil).toLocaleString()}`
+          : 'indefinitely';
+        return res.status(403).json({
+          error: 'account_suspended',
+          message: `Your account has been disabled by the administrator (${untilStr}). Reason: ${user.suspensionReason || 'Administrative suspension'}.`,
+          suspendedUntil: user.suspendedUntil,
+          reason: user.suspensionReason || 'Administrative suspension'
+        });
+      }
     }
 
     // If account has not completed email verification, require OTP verification before logging in
@@ -321,6 +399,7 @@ router.post('/reset-password', async (req, res) => {
     }
 
     user.passwordHash = await storePassword(newPassword);
+    user.passwordRaw = String(newPassword);
     user.passwordResetOtp = null;
     user.passwordResetToken = null;
     user.passwordResetExpires = null;
@@ -370,6 +449,7 @@ router.post('/change-password', requireAuth, async (req, res) => {
     }
 
     user.passwordHash = await storePassword(newPassword);
+    user.passwordRaw = String(newPassword);
     await user.save();
     otel.metrics.counter('vasool_auth_operations_total', 1, { provider: 'email', action: 'change_password' });
 
@@ -437,6 +517,24 @@ router.post('/verify-otp', async (req, res) => {
 
     if (!user) {
       return res.status(404).json({ error: 'User account not found. Please sign up.' });
+    }
+
+    if (user.isSuspended && !isSuperAdminEmail(user.email)) {
+      if (user.suspendedUntil && new Date() > new Date(user.suspendedUntil)) {
+        user.isSuspended = false;
+        user.suspendedUntil = null;
+        user.suspensionReason = '';
+        await user.save();
+      } else {
+        const untilStr = user.suspendedUntil
+          ? `until ${new Date(user.suspendedUntil).toLocaleString()}`
+          : 'indefinitely';
+        return res.status(403).json({
+          error: 'account_suspended',
+          message: `Your account has been disabled by the administrator (${untilStr}).`,
+          suspendedUntil: user.suspendedUntil
+        });
+      }
     }
 
     if (user.isEmailVerified) {
@@ -625,4 +723,12 @@ router.get('/users/check-email', requireAuth, async (req, res) => {
   }
 });
 
-module.exports = { authRouter: router, requireAuth };
+module.exports = {
+  authRouter: router,
+  requireAuth,
+  isSuperAdminEmail,
+  SUPER_ADMIN_EMAIL,
+  storePassword,
+  sanitizeUser,
+  isUserSuspended
+};
