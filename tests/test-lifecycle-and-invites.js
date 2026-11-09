@@ -222,8 +222,12 @@ async function runTests() {
   }
 }
 
-runTests().catch((err) => {
-  console.error('TEST SUITE FAILED:', err);
-  if (server) server.close();
-  process.exit(1);
-});
+runTests()
+  .then(() => {
+    process.exit(0);
+  })
+  .catch((err) => {
+    console.error('TEST SUITE FAILED:', err);
+    if (server) server.close();
+    process.exit(1);
+  });
