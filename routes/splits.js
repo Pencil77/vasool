@@ -4,6 +4,7 @@ const { connectToDatabase } = require('../lib/mongodb');
 const Group = require('../models/Group');
 const Expense = require('../models/Expense');
 const Settlement = require('../models/Settlement');
+const User = require('../models/User');
 const { requireAuth } = require('./auth');
 const { sendGroupInviteEmail } = require('../lib/mailer');
 const logger = require('../lib/logger');
@@ -215,7 +216,19 @@ router.get('/groups', requireAuth, async (req, res) => {
     const groups = await Group.find({
       'members.email': { $regex: new RegExp('^' + userEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') }
     }).sort({ updatedAt: -1 });
-    return res.status(200).json({ groups });
+
+    const activeGroups = [];
+    const pendingInvites = [];
+    groups.forEach((g) => {
+      const myMember = g.members.find((m) => m.email && m.email.toLowerCase().trim() === userEmail);
+      if (myMember && myMember.status === 'pending_acceptance') {
+        pendingInvites.push(g);
+      } else {
+        activeGroups.push(g);
+      }
+    });
+
+    return res.status(200).json({ groups, activeGroups, pendingInvites });
   } catch (err) {
     logger.error('[splits:groups] Error fetching user groups:', err);
     return res.status(500).json({ error: err.message });
@@ -226,15 +239,19 @@ router.get('/groups', requireAuth, async (req, res) => {
 router.post('/groups', requireAuth, async (req, res) => {
   try {
     await connectToDatabase();
-    const { name, description, category, currency, members = [], splitsVisibility = 'personal_only' } = req.body;
+    const { name, description, category, currency, members = [], splitsVisibility = 'personal_only', allowMembersToAddOthers = false } = req.body;
     if (!name) {
       return res.status(400).json({ error: 'Group name is required.' });
     }
 
     const normalizedCreator = {
+      userId: req.user.sub || null,
       name: req.user.name,
-      email: req.user.email.toLowerCase(),
-      role: 'admin'
+      email: req.user.email.toLowerCase().trim(),
+      role: 'admin',
+      status: 'active',
+      acceptedAt: new Date(),
+      defaultWeight: 1
     };
 
     const seenEmails = new Set([normalizedCreator.email]);
@@ -248,7 +265,10 @@ router.post('/groups', requireAuth, async (req, res) => {
           finalMembers.push({
             name: String(m.name).trim(),
             email: cleanEmail,
-            role: 'member'
+            role: 'member',
+            status: 'pending_acceptance',
+            invitedAt: new Date(),
+            defaultWeight: Number(m.defaultWeight) || 1
           });
         }
       }
@@ -264,6 +284,7 @@ router.post('/groups', requireAuth, async (req, res) => {
       createdByEmail: normalizedCreator.email,
       adminEmail: normalizedCreator.email,
       splitsVisibility: splitsVisibility || 'personal_only',
+      allowMembersToAddOthers: Boolean(allowMembersToAddOthers),
       members: finalMembers
     });
 
@@ -321,13 +342,26 @@ router.post('/groups/join', requireAuth, async (req, res) => {
         name: userName,
         email: userEmail,
         role: 'member',
+        status: 'active',
+        acceptedAt: new Date(),
         defaultWeight: 1
       });
       await group.save();
       logger.info(`[splits:join] User ${userEmail} (${userName}) joined group "${group.name}" via code ${cleanCode}`);
       otel.metrics.counter('vasool_groups_joined_total', 1, { status: 'new_member', category: group.category || 'Trip' });
     } else {
-      logger.info(`[splits:join] User ${userEmail} is already a member of "${group.name}"`);
+      if (existingMember.status !== 'active') {
+        existingMember.status = 'active';
+        existingMember.acceptedAt = new Date();
+        existingMember.userId = req.user.sub || existingMember.userId;
+        if (req.user.name && (!existingMember.name || existingMember.name === userEmail.split('@')[0])) {
+          existingMember.name = req.user.name;
+        }
+        await group.save();
+        logger.info(`[splits:join] User ${userEmail} activated membership in "${group.name}" via code ${cleanCode}`);
+      } else {
+        logger.info(`[splits:join] User ${userEmail} is already active member of "${group.name}"`);
+      }
       otel.metrics.counter('vasool_groups_joined_total', 1, { status: 'already_member', category: group.category || 'Trip' });
     }
 
@@ -495,7 +529,7 @@ router.patch('/groups/:id/archive', requireAuth, async (req, res) => {
 router.post('/groups/:id/members', requireAuth, async (req, res) => {
   try {
     await connectToDatabase();
-    const { name, email } = req.body;
+    const { name, email, defaultWeight = 1 } = req.body;
     if (!name || !email) {
       return res.status(400).json({ error: 'Member name and email are required.' });
     }
@@ -504,20 +538,35 @@ router.post('/groups/:id/members', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'Group not found.' });
     }
 
+    const requesterEmail = (req.user.email || '').toLowerCase().trim();
+    const currentAdmin = group.members.find((m) => m.role === 'admin') ||
+      (group.adminEmail ? group.members.find((m) => m.email.toLowerCase() === group.adminEmail.toLowerCase()) : null) ||
+      group.members[0];
+
+    const isCurrentAdmin = currentAdmin && currentAdmin.email.toLowerCase().trim() === requesterEmail;
+    if (!isCurrentAdmin && !group.allowMembersToAddOthers) {
+      return res.status(403).json({
+        error: 'Only the group admin can add members to this group. Non-admin member invitations are disabled by default in group settings.'
+      });
+    }
+
     const cleanEmail = String(email).toLowerCase().trim();
     const cleanName = String(name).trim();
-    if (group.members.some((m) => m.email === cleanEmail)) {
+    if (group.members.some((m) => m.email.toLowerCase().trim() === cleanEmail)) {
       return res.status(409).json({ error: 'Member is already in this group.' });
     }
 
-    group.members.push({ name: cleanName, email: cleanEmail, role: 'member' });
+    group.members.push({
+      name: cleanName,
+      email: cleanEmail,
+      role: 'member',
+      status: 'pending_acceptance',
+      invitedAt: new Date(),
+      defaultWeight: Number(defaultWeight) || 1
+    });
     await group.save();
 
     // Dispatch invitation email asynchronously
-    const currentAdmin = group.members.find((m) => m.role === 'admin') ||
-      (group.adminEmail ? group.members.find((m) => m.email.toLowerCase() === group.adminEmail.toLowerCase()) : null) ||
-      req.user;
-
     const inviterName = req.user.name || (currentAdmin ? currentAdmin.name : 'Group Admin');
     const inviterEmail = req.user.email || (currentAdmin ? currentAdmin.email : group.createdByEmail);
 
@@ -532,11 +581,120 @@ router.post('/groups/:id/members', requireAuth, async (req, res) => {
       logger.error(`[splits:invite] Background member invite dispatch failed for ${cleanEmail}:`, err);
     });
 
-    logger.info(`[splits:members] Added member ${cleanName} (${cleanEmail}) to group "${group.name}"`);
-    otel.metrics.counter('vasool_members_added_total', 1);
-    return res.status(200).json({ group });
+    logger.info(`[splits:members] Added member ${cleanName} (${cleanEmail}) to group "${group.name}" with status: pending_acceptance`);
+    otel.metrics.counter('vasool_members_added_total', 1, { status: 'pending_acceptance' });
+    return res.status(200).json({ group, message: `Invitation sent to ${cleanName} (${cleanEmail}). Status: Pending Acceptance.` });
   } catch (err) {
     logger.error('[splits:members] Error adding member to group:', err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/groups/:id/accept-invite - User accepts an invite to join the group
+router.post('/groups/:id/accept-invite', requireAuth, async (req, res) => {
+  try {
+    await connectToDatabase();
+    const group = await Group.findById(req.params.id);
+    if (!group) {
+      return res.status(404).json({ error: 'Group not found.' });
+    }
+
+    const userEmail = (req.user.email || '').toLowerCase().trim();
+    const member = group.members.find((m) => m.email.toLowerCase().trim() === userEmail);
+    if (!member) {
+      return res.status(404).json({ error: 'You are not listed in this group.' });
+    }
+
+    member.status = 'active';
+    member.acceptedAt = new Date();
+    member.userId = req.user.sub || member.userId;
+    if (req.user.name && (!member.name || member.name === userEmail.split('@')[0])) {
+      member.name = req.user.name;
+    }
+    await group.save();
+
+    logger.info(`[splits:invite] User ${userEmail} accepted invitation to join "${group.name}"`);
+    otel.metrics.counter('vasool_invitations_accepted_total', 1, { group: group.name });
+    return res.status(200).json({
+      message: `You have successfully joined "${group.name}".`,
+      group
+    });
+  } catch (err) {
+    logger.error('[splits:invite] Error accepting invite:', err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/groups/:id/decline-invite - User declines an invite to join the group
+router.post('/groups/:id/decline-invite', requireAuth, async (req, res) => {
+  try {
+    await connectToDatabase();
+    const group = await Group.findById(req.params.id);
+    if (!group) {
+      return res.status(404).json({ error: 'Group not found.' });
+    }
+
+    const userEmail = (req.user.email || '').toLowerCase().trim();
+    const initialCount = group.members.length;
+    group.members = group.members.filter((m) => m.email.toLowerCase().trim() !== userEmail);
+
+    if (group.members.length === initialCount) {
+      return res.status(404).json({ error: 'You are not listed in this group.' });
+    }
+
+    await group.save();
+    logger.info(`[splits:invite] User ${userEmail} declined invitation to join "${group.name}"`);
+    otel.metrics.counter('vasool_invitations_declined_total', 1, { group: group.name });
+    return res.status(200).json({
+      message: `You declined the invitation to join "${group.name}".`,
+      group
+    });
+  } catch (err) {
+    logger.error('[splits:invite] Error declining invite:', err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/groups/:id/settings - Update group admin settings (allowMembersToAddOthers, splitsVisibility, minimizeDebts)
+router.patch('/groups/:id/settings', requireAuth, async (req, res) => {
+  try {
+    await connectToDatabase();
+    const group = await Group.findById(req.params.id);
+    if (!group) return res.status(404).json({ error: 'Group not found.' });
+
+    const requesterEmail = req.user.email.toLowerCase().trim();
+    const currentAdmin = group.members.find((m) => m.role === 'admin') ||
+      (group.adminEmail ? group.members.find((m) => m.email.toLowerCase() === group.adminEmail.toLowerCase()) : null) ||
+      group.members[0];
+
+    const isCurrentAdmin = currentAdmin && currentAdmin.email.toLowerCase().trim() === requesterEmail;
+    if (!isCurrentAdmin) {
+      return res.status(403).json({ error: 'Only the group admin can update group settings.' });
+    }
+
+    if (req.body.allowMembersToAddOthers !== undefined) {
+      group.allowMembersToAddOthers = Boolean(req.body.allowMembersToAddOthers);
+    }
+    if (req.body.splitsVisibility && ['personal_only', 'show_all'].includes(req.body.splitsVisibility)) {
+      group.splitsVisibility = req.body.splitsVisibility;
+    }
+    if (req.body.minimizeDebts !== undefined) {
+      group.minimizeDebts = Boolean(req.body.minimizeDebts);
+    }
+    if (req.body.name && String(req.body.name).trim()) {
+      group.name = String(req.body.name).trim();
+    }
+    if (req.body.category) {
+      group.category = req.body.category;
+    }
+
+    await group.save();
+    logger.info(`[splits:settings] Group "${group.name}" settings updated by ${requesterEmail}`);
+    return res.status(200).json({
+      message: 'Group settings updated successfully.',
+      group
+    });
+  } catch (err) {
     return res.status(500).json({ error: err.message });
   }
 });
@@ -1057,6 +1215,64 @@ router.get('/settlements', requireAuth, async (req, res) => {
     }
     const settlements = await Settlement.find(filter).sort({ settledAt: -1, createdAt: -1 });
     return res.status(200).json({ settlements });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/users/search - Search registered users by email or name for autocomplete
+router.get('/users/search', requireAuth, async (req, res) => {
+  try {
+    await connectToDatabase();
+    const q = String(req.query.q || '').trim();
+    if (!q || q.length < 1) {
+      return res.status(200).json({ users: [] });
+    }
+    const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(escaped, 'i');
+    const users = await User.find(
+      { $or: [{ email: regex }, { name: regex }] },
+      'name email avatarUrl upiId'
+    )
+      .limit(8)
+      .lean();
+
+    return res.status(200).json({
+      users: users.map((u) => ({
+        id: u._id.toString(),
+        name: u.name,
+        email: u.email,
+        avatarUrl: u.avatarUrl || '',
+        upiId: u.upiId || ''
+      }))
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/users/check-email - Checks whether an email is already linked to a registered account
+router.get('/users/check-email', requireAuth, async (req, res) => {
+  try {
+    await connectToDatabase();
+    const email = String(req.query.email || '').toLowerCase().trim();
+    if (!email) {
+      return res.status(400).json({ error: 'Email parameter required.' });
+    }
+    const user = await User.findOne({ email }).lean();
+    if (user) {
+      return res.status(200).json({
+        exists: true,
+        user: {
+          id: user._id.toString(),
+          name: user.name,
+          email: user.email,
+          avatarUrl: user.avatarUrl || '',
+          upiId: user.upiId || ''
+        }
+      });
+    }
+    return res.status(200).json({ exists: false, user: null });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }

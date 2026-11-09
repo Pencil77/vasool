@@ -6,8 +6,11 @@ const MemberSubSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true },
     email: { type: String, required: true, lowercase: true, trim: true },
     role: { type: String, enum: ['admin', 'owner', 'member'], default: 'member' },
+    status: { type: String, enum: ['active', 'pending_acceptance', 'rejected'], default: 'pending_acceptance' },
     defaultWeight: { type: Number, default: 1 },
-    upiId: { type: String, default: '', trim: true }
+    upiId: { type: String, default: '', trim: true },
+    invitedAt: { type: Date, default: Date.now },
+    acceptedAt: { type: Date, default: null }
   },
   { _id: false }
 );
@@ -23,6 +26,7 @@ const GroupSchema = new mongoose.Schema(
     adminEmail: { type: String, lowercase: true, trim: true },
     splitsVisibility: { type: String, enum: ['personal_only', 'show_all'], default: 'personal_only' },
     minimizeDebts: { type: Boolean, default: true },
+    allowMembersToAddOthers: { type: Boolean, default: false },
     isArchived: { type: Boolean, default: false },
     members: { type: [MemberSubSchema], default: [] }
   },

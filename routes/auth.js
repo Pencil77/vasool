@@ -181,52 +181,78 @@ router.post('/signup', async (req, res) => {
 
 /**
  * POST /api/auth/login
- * Log in with Email & Password (requires verified email)
+ * Unified Auth: Log in with Email & Password.
+ * If user does not exist, automatically record their name and details and create the account.
  */
 router.post('/login', async (req, res) => {
   try {
     await connectToDatabase();
-    const { email, password } = req.body;
+    const { email, password, name, upiId } = req.body;
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required.' });
     }
 
     const normalizedEmail = String(email).toLowerCase().trim();
-    const user = await User.findOne({ email: normalizedEmail });
+    let user = await User.findOne({ email: normalizedEmail });
+
     if (!user) {
-      return res.status(401).json({ error: 'Invalid email or password.' });
-    }
-    if (!user.passwordHash) {
-      return res.status(401).json({
-        error: 'This account was registered with Google Sign-In. Please continue with Google or sign up to set a password.'
+      // Seamless Unified Auth: User signing in without signing up beforehand.
+      // Automatically record their name and details and create their account.
+      const userName = (name && String(name).trim()) ? String(name).trim() : normalizedEmail.split('@')[0];
+      const passwordHash = await storePassword(password);
+      user = await User.create({
+        name: userName,
+        email: normalizedEmail,
+        passwordHash,
+        upiId: upiId ? String(upiId).trim() : '',
+        authProviders: ['email'],
+        isEmailVerified: true,
+        lastLoginAt: new Date()
       });
+      const token = signAuthToken(user);
+      otel.metrics.counter('vasool_auth_operations_total', 1, { provider: 'email', action: 'unified_auto_signup' });
+      return res.status(200).json({
+        token,
+        user: sanitizeUser(user),
+        isNewUser: true,
+        message: `Welcome to Vasool, ${user.name}! Your account has been created.`
+      });
+    }
+
+    if (!user.passwordHash) {
+      // User registered with Google or invite placeholder previously, set their password now
+      user.passwordHash = await storePassword(password);
+      if (!user.authProviders.includes('email')) {
+        user.authProviders.push('email');
+      }
+      if (name && (!user.name || user.name === normalizedEmail.split('@')[0])) {
+        user.name = String(name).trim();
+      }
+      if (upiId && !user.upiId) {
+        user.upiId = String(upiId).trim();
+      }
+      user.isEmailVerified = true;
+      user.lastLoginAt = new Date();
+      await user.save();
+      const token = signAuthToken(user);
+      otel.metrics.counter('vasool_auth_operations_total', 1, { provider: 'email', action: 'link_password' });
+      return res.status(200).json({ token, user: sanitizeUser(user), linkedProvider: true });
     }
 
     const isMatch = await verifyPassword(password, user.passwordHash);
     if (!isMatch) {
-      return res.status(401).json({ error: 'Invalid email or password.' });
+      return res.status(401).json({ error: 'Incorrect password for this email. Please check your password or sign in with Google.' });
     }
 
-    // If user has not yet verified their email, block login and offer OTP/magic link verification
     if (!user.isEmailVerified) {
-      // Regenerate fresh OTP & link if expired
-      if (!user.emailVerificationExpires || user.emailVerificationExpires < new Date()) {
-        const otp = generateOtp();
-        const token = generateToken();
-        user.emailVerificationOtp = otp;
-        user.emailVerificationToken = token;
-        user.emailVerificationExpires = new Date(Date.now() + 15 * 60 * 1000);
-        await user.save();
-        await sendVerificationEmail({ email: user.email, name: user.name, otp, token });
-      }
-
-      return res.status(403).json({
-        error: 'Please verify your email address to continue. We have sent a verification code to your email.',
-        requiresVerification: true,
-        email: user.email
-      });
+      user.isEmailVerified = true;
     }
-
+    if (name && (!user.name || user.name === normalizedEmail.split('@')[0])) {
+      user.name = String(name).trim();
+    }
+    if (upiId && !user.upiId) {
+      user.upiId = String(upiId).trim();
+    }
     user.lastLoginAt = new Date();
     await user.save();
     const token = signAuthToken(user);
@@ -476,6 +502,70 @@ router.post('/resend-otp', async (req, res) => {
     });
   } catch (err) {
     return res.status(500).json({ error: err.message || 'Failed to resend verification email.' });
+  }
+});
+
+/**
+ * GET /api/users/search
+ * Search registered users by email or name for typing autocomplete
+ */
+router.get('/users/search', requireAuth, async (req, res) => {
+  try {
+    await connectToDatabase();
+    const q = String(req.query.q || '').trim();
+    if (!q || q.length < 1) {
+      return res.status(200).json({ users: [] });
+    }
+    const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(escaped, 'i');
+    const users = await User.find(
+      { $or: [{ email: regex }, { name: regex }] },
+      'name email avatarUrl upiId'
+    )
+      .limit(8)
+      .lean();
+
+    return res.status(200).json({
+      users: users.map((u) => ({
+        id: u._id.toString(),
+        name: u.name,
+        email: u.email,
+        avatarUrl: u.avatarUrl || '',
+        upiId: u.upiId || ''
+      }))
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/users/check-email
+ * Checks whether an email address is already linked to a registered account
+ */
+router.get('/users/check-email', requireAuth, async (req, res) => {
+  try {
+    await connectToDatabase();
+    const email = String(req.query.email || '').toLowerCase().trim();
+    if (!email) {
+      return res.status(400).json({ error: 'Email parameter required.' });
+    }
+    const user = await User.findOne({ email }).lean();
+    if (user) {
+      return res.status(200).json({
+        exists: true,
+        user: {
+          id: user._id.toString(),
+          name: user.name,
+          email: user.email,
+          avatarUrl: user.avatarUrl || '',
+          upiId: user.upiId || ''
+        }
+      });
+    }
+    return res.status(200).json({ exists: false, user: null });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
   }
 });
 
