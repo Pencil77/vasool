@@ -14,7 +14,6 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     :root {
       --sat: env(safe-area-inset-top, 0px);
@@ -117,13 +116,19 @@
 
         <!-- Active User Pill -->
         <div id="headerUserArea" data-testid="header-user-area" class="hidden items-center gap-1.5 sm:gap-2 pl-1 sm:pl-2 border-l border-slate-800">
-          <div id="headerUserAvatar" data-testid="header-user-avatar" class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-emerald-500/30 to-teal-500/30 border border-emerald-400/40 flex items-center justify-center text-[11px] sm:text-xs font-bold text-emerald-300 flex-shrink-0">
+          <div id="headerUserAvatar" onclick="openAccountSettingsModal()" title="Account Settings & Profile" data-testid="header-user-avatar" class="cursor-pointer w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-emerald-500/30 to-teal-500/30 border border-emerald-400/40 flex items-center justify-center text-[11px] sm:text-xs font-bold text-emerald-300 flex-shrink-0 hover:border-emerald-400 transition">
             --
           </div>
-          <div class="hidden lg:block text-left">
+          <div onclick="openAccountSettingsModal()" title="Account Settings & Profile" class="hidden lg:block text-left cursor-pointer hover:opacity-90 transition">
             <div id="headerUserName" data-testid="header-user-name" class="text-xs font-semibold text-slate-100 leading-tight"></div>
             <div id="headerUserProvider" data-testid="header-user-provider" class="text-[10px] text-emerald-400 leading-tight"></div>
           </div>
+          <button id="btnHeaderAccountSettings" data-testid="btn-header-settings" onclick="openAccountSettingsModal()" title="Account Settings & Password" class="p-1 sm:p-1.5 rounded-lg text-slate-400 hover:text-emerald-400 hover:bg-slate-800/80 transition flex-shrink-0">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
           <button id="btnHeaderLogout" data-testid="btn-header-logout" onclick="promptLogout()" title="Sign out" class="p-1 sm:p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800/80 transition flex-shrink-0">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
@@ -135,7 +140,7 @@
   </header>
 
   <!-- ===================================================================== -->
-  <!-- VIEW 1: AUTHENTICATION PORTAL (EMAIL/PASSWORD + GOOGLE OAUTH 2.0)     -->
+  <!-- VIEW 1: AUTHENTICATION PORTAL (EMAIL/PASSWORD + OTP VERIFICATION)     -->
   <!-- ===================================================================== -->
   <section id="authViewSection" data-testid="auth-view-section" class="hidden max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
     <!-- Active Session Return Banner (Mobile/Desktop Friendly) -->
@@ -172,7 +177,7 @@
               Split group bills effortlessly. Settle up in one tap.
             </h1>
             <p class="text-xs sm:text-sm text-slate-300 mt-1">
-              Sign up or log in with your Email &amp; Password or Google Account. Automatically simplifies multi-person debts into the minimum number of transfers.
+              Sign up or log in with your Email &amp; Password and verified OTP. Automatically simplifies multi-person debts into the minimum number of transfers.
             </p>
           </div>
         </div>
@@ -180,7 +185,7 @@
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div class="glass-panel glass-card-hover rounded-xl p-4">
             <div class="text-emerald-400 font-semibold text-xs uppercase tracking-wider mb-1">Seamless Sign-In</div>
-            <p class="text-xs text-slate-300">Fast, secure access using your Email &amp; Password or 1-click Google Sign-In with automatic account sync.</p>
+            <p class="text-xs text-slate-300">Fast, secure access using your Email &amp; Password with email OTP verification and one-click password reset.</p>
           </div>
           <div class="glass-panel glass-card-hover rounded-xl p-4">
             <div class="text-teal-400 font-semibold text-xs uppercase tracking-wider mb-1">4 Split Modes</div>
@@ -193,7 +198,7 @@
         </div>
       </div>
 
-      <!-- Right Column: Auth Card (Login / Signup / Google Sign-In) -->
+      <!-- Right Column: Auth Card (Sign In / Create Account with Email & OTP) -->
       <div class="lg:col-span-5">
         <div class="glass-panel rounded-2xl p-6 sm:p-8 shadow-2xl border border-slate-800">
           <!-- Pending Group Invite Banner -->
@@ -201,54 +206,22 @@
             <span class="text-base flex-shrink-0">📩</span>
             <div>
               <div class="font-bold text-white mb-0.5">You've been invited to join a group!</div>
-              <div class="text-slate-300">Sign in with Google or your email below to automatically accept the invitation.</div>
+              <div class="text-slate-300">Sign in or create an account with your email below to automatically accept the invitation.</div>
             </div>
           </div>
 
-          <!-- Unified Access Banner (No difference between sign in & sign up) -->
-          <div class="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 mb-6 text-center">
-            <span class="text-xs font-semibold text-emerald-400 flex items-center justify-center gap-1.5">
-              <span>⚡</span>
-              <span>Unified Access &bull; Sign in or auto-create account in one step</span>
-            </span>
-            <!-- Hidden mode buttons preserved for test harness compatibility -->
-            <button id="tabAuthLogin" data-testid="tab-auth-login" onclick="switchAuthTab('login')" class="hidden"></button>
-            <button id="tabAuthSignup" data-testid="tab-auth-signup" onclick="switchAuthTab('signup')" class="hidden"></button>
-          </div>
-
-          <!-- Google Sign-In / Sign-Up Button -->
-          <div class="space-y-2 mb-5">
-            <div id="googleGsiBtnContainer" class="flex justify-center w-full min-h-[44px]"></div>
-            <button id="btnGoogleOAuth" data-testid="btn-google-oauth" onclick="openGoogleOAuthModal()" type="button" class="w-full py-2.5 px-4 rounded-xl bg-white hover:bg-slate-100 text-slate-900 font-semibold text-sm flex items-center justify-center gap-3 shadow transition">
-              <svg class="w-5 h-5" viewBox="0 0 24 24">
-                <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.4 1 3.5 3.6 1.6 7.4l3.7 2.8C6.2 7.2 8.9 5 12 5z"/>
-                <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.6l3.7 2.9c2.2-2 3.7-5 3.7-8.7z"/>
-                <path fill="#FBBC05" d="M5.3 14.8c-.2-.8-.4-1.6-.4-2.5s.2-1.7.4-2.5L1.6 7C.6 9 0 11.2 0 13.5s.6 4.5 1.6 6.5l3.7-2.9z"/>
-                <path fill="#34A853" d="M12 24c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3.1 0-5.8-2.1-6.7-5l-3.7 2.8C3.5 21.4 7.4 24 12 24z"/>
-              </svg>
-              <span id="googleBtnLabel">Sign in with Google</span>
+          <!-- Auth Mode Tabs (Sign In vs Create Account) -->
+          <div class="grid grid-cols-2 gap-1 p-1 rounded-xl bg-slate-900/90 border border-slate-800 mb-6">
+            <button id="tabAuthLogin" data-testid="tab-auth-login" onclick="switchAuthTab('login')" class="py-2.5 text-xs sm:text-sm font-semibold rounded-lg bg-emerald-500 text-slate-950 shadow transition">
+              Sign In
             </button>
-            <div class="text-center pt-1">
-              <button type="button" onclick="openGoogleOAuthModal()" class="text-[11px] text-slate-400 hover:text-emerald-400 transition underline">
-                Google popup blocked or error? Use direct Google auth
-              </button>
-            </div>
+            <button id="tabAuthSignup" data-testid="tab-auth-signup" onclick="switchAuthTab('signup')" class="py-2.5 text-xs sm:text-sm font-semibold rounded-lg text-slate-400 hover:text-white transition">
+              Create Account
+            </button>
           </div>
 
-          <div class="relative flex py-2 items-center mb-5">
-            <div class="flex-grow border-t border-slate-800"></div>
-            <span class="flex-shrink mx-3 text-xs uppercase tracking-wider text-slate-500">or with email &amp; password</span>
-            <div class="flex-grow border-t border-slate-800"></div>
-          </div>
-
-          <!-- UNIFIED AUTH FORM (NO DIFFERENCE BETWEEN SIGN IN & SIGN UP) -->
+          <!-- 1. SIGN IN FORM -->
           <form id="loginForm" data-testid="login-form" onsubmit="handleEmailLogin(event)" class="space-y-4">
-            <div>
-              <label for="loginName" class="block text-xs font-medium text-slate-300 mb-1">
-                Full Name <span class="text-emerald-400 font-normal">(Recorded for your profile &amp; splits)</span>
-              </label>
-              <input id="loginName" data-testid="input-signup-name" type="text" placeholder="e.g. Parvathy Udayan" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500" />
-            </div>
             <div>
               <label for="loginEmail" class="block text-xs font-medium text-slate-300 mb-1">Email Address</label>
               <input id="loginEmail" data-testid="input-login-email" type="email" required placeholder="you@example.com" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500" />
@@ -256,7 +229,7 @@
             <div>
               <div class="flex items-center justify-between mb-1">
                 <label for="loginPassword" class="block text-xs font-medium text-slate-300">Password</label>
-                <button type="button" data-testid="btn-forgot-password" onclick="triggerPasswordResetPrompt()" class="text-xs text-emerald-400 hover:underline">Forgot password?</button>
+                <button type="button" data-testid="btn-forgot-password" onclick="openForgotPasswordModal()" class="text-xs text-emerald-400 hover:underline">Forgot password?</button>
               </div>
               <div class="relative">
                 <input id="loginPassword" data-testid="input-login-password" type="password" required placeholder="••••••••" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500 pr-16" />
@@ -265,28 +238,55 @@
                 </button>
               </div>
             </div>
-            <div id="unifiedAuthUpiContainer">
-              <label for="loginUpi" class="block text-xs font-medium text-slate-300 mb-1">UPI ID / Payment Handle <span class="text-slate-500 font-normal">(Optional)</span></label>
-              <input id="loginUpi" data-testid="input-signup-upi" type="text" placeholder="e.g. yourname@okaxis" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500" />
-            </div>
             <button type="submit" id="btnSubmitLogin" data-testid="btn-submit-login" class="w-full py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm shadow-lg shadow-emerald-500/20 transition flex items-center justify-center gap-2">
-              <span id="btnSubmitAuthText">Continue to Vasool</span>
+              <span id="btnSubmitAuthText">Sign In</span>
               <span>&rarr;</span>
             </button>
-            <p class="text-[11px] text-center text-slate-400 pt-0.5">
-              ✨ Sign in or sign up seamlessly — new accounts are created and details recorded instantly.
-            </p>
+            <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-[11px] text-slate-400 flex items-start gap-2">
+              <span class="text-emerald-400 text-sm">🔒</span>
+              <span>Secure password authentication. If your account is pending email verification, a 6-digit OTP will be sent to complete your sign-in.</span>
+            </div>
           </form>
 
-          <!-- COMPATIBILITY SIGNUP FORM (Mirrors inputs for automated tests) -->
+          <!-- 2. CREATE ACCOUNT (SIGN UP) FORM -->
           <form id="signupForm" data-testid="signup-form" onsubmit="handleEmailSignup(event)" class="space-y-4 hidden">
-            <input id="signupName" type="hidden" />
-            <input id="signupEmail" type="hidden" />
-            <input id="signupPassword" type="hidden" />
-            <input id="signupUpi" type="hidden" />
-            <div id="pwdStrengthBar" class="hidden"></div>
-            <div id="pwdStrengthText" class="hidden"></div>
-            <button type="submit" data-testid="btn-submit-signup" class="hidden">Create Account</button>
+            <div>
+              <label for="signupName" class="block text-xs font-medium text-slate-300 mb-1">
+                Full Name <span class="text-emerald-400 font-normal">(Recorded for your profile &amp; splits)</span>
+              </label>
+              <input id="signupName" data-testid="input-signup-name" type="text" required placeholder="e.g. Parvathy Udayan" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500" />
+            </div>
+            <div>
+              <label for="signupEmail" class="block text-xs font-medium text-slate-300 mb-1">Email Address</label>
+              <input id="signupEmail" data-testid="input-signup-email" type="email" required placeholder="you@example.com" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500" />
+            </div>
+            <div>
+              <label for="signupPassword" class="block text-xs font-medium text-slate-300 mb-1">Password (min 8 characters)</label>
+              <div class="relative">
+                <input id="signupPassword" data-testid="input-signup-password" type="password" required minlength="8" oninput="updatePasswordStrength(this.value)" placeholder="••••••••" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500 pr-16" />
+                <button type="button" onclick="togglePasswordVisibility('signupPassword', 'signupPwdToggle')" id="signupPwdToggle" class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-200">
+                  Show
+                </button>
+              </div>
+              <div class="mt-1 flex items-center justify-between text-[10px]">
+                <div class="h-1 flex-1 bg-slate-800 rounded-full overflow-hidden mr-2">
+                  <div id="pwdStrengthBar" class="h-full bg-rose-500 transition-all duration-300" style="width: 0%"></div>
+                </div>
+                <span id="pwdStrengthText" class="text-slate-500">Weak</span>
+              </div>
+            </div>
+            <div>
+              <label for="signupUpi" class="block text-xs font-medium text-slate-300 mb-1">UPI ID / Payment Handle <span class="text-slate-500 font-normal">(Optional for 1-tap settlements)</span></label>
+              <input id="signupUpi" data-testid="input-signup-upi" type="text" placeholder="e.g. yourname@okaxis" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500" />
+            </div>
+            <button type="submit" id="btnSubmitSignup" data-testid="btn-submit-signup" class="w-full py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm shadow-lg shadow-emerald-500/20 transition flex items-center justify-center gap-2">
+              <span>Create Account &amp; Send Code</span>
+              <span>&rarr;</span>
+            </button>
+            <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-[11px] text-slate-400 flex items-start gap-2">
+              <span class="text-emerald-400 text-sm">✉️</span>
+              <span>We'll send a 6-digit verification code to your email. Enter the code on the next screen to activate your account.</span>
+            </div>
           </form>
         </div>
       </div>
@@ -1055,46 +1055,187 @@
   </div>
 
   <!-- ===================================================================== -->
-  <!-- MODAL 4: GOOGLE OAUTH 2.0 ACCOUNT CHOOSER (MOBILE BOTTOM SHEET)       -->
+  <!-- MODAL 4: FORGOT PASSWORD (EMAIL OTP & MAGIC RESET LINK)               -->
   <!-- ===================================================================== -->
-  <div id="googleOAuthModal" data-testid="google-oauth-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
-    <div class="bg-white text-slate-900 rounded-t-3xl sm:rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl my-0 sm:my-8 max-h-[90vh] sm:max-h-[85vh] overflow-y-auto">
-      <div class="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 sm:hidden"></div>
-      <div class="flex items-center justify-between pb-3 border-b border-slate-200">
+  <div id="forgotPasswordModal" data-testid="forgot-password-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
+    <div class="glass-panel rounded-t-3xl sm:rounded-2xl max-w-md w-full p-5 sm:p-6 border border-slate-700 shadow-2xl my-0 sm:my-8 max-h-[90vh] sm:max-h-[85vh] overflow-y-auto">
+      <div class="w-12 h-1.5 bg-slate-700/80 rounded-full mx-auto mb-3 sm:hidden"></div>
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
         <div class="flex items-center gap-2">
-          <svg class="w-5 h-5" viewBox="0 0 24 24">
-            <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.4 1 3.5 3.6 1.6 7.4l3.7 2.8C6.2 7.2 8.9 5 12 5z"/>
-            <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.6l3.7 2.9c2.2-2 3.7-5 3.7-8.7z"/>
-            <path fill="#FBBC05" d="M5.3 14.8c-.2-.8-.4-1.6-.4-2.5s.2-1.7.4-2.5L1.6 7C.6 9 0 11.2 0 13.5s.6 4.5 1.6 6.5l3.7-2.9z"/>
-            <path fill="#34A853" d="M12 24c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3.1 0-5.8-2.1-6.7-5l-3.7 2.8C3.5 21.4 7.4 24 12 24z"/>
-          </svg>
-          <span id="googleModalTitle" class="font-semibold text-sm text-slate-700">Sign in with Google</span>
+          <span class="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-sm">🔑</span>
+          <h3 class="text-base font-bold text-white">Reset Password</h3>
         </div>
-        <button type="button" onclick="closeModal('googleOAuthModal')" class="text-slate-400 hover:text-slate-700 text-sm px-2">✕</button>
+        <button type="button" onclick="closeModal('forgotPasswordModal')" class="text-slate-400 hover:text-white text-sm px-2">✕</button>
       </div>
 
-      <div class="mt-4">
-        <h4 id="googleModalHeading" class="text-base font-bold text-slate-900">Sign in with Google</h4>
-        <p class="text-xs text-slate-500 mt-0.5">to continue to <span class="font-semibold text-emerald-700">Vasool</span></p>
-
-        <!-- Informational Google origin policy note -->
-        <div class="p-3 my-3 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-900 leading-relaxed">
-          <div class="font-semibold text-amber-900 flex items-center gap-1.5 mb-0.5">
-            <span>ℹ️</span> Google OAuth Origin Policy Notice
+      <!-- Step 1: Request Code / Link -->
+      <div id="forgotPwStep1" class="mt-4 space-y-4">
+        <p class="text-xs text-slate-300 leading-relaxed">
+          Enter your registered email address. We'll send you a 6-digit OTP verification code and a 1-click magic link to reset your password.
+        </p>
+        <form onsubmit="handleSendPasswordReset(event)" class="space-y-4">
+          <div>
+            <label for="forgotPwEmail" class="block text-xs font-medium text-slate-300 mb-1">Registered Email Address</label>
+            <input id="forgotPwEmail" data-testid="input-forgot-email" type="email" required placeholder="you@example.com" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500" />
           </div>
-          If you encounter <code class="bg-amber-100 text-amber-950 px-1 py-0.5 rounded font-mono text-[10px]">Error 400: origin_mismatch</code>, register <code class="bg-amber-100 text-amber-950 px-1 py-0.5 rounded font-mono text-[10px]">https://vasool-ecru.vercel.app</code> in Google Cloud Console under Authorized JavaScript Origins, or enter your Google details below to sign in directly.
-        </div>
-
-        <div id="modalGoogleGsiBtn" class="flex justify-center my-2"></div>
-
-        <form onsubmit="handleCustomGoogleAccount(event)" class="mt-3 pt-3 border-t border-slate-200 space-y-2.5">
-          <div id="googleFormPrompt" class="text-xs font-semibold text-slate-600">Enter your Google account details to sign in:</div>
-          <input id="customGoogleName" data-testid="input-custom-google-name" type="text" required placeholder="Full Name" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs text-slate-900" />
-          <input id="customGoogleEmail" data-testid="input-custom-google-email" type="email" required placeholder="your.email@gmail.com" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs text-slate-900" />
-          <button type="submit" id="btnSubmitCustomGoogle" data-testid="btn-submit-custom-google" class="w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition">
-            Continue with this Google Account
+          <button type="submit" id="btnSendForgotPw" data-testid="btn-send-forgot-pw" class="w-full py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm shadow-lg shadow-emerald-500/20 transition flex items-center justify-center gap-2">
+            <span>Send Reset Code &amp; Link</span>
+            <span>&rarr;</span>
           </button>
         </form>
+        <div class="text-center pt-2">
+          <button type="button" onclick="closeModal('forgotPasswordModal')" class="text-xs text-slate-400 hover:text-emerald-400 transition">
+            Back to Sign In
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 2: Enter OTP & Set New Password -->
+      <div id="forgotPwStep2" class="mt-4 space-y-4 hidden">
+        <div class="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300">
+          Reset instructions sent to <span id="forgotPwEmailDisplay" class="font-bold text-white"></span>. Enter the 6-digit code or use the email link.
+        </div>
+        <form onsubmit="handleExecutePasswordReset(event)" class="space-y-4">
+          <input id="forgotPwResetToken" type="hidden" />
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <label for="forgotPwOtp" class="block text-xs font-medium text-slate-300">6-Digit Reset Code</label>
+              <button type="button" id="btnResendForgotPwOtp" onclick="handleResendForgotPwOtp()" class="text-xs text-emerald-400 hover:underline">Resend Code</button>
+            </div>
+            <input id="forgotPwOtp" data-testid="input-forgot-otp" type="text" maxlength="6" inputmode="numeric" placeholder="123456" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-center font-mono text-lg font-bold tracking-widest text-emerald-400 focus:outline-none focus:border-emerald-500" />
+            <div class="mt-1 flex items-center justify-between text-[11px] text-slate-400">
+              <span id="forgotPwCountdownTimer">Expires in 15:00</span>
+              <span class="text-slate-500">Check spam folder if delayed</span>
+            </div>
+          </div>
+          <div>
+            <label for="forgotPwNewPassword" class="block text-xs font-medium text-slate-300 mb-1">New Password (min 8 characters)</label>
+            <div class="relative">
+              <input id="forgotPwNewPassword" data-testid="input-forgot-new-pwd" type="password" required minlength="8" oninput="updateForgotPwdStrength(this.value)" placeholder="••••••••" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500 pr-16" />
+              <button type="button" onclick="togglePasswordVisibility('forgotPwNewPassword', 'forgotNewPwdToggle')" id="forgotNewPwdToggle" class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-200">
+                Show
+              </button>
+            </div>
+            <div class="mt-1 flex items-center justify-between text-[10px]">
+              <div class="h-1 flex-1 bg-slate-800 rounded-full overflow-hidden mr-2">
+                <div id="forgotPwdStrengthBar" class="h-full bg-rose-500 transition-all duration-300" style="width: 0%"></div>
+              </div>
+              <span id="forgotPwdStrengthText" class="text-slate-500">Weak</span>
+            </div>
+          </div>
+          <div>
+            <label for="forgotPwConfirmPassword" class="block text-xs font-medium text-slate-300 mb-1">Confirm New Password</label>
+            <div class="relative">
+              <input id="forgotPwConfirmPassword" data-testid="input-forgot-confirm-pwd" type="password" required minlength="8" placeholder="••••••••" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500 pr-16" />
+              <button type="button" onclick="togglePasswordVisibility('forgotPwConfirmPassword', 'forgotConfirmPwdToggle')" id="forgotConfirmPwdToggle" class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-200">
+                Show
+              </button>
+            </div>
+          </div>
+          <button type="submit" id="btnSubmitResetPw" data-testid="btn-submit-reset-pw" class="w-full py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm shadow-lg shadow-emerald-500/20 transition flex items-center justify-center gap-2">
+            <span>Reset Password &amp; Log In</span>
+            <span>&rarr;</span>
+          </button>
+        </form>
+        <div class="flex items-center justify-between pt-2 text-xs">
+          <button type="button" onclick="switchForgotPwStep(1)" class="text-slate-400 hover:text-white transition">
+            &larr; Change Email
+          </button>
+          <button type="button" onclick="closeModal('forgotPasswordModal')" class="text-slate-400 hover:text-rose-400 transition">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 4B: ACCOUNT SETTINGS & PASSWORD MANAGEMENT                      -->
+  <!-- ===================================================================== -->
+  <div id="accountSettingsModal" data-testid="account-settings-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
+    <div class="glass-panel rounded-t-3xl sm:rounded-2xl max-w-md w-full p-5 sm:p-6 border border-slate-700 shadow-2xl my-0 sm:my-8 max-h-[90vh] sm:max-h-[85vh] overflow-y-auto">
+      <div class="w-12 h-1.5 bg-slate-700/80 rounded-full mx-auto mb-3 sm:hidden"></div>
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div class="flex items-center gap-2">
+          <span class="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-sm">⚙️</span>
+          <div>
+            <h3 class="text-base font-bold text-white">Account Settings</h3>
+            <p class="text-[11px] text-slate-400">Profile security &amp; password preferences</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeModal('accountSettingsModal')" class="text-slate-400 hover:text-white text-sm px-2">✕</button>
+      </div>
+
+      <div class="mt-4 space-y-5">
+        <!-- Profile Overview Card -->
+        <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center gap-3">
+          <div id="settingsProfileAvatar" class="w-11 h-11 rounded-full bg-gradient-to-br from-emerald-500/30 to-teal-500/30 border border-emerald-400/40 flex items-center justify-center text-sm font-bold text-emerald-300 flex-shrink-0">
+            --
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-1.5">
+              <span id="settingsProfileName" class="text-sm font-bold text-white truncate"></span>
+              <span id="settingsVerifiedBadge" class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                ✓ Verified
+              </span>
+            </div>
+            <div id="settingsProfileEmail" class="text-xs text-slate-400 truncate"></div>
+            <div id="settingsProfileUpi" class="text-[11px] text-emerald-400/90 mt-0.5 truncate font-mono"></div>
+          </div>
+        </div>
+
+        <!-- Section: Change Password -->
+        <div class="pt-2 border-t border-slate-800/80">
+          <div class="flex items-center gap-2 mb-3">
+            <span class="text-emerald-400 text-sm">🔒</span>
+            <h4 class="text-xs font-bold text-slate-200 uppercase tracking-wider">Change Password</h4>
+          </div>
+          <form onsubmit="handleChangePasswordSubmit(event)" class="space-y-3.5">
+            <div>
+              <label for="settingsCurrentPassword" class="block text-xs font-medium text-slate-300 mb-1">Current Password</label>
+              <div class="relative">
+                <input id="settingsCurrentPassword" data-testid="input-current-password" type="password" required placeholder="••••••••" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500 pr-16" />
+                <button type="button" onclick="togglePasswordVisibility('settingsCurrentPassword', 'settingsCurrentPwdToggle')" id="settingsCurrentPwdToggle" class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-200">
+                  Show
+                </button>
+              </div>
+            </div>
+            <div>
+              <label for="settingsNewPassword" class="block text-xs font-medium text-slate-300 mb-1">New Password (min 8 characters)</label>
+              <div class="relative">
+                <input id="settingsNewPassword" data-testid="input-new-password" type="password" required minlength="8" oninput="updateChangePwdStrength(this.value)" placeholder="••••••••" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500 pr-16" />
+                <button type="button" onclick="togglePasswordVisibility('settingsNewPassword', 'settingsNewPwdToggle')" id="settingsNewPwdToggle" class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-200">
+                  Show
+                </button>
+              </div>
+              <div class="mt-1 flex items-center justify-between text-[10px]">
+                <div class="h-1 flex-1 bg-slate-800 rounded-full overflow-hidden mr-2">
+                  <div id="changePwdStrengthBar" class="h-full bg-rose-500 transition-all duration-300" style="width: 0%"></div>
+                </div>
+                <span id="changePwdStrengthText" class="text-slate-500">Weak</span>
+              </div>
+            </div>
+            <div>
+              <label for="settingsConfirmPassword" class="block text-xs font-medium text-slate-300 mb-1">Confirm New Password</label>
+              <div class="relative">
+                <input id="settingsConfirmPassword" data-testid="input-confirm-password" type="password" required minlength="8" placeholder="••••••••" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500 pr-16" />
+                <button type="button" onclick="togglePasswordVisibility('settingsConfirmPassword', 'settingsConfirmPwdToggle')" id="settingsConfirmPwdToggle" class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-200">
+                  Show
+                </button>
+              </div>
+            </div>
+            <button type="submit" id="btnSubmitChangePassword" data-testid="btn-submit-change-password" class="w-full py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm shadow-lg shadow-emerald-500/20 transition flex items-center justify-center gap-2">
+              <span>Update Password</span>
+              <span>&check;</span>
+            </button>
+          </form>
+        </div>
+
+        <div class="flex justify-end pt-2 border-t border-slate-800">
+          <button type="button" onclick="closeModal('accountSettingsModal')" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition">
+            Close
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -1747,7 +1888,7 @@ exec node server.js`
           id: 'usr_zubair_01',
           name: 'Zubair Mohammed',
           email: 'mrzoromit3@gmail.com',
-          authProviders: ['email', 'google'],
+          authProviders: ['email'],
           upiId: 'zubair@amazonpay'
         },
         users: [
@@ -1756,7 +1897,7 @@ exec node server.js`
             name: 'Zubair Mohammed',
             email: 'mrzoromit3@gmail.com',
             passwordHash: 'Vasool#2026',
-            authProviders: ['email', 'google'],
+            authProviders: ['email'],
             upiId: 'zubair@amazonpay'
           },
           {
@@ -1764,7 +1905,7 @@ exec node server.js`
             name: 'Omkar Chinnam',
             email: 'omkar.chinnam@gmail.com',
             passwordHash: 'OmkarPass#2026',
-            authProviders: ['google'],
+            authProviders: ['email'],
             upiId: 'omkar@okicici'
           },
           {
@@ -1780,7 +1921,7 @@ exec node server.js`
             name: 'Anshuman Barik',
             email: 'anshuman.barik@gmail.com',
             passwordHash: 'Anshuman#2026',
-            authProviders: ['google'],
+            authProviders: ['email'],
             upiId: 'anshuman@okaxis'
           }
         ],
@@ -2044,7 +2185,7 @@ exec node server.js`
     }
 
     // =========================================================================
-    // AUTHENTICATION HANDLERS (EMAIL/PASSWORD + GOOGLE OAUTH 2.0)
+    // AUTHENTICATION HANDLERS (EMAIL & PASSWORD + OTP & PASSWORD RESET)
     // =========================================================================
     function toggleAuthOrAppView() {
       showingAuthPortal = !showingAuthPortal;
@@ -2105,11 +2246,10 @@ exec node server.js`
         if (avatarEl) avatarEl.textContent = initials;
         const nameEl = document.getElementById('headerUserName');
         if (nameEl) nameEl.textContent = appState.currentUser.name;
-        const providers = (appState.currentUser.authProviders || ['email']).map((p) =>
-          p === 'google' ? 'Google OAuth' : 'Email'
-        );
         const provEl = document.getElementById('headerUserProvider');
-        if (provEl) provEl.textContent = providers.join(' + ');
+        if (provEl) {
+          provEl.textContent = appState.currentUser.isEmailVerified !== false ? '✓ Verified Account' : '⚠️ Unverified';
+        }
         const welcomeEl = document.getElementById('welcomeUserName');
         if (welcomeEl) welcomeEl.textContent = (appState.currentUser.name || 'Friend').split(' ')[0];
       } else {
@@ -2121,69 +2261,27 @@ exec node server.js`
     }
 
     let currentAuthMode = 'login';
-    let cachedGoogleClientId = null;
-
-    function renderGoogleGsiButtons(buttonText = 'signin_with') {
-      if (window.google?.accounts?.id && cachedGoogleClientId) {
-        const container = document.getElementById('googleGsiBtnContainer');
-        if (container) {
-          container.innerHTML = '';
-          window.google.accounts.id.renderButton(container, {
-            theme: 'outline',
-            size: 'large',
-            width: 320,
-            shape: 'pill',
-            text: buttonText
-          });
-        }
-        const modalContainer = document.getElementById('modalGoogleGsiBtn');
-        if (modalContainer) {
-          modalContainer.innerHTML = '';
-          window.google.accounts.id.renderButton(modalContainer, {
-            theme: 'outline',
-            size: 'large',
-            width: 320,
-            shape: 'pill',
-            text: buttonText
-          });
-        }
-      }
-    }
 
     function switchAuthTab(mode) {
       currentAuthMode = mode;
       const loginForm = document.getElementById('loginForm');
+      const signupForm = document.getElementById('signupForm');
       const tabLogin = document.getElementById('tabAuthLogin');
       const tabSignup = document.getElementById('tabAuthSignup');
-      const googleLabel = document.getElementById('googleBtnLabel');
-      const modalTitle = document.getElementById('googleModalTitle');
-      const modalHeading = document.getElementById('googleModalHeading');
-      const modalBtn = document.getElementById('btnSubmitCustomGoogle');
-      const formPrompt = document.getElementById('googleFormPrompt');
-
-      if (loginForm) loginForm.classList.remove('hidden');
 
       if (mode === 'login') {
+        if (loginForm) loginForm.classList.remove('hidden');
+        if (signupForm) signupForm.classList.add('hidden');
         if (tabLogin) tabLogin.className = 'py-2.5 text-xs sm:text-sm font-semibold rounded-lg bg-emerald-500 text-slate-950 shadow transition';
         if (tabSignup) tabSignup.className = 'py-2.5 text-xs sm:text-sm font-semibold rounded-lg text-slate-400 hover:text-white transition';
-        if (googleLabel) googleLabel.textContent = 'Continue with Google';
-        if (modalTitle) modalTitle.textContent = 'Continue with Google';
-        if (modalHeading) modalHeading.textContent = 'Continue with Google';
-        if (modalBtn) modalBtn.textContent = 'Continue with this Google Account';
-        if (formPrompt) formPrompt.textContent = 'Enter your Google account details to continue:';
-        renderGoogleGsiButtons('signin_with');
         const emailEl = document.getElementById('loginEmail');
         if (emailEl) emailEl.focus();
       } else {
+        if (signupForm) signupForm.classList.remove('hidden');
+        if (loginForm) loginForm.classList.add('hidden');
         if (tabSignup) tabSignup.className = 'py-2.5 text-xs sm:text-sm font-semibold rounded-lg bg-emerald-500 text-slate-950 shadow transition';
         if (tabLogin) tabLogin.className = 'py-2.5 text-xs sm:text-sm font-semibold rounded-lg text-slate-400 hover:text-white transition';
-        if (googleLabel) googleLabel.textContent = 'Continue with Google';
-        if (modalTitle) modalTitle.textContent = 'Continue with Google';
-        if (modalHeading) modalHeading.textContent = 'Continue with Google';
-        if (modalBtn) modalBtn.textContent = 'Continue with this Google Account';
-        if (formPrompt) formPrompt.textContent = 'Enter your Google account details to continue:';
-        renderGoogleGsiButtons('signup_with');
-        const nameEl = document.getElementById('loginName');
+        const nameEl = document.getElementById('signupName');
         if (nameEl) nameEl.focus();
       }
     }
@@ -2261,21 +2359,25 @@ exec node server.js`
       e.preventDefault();
       const email = document.getElementById('loginEmail').value.trim().toLowerCase();
       const password = document.getElementById('loginPassword').value;
-      const name = (document.getElementById('loginName')?.value || document.getElementById('signupName')?.value || '').trim();
-      const upiId = (document.getElementById('loginUpi')?.value || document.getElementById('signupUpi')?.value || '').trim();
 
-      const submitBtn = e.target.querySelector('button[type="submit"]');
-      const originalText = submitBtn ? submitBtn.textContent : '';
+      const submitBtn = document.getElementById('btnSubmitLogin');
+      const originalText = submitBtn ? submitBtn.innerHTML : '';
       if (submitBtn) {
         submitBtn.disabled = true;
-        submitBtn.textContent = 'Continuing to Vasool...';
+        submitBtn.innerHTML = '<span>Signing In...</span>';
       }
 
       try {
         const res = await apiFetch('/api/auth/login', {
           method: 'POST',
-          body: JSON.stringify({ email, password, name, upiId })
+          body: JSON.stringify({ email, password })
         });
+
+        if (res.requiresVerification) {
+          openEmailVerificationModal(res.email || email);
+          showToast(res.message || 'Please verify your email address to continue.', 'info');
+          return;
+        }
 
         localStorage.setItem(AUTH_TOKEN_KEY, res.token);
         appState.currentUser = res.user;
@@ -2285,7 +2387,7 @@ exec node server.js`
         showingAuthPortal = false;
         saveState();
         refreshAllViews();
-        showToast(res.isNewUser ? `Welcome to Vasool, ${res.user.name}! Account created.` : `Welcome back, ${res.user.name}!`);
+        showToast(res.message || `Welcome back, ${res.user.name}!`);
         await syncWithBackend();
         await checkAndProcessPendingJoin();
       } catch (err) {
@@ -2298,25 +2400,63 @@ exec node server.js`
       } finally {
         if (submitBtn) {
           submitBtn.disabled = false;
-          submitBtn.textContent = originalText;
+          submitBtn.innerHTML = originalText;
         }
       }
     }
 
     async function handleEmailSignup(e) {
       e.preventDefault();
-      // Seamless Unified Auth: forward to handleEmailLogin with all parameters
-      const email = (document.getElementById('signupEmail')?.value || document.getElementById('loginEmail')?.value || '').trim().toLowerCase();
-      const password = (document.getElementById('signupPassword')?.value || document.getElementById('loginPassword')?.value || '');
-      const name = (document.getElementById('signupName')?.value || document.getElementById('loginName')?.value || '').trim();
-      const upiId = (document.getElementById('signupUpi')?.value || document.getElementById('loginUpi')?.value || '').trim();
+      const name = document.getElementById('signupName').value.trim();
+      const email = document.getElementById('signupEmail').value.trim().toLowerCase();
+      const password = document.getElementById('signupPassword').value;
+      const upiId = (document.getElementById('signupUpi')?.value || '').trim();
 
-      if (email && document.getElementById('loginEmail')) document.getElementById('loginEmail').value = email;
-      if (password && document.getElementById('loginPassword')) document.getElementById('loginPassword').value = password;
-      if (name && document.getElementById('loginName')) document.getElementById('loginName').value = name;
-      if (upiId && document.getElementById('loginUpi')) document.getElementById('loginUpi').value = upiId;
+      if (password.length < 8) {
+        showToast('Password must be at least 8 characters long.', 'error');
+        return;
+      }
 
-      return handleEmailLogin(e);
+      const submitBtn = document.getElementById('btnSubmitSignup');
+      const originalText = submitBtn ? submitBtn.innerHTML : '';
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span>Creating Account...</span>';
+      }
+
+      try {
+        const res = await apiFetch('/api/auth/signup', {
+          method: 'POST',
+          body: JSON.stringify({ name, email, password, upiId })
+        });
+
+        if (res.requiresVerification) {
+          openEmailVerificationModal(res.email || email);
+          showToast(res.message || 'Verification code sent! Please verify your email.');
+          return;
+        }
+
+        if (res.token) {
+          localStorage.setItem(AUTH_TOKEN_KEY, res.token);
+          appState.currentUser = res.user;
+          if (!appState.users.some((u) => u.email === res.user.email)) {
+            appState.users.push(res.user);
+          }
+          showingAuthPortal = false;
+          saveState();
+          refreshAllViews();
+          showToast(`Welcome to Vasool, ${res.user.name}!`);
+          await syncWithBackend();
+          await checkAndProcessPendingJoin();
+        }
+      } catch (err) {
+        showToast(err.message || 'Account creation failed.', 'error');
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = originalText;
+        }
+      }
     }
 
     let pendingVerificationEmail = '';
@@ -2484,6 +2624,24 @@ exec node server.js`
         return;
       }
 
+      if (params.get('resetToken')) {
+        const resetToken = params.get('resetToken');
+        const email = params.get('email') || '';
+        window.history.replaceState({}, document.title, window.location.pathname);
+
+        const emailDisplay = document.getElementById('forgotPwEmailDisplay');
+        const tokenInput = document.getElementById('forgotPwResetToken');
+        const emailInput = document.getElementById('forgotPwEmail');
+        if (emailDisplay) emailDisplay.textContent = email;
+        if (emailInput) emailInput.value = email;
+        if (tokenInput) tokenInput.value = resetToken;
+
+        switchForgotPwStep(2);
+        openModal('forgotPasswordModal');
+        showToast('🔑 Magic reset link recognized. Please enter your new password.');
+        return;
+      }
+
       if (params.get('verifyError')) {
         const errorType = params.get('verifyError');
         const email = params.get('email') || '';
@@ -2500,110 +2658,310 @@ exec node server.js`
       }
     }
 
-    function openGoogleOAuthModal() {
-      openModal('googleOAuthModal');
+    // =========================================================================
+    // FORGOT PASSWORD (EMAIL OTP & MAGIC LINK) HANDLERS
+    // =========================================================================
+    let forgotPwSecondsLeft = 900;
+    let forgotPwTimerInterval = null;
+    let forgotResendCooldownSeconds = 0;
+    let forgotResendCooldownInterval = null;
+
+    function openForgotPasswordModal() {
+      const currentEmail = (document.getElementById('loginEmail')?.value || document.getElementById('signupEmail')?.value || '').trim();
+      const emailInput = document.getElementById('forgotPwEmail');
+      if (emailInput && currentEmail) {
+        emailInput.value = currentEmail;
+      }
+      switchForgotPwStep(1);
+      openModal('forgotPasswordModal');
     }
 
-    async function handleGoogleCredentialResponse(response) {
-      try {
-        showToast('Signing in with Google...');
-        const res = await apiFetch('/api/auth/google', {
-          method: 'POST',
-          body: JSON.stringify({ credential: response.credential })
-        });
-
-        localStorage.setItem(AUTH_TOKEN_KEY, res.token);
-        appState.currentUser = res.user;
-        if (!appState.users.some((u) => u.email === res.user.email)) {
-          appState.users.push(res.user);
+    function switchForgotPwStep(step) {
+      const step1 = document.getElementById('forgotPwStep1');
+      const step2 = document.getElementById('forgotPwStep2');
+      if (step === 1) {
+        if (step1) step1.classList.remove('hidden');
+        if (step2) step2.classList.add('hidden');
+        clearInterval(forgotPwTimerInterval);
+        clearInterval(forgotResendCooldownInterval);
+      } else {
+        if (step1) step1.classList.add('hidden');
+        if (step2) step2.classList.remove('hidden');
+        const otpInput = document.getElementById('forgotPwOtp');
+        if (otpInput) {
+          otpInput.value = '';
+          setTimeout(() => otpInput.focus(), 300);
         }
-        closeModal('googleOAuthModal');
-        showingAuthPortal = false;
-        saveState();
-        refreshAllViews();
-        showToast(`Signed in with Google as ${res.user.name}!`);
-        await syncWithBackend();
-        await checkAndProcessPendingJoin();
-      } catch (err) {
-        showToast('Google OAuth verification: ' + err.message, 'error');
       }
     }
 
-    async function completeGoogleAuth(name, email) {
-      const normalizedEmail = email.trim().toLowerCase();
-      try {
-        const res = await apiFetch('/api/auth/google', {
-          method: 'POST',
-          body: JSON.stringify({
-            profileFallback: {
-              name: name.trim(),
-              email: normalizedEmail
-            }
-          })
-        });
-
-        localStorage.setItem(AUTH_TOKEN_KEY, res.token);
-        appState.currentUser = res.user;
-        if (!appState.users.some((u) => u.email === res.user.email)) {
-          appState.users.push(res.user);
-        }
-        showingAuthPortal = false;
-        closeModal('googleOAuthModal');
-        saveState();
-        refreshAllViews();
-        showToast(`Signed in with Google as ${res.user.name} (${res.user.email}).`);
-        await syncWithBackend();
-        await checkAndProcessPendingJoin();
-      } catch (err) {
-        // Fallback local
-        let user = appState.users.find((u) => u.email.toLowerCase() === normalizedEmail);
-        if (!user) {
-          user = {
-            id: 'usr_google_' + Date.now(),
-            name: name.trim(),
-            email: normalizedEmail,
-            passwordHash: null,
-            authProviders: ['google'],
-            upiId: ''
-          };
-          appState.users.push(user);
-        }
-        appState.currentUser = user;
-        showingAuthPortal = false;
-        closeModal('googleOAuthModal');
-        saveState();
-        refreshAllViews();
-        showToast(`Signed in as ${user.name} (${user.email}).`);
-      }
+    function updateForgotPwdStrength(pwd) {
+      const bar = document.getElementById('forgotPwdStrengthBar');
+      const label = document.getElementById('forgotPwdStrengthText');
+      const res = evaluatePasswordStrengthObj(pwd);
+      if (bar) bar.style.width = res.score + '%';
+      if (label) label.textContent = res.label;
+      return res;
     }
 
-    async function handleCustomGoogleAccount(e) {
+    function updateChangePwdStrength(pwd) {
+      const bar = document.getElementById('changePwdStrengthBar');
+      const label = document.getElementById('changePwdStrengthText');
+      const res = evaluatePasswordStrengthObj(pwd);
+      if (bar) bar.style.width = res.score + '%';
+      if (label) label.textContent = res.label;
+      return res;
+    }
+
+    function startForgotResendCooldown(seconds = 60) {
+      forgotResendCooldownSeconds = seconds;
+      const btn = document.getElementById('btnResendForgotPwOtp');
+      if (!btn) return;
+      btn.disabled = true;
+
+      clearInterval(forgotResendCooldownInterval);
+      forgotResendCooldownInterval = setInterval(() => {
+        forgotResendCooldownSeconds--;
+        if (forgotResendCooldownSeconds <= 0) {
+          clearInterval(forgotResendCooldownInterval);
+          btn.disabled = false;
+          btn.textContent = 'Resend Code';
+        } else {
+          btn.textContent = `Resend in ${forgotResendCooldownSeconds}s`;
+        }
+      }, 1000);
+    }
+
+    function updateForgotCountdownDisplay() {
+      const timerEl = document.getElementById('forgotPwCountdownTimer');
+      if (!timerEl) return;
+      const mins = Math.floor(forgotPwSecondsLeft / 60);
+      const secs = forgotPwSecondsLeft % 60;
+      timerEl.textContent = `Expires in ${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    }
+
+    async function handleSendPasswordReset(e) {
       e.preventDefault();
-      const name = document.getElementById('customGoogleName').value;
-      const email = document.getElementById('customGoogleEmail').value;
-      await completeGoogleAuth(name, email);
+      const email = document.getElementById('forgotPwEmail').value.trim().toLowerCase();
+      if (!email) {
+        showToast('Please enter your email address.', 'error');
+        return;
+      }
+
+      const submitBtn = document.getElementById('btnSendForgotPw');
+      const originalText = submitBtn ? submitBtn.innerHTML : '';
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span>Sending Code...</span>';
+      }
+
+      try {
+        const res = await apiFetch('/api/auth/forgot-password', {
+          method: 'POST',
+          body: JSON.stringify({ email })
+        });
+
+        const displayEl = document.getElementById('forgotPwEmailDisplay');
+        if (displayEl) displayEl.textContent = email;
+
+        switchForgotPwStep(2);
+        showToast(res.message || 'Password reset code and link have been sent to your email.');
+
+        clearInterval(forgotPwTimerInterval);
+        forgotPwSecondsLeft = 900;
+        updateForgotCountdownDisplay();
+        forgotPwTimerInterval = setInterval(() => {
+          forgotPwSecondsLeft--;
+          if (forgotPwSecondsLeft <= 0) {
+            clearInterval(forgotPwTimerInterval);
+            const timerEl = document.getElementById('forgotPwCountdownTimer');
+            if (timerEl) timerEl.textContent = 'Code expired';
+          } else {
+            updateForgotCountdownDisplay();
+          }
+        }, 1000);
+
+        startForgotResendCooldown(60);
+      } catch (err) {
+        showToast(err.message || 'Failed to send password reset code.', 'error');
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = originalText;
+        }
+      }
     }
 
-    async function initGoogleOAuth() {
-      try {
-        const cfg = await apiFetch('/api/auth/config');
-        if (cfg && cfg.googleClientId && window.google?.accounts?.id) {
-          cachedGoogleClientId = cfg.googleClientId;
-          window.google.accounts.id.initialize({
-            client_id: cfg.googleClientId,
-            callback: handleGoogleCredentialResponse,
-            auto_select: false,
-            cancel_on_tap_outside: true
-          });
+    async function handleResendForgotPwOtp() {
+      const email = (document.getElementById('forgotPwEmailDisplay')?.textContent || document.getElementById('forgotPwEmail')?.value || '').trim();
+      if (!email) return;
 
-          renderGoogleGsiButtons(currentAuthMode === 'signup' ? 'signup_with' : 'signin_with');
-          const customBtn = document.getElementById('btnGoogleOAuth');
-          if (customBtn) {
-            customBtn.classList.add('hidden');
-          }
-        }
+      const btn = document.getElementById('btnResendForgotPwOtp');
+      if (btn) btn.disabled = true;
+
+      try {
+        const res = await apiFetch('/api/auth/forgot-password', {
+          method: 'POST',
+          body: JSON.stringify({ email })
+        });
+        showToast(res.message || 'A fresh reset code has been sent to your email.');
+        forgotPwSecondsLeft = 900;
+        updateForgotCountdownDisplay();
+        startForgotResendCooldown(60);
       } catch (err) {
-        console.log('[Google GIS] Setup note:', err.message);
+        showToast(err.message || 'Failed to resend code.', 'error');
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    async function handleExecutePasswordReset(e) {
+      e.preventDefault();
+      const email = (document.getElementById('forgotPwEmailDisplay')?.textContent || document.getElementById('forgotPwEmail')?.value || '').trim().toLowerCase();
+      const otp = document.getElementById('forgotPwOtp').value.trim();
+      const token = document.getElementById('forgotPwResetToken').value.trim();
+      const newPassword = document.getElementById('forgotPwNewPassword').value;
+      const confirmPassword = document.getElementById('forgotPwConfirmPassword').value;
+
+      if (!otp && !token) {
+        showToast('Please enter the 6-digit reset code from your email.', 'error');
+        return;
+      }
+      if (newPassword.length < 8) {
+        showToast('New password must be at least 8 characters long.', 'error');
+        return;
+      }
+      if (newPassword !== confirmPassword) {
+        showToast('Passwords do not match. Please re-enter.', 'error');
+        return;
+      }
+
+      const submitBtn = document.getElementById('btnSubmitResetPw');
+      const originalText = submitBtn ? submitBtn.innerHTML : '';
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span>Updating Password...</span>';
+      }
+
+      try {
+        const res = await apiFetch('/api/auth/reset-password', {
+          method: 'POST',
+          body: JSON.stringify({ email, otp: otp || undefined, token: token || undefined, newPassword })
+        });
+
+        closeModal('forgotPasswordModal');
+        clearInterval(forgotPwTimerInterval);
+        clearInterval(forgotResendCooldownInterval);
+
+        localStorage.setItem(AUTH_TOKEN_KEY, res.token);
+        appState.currentUser = res.user;
+        if (!appState.users.some((u) => u.email === res.user.email)) {
+          appState.users.push(res.user);
+        }
+        showingAuthPortal = false;
+        saveState();
+        refreshAllViews();
+        showToast(`🎉 ${res.message || 'Password reset successfully! Welcome to Vasool.'}`);
+        await syncWithBackend();
+        await checkAndProcessPendingJoin();
+      } catch (err) {
+        showToast(err.message || 'Password reset failed.', 'error');
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = originalText;
+        }
+      }
+    }
+
+    // =========================================================================
+    // ACCOUNT SETTINGS & PASSWORD CHANGE HANDLERS
+    // =========================================================================
+    function openAccountSettingsModal() {
+      const user = appState.currentUser;
+      if (!user) {
+        showToast('Please log in to manage your account settings.', 'error');
+        return;
+      }
+
+      const avatarEl = document.getElementById('settingsProfileAvatar');
+      const nameEl = document.getElementById('settingsProfileName');
+      const emailEl = document.getElementById('settingsProfileEmail');
+      const upiEl = document.getElementById('settingsProfileUpi');
+      const badgeEl = document.getElementById('settingsVerifiedBadge');
+
+      if (nameEl) nameEl.textContent = user.name || 'User';
+      if (emailEl) emailEl.textContent = user.email || '';
+      if (upiEl) upiEl.textContent = user.upiId ? `UPI: ${user.upiId}` : 'UPI Handle: Not configured';
+      if (avatarEl) {
+        const initials = (user.name || user.email || 'U')
+          .split(' ')
+          .map((w) => w[0])
+          .join('')
+          .slice(0, 2)
+          .toUpperCase();
+        avatarEl.textContent = initials;
+      }
+      if (badgeEl) {
+        if (user.isEmailVerified !== false) {
+          badgeEl.className = 'inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
+          badgeEl.textContent = '✓ Verified';
+        } else {
+          badgeEl.className = 'inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30';
+          badgeEl.textContent = '⚠️ Unverified';
+        }
+      }
+
+      const curr = document.getElementById('settingsCurrentPassword');
+      const nw = document.getElementById('settingsNewPassword');
+      const conf = document.getElementById('settingsConfirmPassword');
+      if (curr) curr.value = '';
+      if (nw) nw.value = '';
+      if (conf) conf.value = '';
+      const bar = document.getElementById('changePwdStrengthBar');
+      const lbl = document.getElementById('changePwdStrengthText');
+      if (bar) bar.style.width = '0%';
+      if (lbl) lbl.textContent = 'Weak';
+
+      openModal('accountSettingsModal');
+    }
+
+    async function handleChangePasswordSubmit(e) {
+      e.preventDefault();
+      const currentPassword = document.getElementById('settingsCurrentPassword').value;
+      const newPassword = document.getElementById('settingsNewPassword').value;
+      const confirmPassword = document.getElementById('settingsConfirmPassword').value;
+
+      if (newPassword.length < 8) {
+        showToast('New password must be at least 8 characters long.', 'error');
+        return;
+      }
+      if (newPassword !== confirmPassword) {
+        showToast('New password and confirmation do not match.', 'error');
+        return;
+      }
+
+      const submitBtn = document.getElementById('btnSubmitChangePassword');
+      const originalText = submitBtn ? submitBtn.innerHTML : '';
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span>Updating Password...</span>';
+      }
+
+      try {
+        const res = await apiFetch('/api/auth/change-password', {
+          method: 'POST',
+          body: JSON.stringify({ currentPassword, newPassword })
+        });
+
+        closeModal('accountSettingsModal');
+        showToast(`✅ ${res.message || 'Password changed successfully.'}`);
+      } catch (err) {
+        showToast(err.message || 'Failed to change password.', 'error');
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = originalText;
+        }
       }
     }
 
@@ -5070,13 +5428,13 @@ exec node server.js`
         return `${def.users.length} users, ${def.groups.length} groups, ${def.expenses.length} bills`;
       });
 
-      runCase('Integration', 'IT-02: Dual Auth links Email + Google OAuth 2.0 on user profile', () => {
+      runCase('Integration', 'IT-02: Secure Email & Password with OTP verification on user profile', () => {
         const def = getMockSampleState();
         const z = (appState.users && appState.users.find((u) => u.email === 'mrzoromit3@gmail.com')) || def.users.find((u) => u.email === 'mrzoromit3@gmail.com');
-        if (!z || !z.authProviders.includes('email') || !z.authProviders.includes('google')) {
-          throw new Error('Dual provider link missing');
+        if (!z || !z.authProviders.includes('email')) {
+          throw new Error('Email provider missing');
         }
-        return 'Providers: email + google linked';
+        return 'Provider: email verified';
       });
 
       runCase('Integration', 'IT-03: Group Filter isolates "Goa Weekend Getaway" spend & balances', () => {
@@ -5165,12 +5523,12 @@ exec node server.js`
         return '5/5 nav tabs instrumented with data-testid';
       });
 
-      runCase('UI E2E', 'UI-02: Auth Portal Login, Signup & Google OAuth 2.0 elements present in DOM', () => {
-        const tids = ['login-form', 'signup-form', 'btn-google-oauth', 'google-oauth-modal'];
+      runCase('UI E2E', 'UI-02: Auth Portal Login, Signup, Forgot Password & Settings elements present in DOM', () => {
+        const tids = ['login-form', 'signup-form', 'forgot-password-modal', 'account-settings-modal'];
         tids.forEach((tid) => {
           if (!document.querySelector(`[data-testid="${tid}"]`)) throw new Error(`Missing ${tid}`);
         });
-        return 'Auth forms & OAuth chooser verified';
+        return 'Auth forms, Forgot Password & Account Settings verified';
       });
 
       runCase('UI E2E', 'UI-03: Add Expense Modal & 4 Split Mode buttons (=, ₹, %, ×) wired in DOM', () => {
@@ -5439,8 +5797,6 @@ exec node server.js`
           refreshAllViews();
         }
       }
-
-      await initGoogleOAuth();
 
       // Report Navigation Timings & Performance to OpenTelemetry RUM
       setTimeout(() => {

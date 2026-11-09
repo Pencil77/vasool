@@ -2,16 +2,13 @@ const express = require('express');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { OAuth2Client } = require('google-auth-library');
 const { connectToDatabase } = require('../lib/mongodb');
-const { sendVerificationEmail } = require('../lib/mailer');
+const { sendVerificationEmail, sendPasswordResetEmail } = require('../lib/mailer');
 const otel = require('../lib/otel');
 const User = require('../models/User');
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-fallback-secret-override-in-infisical';
-const GOOGLE_CLIENT_ID = process.env.VASOOL_GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID;
-const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 function generateOtp() {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -91,7 +88,8 @@ function requireAuth(req, res, next) {
 
 /**
  * POST /api/auth/signup
- * Register with Email & Password (initiates 6-digit OTP + Magic Link email verification)
+ * Register with Email & Password.
+ * Dispatches a 6-digit OTP and Magic Link to email; user must verify OTP to complete registration.
  */
 router.post('/signup', async (req, res) => {
   try {
@@ -117,24 +115,7 @@ router.post('/signup', async (req, res) => {
         return res.status(409).json({ error: 'An account with this email already exists. Please log in.' });
       }
 
-      // If user was created via Google Sign-In previously (pre-verified), link password directly
-      if (existing.authProviders.includes('google') && existing.isEmailVerified) {
-        existing.passwordHash = passwordHash;
-        if (!existing.authProviders.includes('email')) {
-          existing.authProviders.push('email');
-        }
-        existing.lastLoginAt = new Date();
-        await existing.save();
-        const authToken = signAuthToken(existing);
-        return res.status(200).json({
-          token: authToken,
-          user: sanitizeUser(existing),
-          linkedProvider: true,
-          message: 'Password successfully linked to your existing Google account.'
-        });
-      }
-
-      // User registered previously with email/password but never verified: update credentials and send fresh OTP/link
+      // User registered previously or invited, update credentials and send fresh OTP/link
       existing.name = String(name).trim();
       existing.passwordHash = passwordHash;
       if (upiId) existing.upiId = String(upiId).trim();
@@ -149,7 +130,7 @@ router.post('/signup', async (req, res) => {
       return res.status(200).json({
         requiresVerification: true,
         email: normalizedEmail,
-        message: 'Verification email sent. Please enter the 6-digit code or click the verification link in your email.'
+        message: 'Verification code sent. Please enter the 6-digit code sent to your email to complete registration.'
       });
     }
 
@@ -172,7 +153,7 @@ router.post('/signup', async (req, res) => {
     return res.status(201).json({
       requiresVerification: true,
       email: normalizedEmail,
-      message: 'Verification email sent. Please enter the 6-digit code or click the verification link in your email.'
+      message: 'Verification code sent. Please enter the 6-digit code sent to your email to complete registration.'
     });
   } catch (err) {
     return res.status(500).json({ error: err.message || 'Signup failed.' });
@@ -181,159 +162,217 @@ router.post('/signup', async (req, res) => {
 
 /**
  * POST /api/auth/login
- * Unified Auth: Log in with Email & Password.
- * If user does not exist, automatically record their name and details and create the account.
+ * Log in with Email & Password.
+ * If account is not verified, sends a fresh 6-digit OTP and requires OTP verification before logging in.
  */
 router.post('/login', async (req, res) => {
   try {
     await connectToDatabase();
-    const { email, password, name, upiId } = req.body;
+    const { email, password } = req.body;
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required.' });
     }
 
     const normalizedEmail = String(email).toLowerCase().trim();
-    let user = await User.findOne({ email: normalizedEmail });
+    const user = await User.findOne({ email: normalizedEmail });
 
     if (!user) {
-      // Seamless Unified Auth: User signing in without signing up beforehand.
-      // Automatically record their name and details and create their account.
-      const userName = (name && String(name).trim()) ? String(name).trim() : normalizedEmail.split('@')[0];
-      const passwordHash = await storePassword(password);
-      user = await User.create({
-        name: userName,
-        email: normalizedEmail,
-        passwordHash,
-        upiId: upiId ? String(upiId).trim() : '',
-        authProviders: ['email'],
-        isEmailVerified: true,
-        lastLoginAt: new Date()
-      });
-      const token = signAuthToken(user);
-      otel.metrics.counter('vasool_auth_operations_total', 1, { provider: 'email', action: 'unified_auto_signup' });
-      return res.status(200).json({
-        token,
-        user: sanitizeUser(user),
-        isNewUser: true,
-        message: `Welcome to Vasool, ${user.name}! Your account has been created.`
-      });
+      return res.status(401).json({ error: 'No account found with this email. Please sign up to create an account.' });
     }
 
     if (!user.passwordHash) {
-      // User registered with Google or invite placeholder previously, set their password now
-      user.passwordHash = await storePassword(password);
-      if (!user.authProviders.includes('email')) {
-        user.authProviders.push('email');
-      }
-      if (name && (!user.name || user.name === normalizedEmail.split('@')[0])) {
-        user.name = String(name).trim();
-      }
-      if (upiId && !user.upiId) {
-        user.upiId = String(upiId).trim();
-      }
-      user.isEmailVerified = true;
-      user.lastLoginAt = new Date();
-      await user.save();
-      const token = signAuthToken(user);
-      otel.metrics.counter('vasool_auth_operations_total', 1, { provider: 'email', action: 'link_password' });
-      return res.status(200).json({ token, user: sanitizeUser(user), linkedProvider: true });
+      return res.status(401).json({ error: 'No password set for this account. Please use Forgot Password to set one.' });
     }
 
     const isMatch = await verifyPassword(password, user.passwordHash);
     if (!isMatch) {
-      return res.status(401).json({ error: 'Incorrect password for this email. Please check your password or sign in with Google.' });
+      return res.status(401).json({ error: 'Incorrect password. Please check your password or use Forgot Password.' });
     }
 
+    // If account has not completed email verification, require OTP verification before logging in
     if (!user.isEmailVerified) {
-      user.isEmailVerified = true;
+      const otp = generateOtp();
+      const token = generateToken();
+      user.emailVerificationOtp = otp;
+      user.emailVerificationToken = token;
+      user.emailVerificationExpires = new Date(Date.now() + 15 * 60 * 1000);
+      await user.save();
+
+      await sendVerificationEmail({ email: normalizedEmail, name: user.name, otp, token });
+      otel.metrics.counter('vasool_auth_operations_total', 1, { provider: 'email', action: 'login_requires_verification' });
+
+      return res.status(200).json({
+        requiresVerification: true,
+        email: normalizedEmail,
+        message: 'Your account is not verified yet. A 6-digit verification code has been sent to your email.'
+      });
     }
-    if (name && (!user.name || user.name === normalizedEmail.split('@')[0])) {
-      user.name = String(name).trim();
-    }
-    if (upiId && !user.upiId) {
-      user.upiId = String(upiId).trim();
-    }
+
     user.lastLoginAt = new Date();
     await user.save();
     const token = signAuthToken(user);
     otel.metrics.counter('vasool_auth_operations_total', 1, { provider: 'email', action: 'login' });
-    return res.status(200).json({ token, user: sanitizeUser(user) });
+    return res.status(200).json({
+      token,
+      user: sanitizeUser(user),
+      message: `Welcome back, ${user.name}!`
+    });
   } catch (err) {
     return res.status(500).json({ error: err.message || 'Login failed.' });
   }
 });
 
 /**
- * POST /api/auth/google
- * Google OAuth 2.0 Sign-Up / Sign-In (verifies Google ID token from Google Identity Services)
+ * POST /api/auth/forgot-password
+ * Initiates password reset by sending a 6-digit OTP and reset link to the registered email.
  */
-router.post('/google', async (req, res) => {
+router.post('/forgot-password', async (req, res) => {
   try {
     await connectToDatabase();
-    const { credential, profileFallback } = req.body;
-
-    let googlePayload = null;
-    if (credential && GOOGLE_CLIENT_ID) {
-      const ticket = await googleClient.verifyIdToken({
-        idToken: credential,
-        audience: GOOGLE_CLIENT_ID
-      });
-      googlePayload = ticket.getPayload();
-    } else if (profileFallback && profileFallback.email) {
-      // Development fallback when testing locally before setting GOOGLE_CLIENT_ID
-      googlePayload = {
-        sub: profileFallback.sub || 'google_' + Date.now(),
-        email: profileFallback.email,
-        name: profileFallback.name || profileFallback.email.split('@')[0],
-        picture: profileFallback.picture || ''
-      };
-    } else {
-      return res.status(400).json({ error: 'Missing Google ID token credential.' });
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: 'Email address is required.' });
     }
 
-    const normalizedEmail = String(googlePayload.email).toLowerCase().trim();
-    let user = await User.findOne({ email: normalizedEmail });
+    const normalizedEmail = String(email).toLowerCase().trim();
+    const user = await User.findOne({ email: normalizedEmail });
 
     if (!user) {
-      user = await User.create({
-        name: googlePayload.name || normalizedEmail.split('@')[0],
-        email: normalizedEmail,
-        googleId: googlePayload.sub,
-        avatarUrl: googlePayload.picture || '',
-        authProviders: ['google'],
-        isEmailVerified: true,
-        lastLoginAt: new Date()
-      });
-    } else {
-      user.googleId = googlePayload.sub || user.googleId;
-      user.isEmailVerified = true;
-      user.emailVerificationOtp = null;
-      user.emailVerificationToken = null;
-      user.emailVerificationExpires = null;
-      if (googlePayload.picture && !user.avatarUrl) {
-        user.avatarUrl = googlePayload.picture;
-      }
-      if (!user.authProviders.includes('google')) {
-        user.authProviders.push('google');
-      }
-      user.lastLoginAt = new Date();
-      await user.save();
+      return res.status(404).json({ error: 'No account found with this email address.' });
     }
 
-    const token = signAuthToken(user);
-    otel.metrics.counter('vasool_auth_operations_total', 1, { provider: 'google', action: 'oauth' });
-    return res.status(200).json({ token, user: sanitizeUser(user) });
+    const otp = generateOtp();
+    const token = generateToken();
+    user.passwordResetOtp = otp;
+    user.passwordResetToken = token;
+    user.passwordResetExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+    await user.save();
+
+    await sendPasswordResetEmail({ email: normalizedEmail, name: user.name, otp, token });
+    otel.metrics.counter('vasool_auth_operations_total', 1, { provider: 'email', action: 'forgot_password' });
+
+    return res.status(200).json({
+      success: true,
+      email: normalizedEmail,
+      message: 'Password reset code and link have been sent to your email.'
+    });
   } catch (err) {
-    const isAuthError = err.message && (
-      err.message.toLowerCase().includes('token') ||
-      err.message.toLowerCase().includes('signature') ||
-      err.message.toLowerCase().includes('audience') ||
-      err.message.toLowerCase().includes('recipient') ||
-      err.message.toLowerCase().includes('jwt') ||
-      err.message.toLowerCase().includes('wrong number of segments')
-    );
-    return res.status(isAuthError ? 401 : 500).json({ error: err.message || 'Google authentication failed.' });
+    return res.status(500).json({ error: err.message || 'Failed to process password reset request.' });
   }
+});
+
+/**
+ * POST /api/auth/reset-password
+ * Resets user password using either:
+ * 1. 6-digit OTP entered on-screen
+ * 2. Secure reset token from the email link
+ */
+router.post('/reset-password', async (req, res) => {
+  try {
+    await connectToDatabase();
+    const { email, otp, token, newPassword } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: 'Email address is required.' });
+    }
+    if (!newPassword || String(newPassword).length < 8) {
+      return res.status(400).json({ error: 'New password must be at least 8 characters long.' });
+    }
+    if (!otp && !token) {
+      return res.status(400).json({ error: 'Either the 6-digit reset code or reset token is required.' });
+    }
+
+    const normalizedEmail = String(email).toLowerCase().trim();
+    const user = await User.findOne({ email: normalizedEmail });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User account not found.' });
+    }
+
+    if (!user.passwordResetExpires || user.passwordResetExpires < new Date()) {
+      return res.status(400).json({ error: 'Password reset code/link has expired. Please request a new one.' });
+    }
+
+    let isMatch = false;
+    if (otp && user.passwordResetOtp && String(otp).trim() === user.passwordResetOtp) {
+      isMatch = true;
+    } else if (token && user.passwordResetToken && String(token).trim() === user.passwordResetToken) {
+      isMatch = true;
+    }
+
+    if (!isMatch) {
+      return res.status(400).json({ error: 'Invalid reset code or token. Please check and try again.' });
+    }
+
+    user.passwordHash = await storePassword(newPassword);
+    user.passwordResetOtp = null;
+    user.passwordResetToken = null;
+    user.passwordResetExpires = null;
+    user.isEmailVerified = true; // Email ownership proved through reset code/link
+    user.lastLoginAt = new Date();
+    await user.save();
+
+    const authToken = signAuthToken(user);
+    otel.metrics.counter('vasool_auth_operations_total', 1, { provider: 'email', action: 'reset_password' });
+
+    return res.status(200).json({
+      success: true,
+      token: authToken,
+      user: sanitizeUser(user),
+      message: 'Password reset successfully! You are now logged in.'
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Failed to reset password.' });
+  }
+});
+
+/**
+ * POST /api/auth/change-password
+ * Authenticated endpoint: allows logged-in user to change their password from account settings.
+ */
+router.post('/change-password', requireAuth, async (req, res) => {
+  try {
+    await connectToDatabase();
+    const { currentPassword, newPassword } = req.body;
+    if (!newPassword || String(newPassword).length < 8) {
+      return res.status(400).json({ error: 'New password must be at least 8 characters long.' });
+    }
+
+    const user = await User.findById(req.user.sub);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    if (user.passwordHash) {
+      if (!currentPassword) {
+        return res.status(400).json({ error: 'Current password is required.' });
+      }
+      const isMatch = await verifyPassword(currentPassword, user.passwordHash);
+      if (!isMatch) {
+        return res.status(400).json({ error: 'Current password is incorrect.' });
+      }
+    }
+
+    user.passwordHash = await storePassword(newPassword);
+    await user.save();
+    otel.metrics.counter('vasool_auth_operations_total', 1, { provider: 'email', action: 'change_password' });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Password changed successfully.'
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Failed to change password.' });
+  }
+});
+
+/**
+ * POST /api/auth/google
+ * Legacy compatibility: informs client that Google OAuth has been replaced with Email + OTP.
+ */
+router.post('/google', (req, res) => {
+  return res.status(410).json({
+    error: 'Google Sign-In has been removed. Please log in or create an account with your email and password.'
+  });
 });
 
 /**
@@ -354,11 +393,11 @@ router.get('/me', requireAuth, async (req, res) => {
 
 /**
  * GET /api/auth/config
- * Exposes public client configuration (e.g. Google OAuth 2.0 Web Client ID)
+ * Exposes public client configuration
  */
 router.get('/config', (req, res) => {
   return res.status(200).json({
-    googleClientId: GOOGLE_CLIENT_ID || null,
+    authMethods: ['email_password_otp'],
     environment: process.env.NODE_ENV || 'production'
   });
 });

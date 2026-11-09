@@ -14,6 +14,9 @@ const UserSchema = new mongoose.Schema(
     emailVerificationOtp: { type: String, default: null },
     emailVerificationToken: { type: String, default: null, index: true },
     emailVerificationExpires: { type: Date, default: null },
+    passwordResetOtp: { type: String, default: null },
+    passwordResetToken: { type: String, default: null, index: true },
+    passwordResetExpires: { type: Date, default: null },
     lastLoginAt: { type: Date, default: Date.now }
   },
   { timestamps: true }

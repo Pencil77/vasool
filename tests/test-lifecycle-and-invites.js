@@ -56,35 +56,49 @@ async function runTests() {
 
   try {
     // -------------------------------------------------------------------------
-    // TEST 1: Unified Sign In / Sign Up (Auto-creation of non-existing user)
+    // TEST 1: Sign Up with Email, Password & OTP verification
     // -------------------------------------------------------------------------
-    console.log('▶ TEST 1: Unified Sign In (Signing in without signing up beforehand)...');
-    const adminLoginRes = await request('POST', '/api/auth/login', {
+    console.log('▶ TEST 1: Registering Admin account & verifying with email OTP...');
+    const adminSignupRes = await request('POST', '/api/auth/signup', {
       email: adminEmail,
       password: 'SecurePassword123!',
       name: 'Admin Zoro Test',
       upiId: 'admin@okicici'
     });
-    assert.strictEqual(adminLoginRes.status, 200, 'Expected 200 OK for auto-signup on login');
-    assert.ok(adminLoginRes.body.token, 'Token must be returned');
-    assert.strictEqual(adminLoginRes.body.user.name, 'Admin Zoro Test', 'Name must be recorded');
-    assert.strictEqual(adminLoginRes.body.user.email, adminEmail, 'Email must match');
-    assert.strictEqual(adminLoginRes.body.user.upiId, 'admin@okicici', 'UPI ID must be recorded');
-    const adminToken = adminLoginRes.body.token;
-    console.log('  ✓ Admin account automatically created & details recorded on sign-in');
+    assert.strictEqual(adminSignupRes.status, 201, 'Expected 201 Created');
+    assert.strictEqual(adminSignupRes.body.requiresVerification, true);
+
+    const adminUser = await User.findOne({ email: adminEmail });
+    const adminVerifyRes = await request('POST', '/api/auth/verify-otp', {
+      email: adminEmail,
+      otp: adminUser.emailVerificationOtp
+    });
+    assert.strictEqual(adminVerifyRes.status, 200);
+    assert.ok(adminVerifyRes.body.token, 'Token must be returned');
+    assert.strictEqual(adminVerifyRes.body.user.name, 'Admin Zoro Test', 'Name must be recorded');
+    assert.strictEqual(adminVerifyRes.body.user.email, adminEmail, 'Email must match');
+    assert.strictEqual(adminVerifyRes.body.user.upiId, 'admin@okicici', 'UPI ID must be recorded');
+    const adminToken = adminVerifyRes.body.token;
+    console.log('  ✓ Admin account created, verified via OTP, & details recorded on sign-in');
 
     // -------------------------------------------------------------------------
-    // TEST 2: Member auto-signup on sign-in
+    // TEST 2: Member sign-up & OTP verification
     // -------------------------------------------------------------------------
-    console.log('▶ TEST 2: Member auto-signup on sign-in...');
-    const memberLoginRes = await request('POST', '/api/auth/login', {
+    console.log('▶ TEST 2: Member sign-up & OTP verification...');
+    const memberSignupRes = await request('POST', '/api/auth/signup', {
       email: memberEmail,
       password: 'MemberPassword123!',
       name: 'Pavan Sai Test'
     });
-    assert.strictEqual(memberLoginRes.status, 200);
-    const memberToken = memberLoginRes.body.token;
-    console.log('  ✓ Member account automatically created & logged in seamlessly');
+    assert.strictEqual(memberSignupRes.status, 201);
+    const memberUser = await User.findOne({ email: memberEmail });
+    const memberVerifyRes = await request('POST', '/api/auth/verify-otp', {
+      email: memberEmail,
+      otp: memberUser.emailVerificationOtp
+    });
+    assert.strictEqual(memberVerifyRes.status, 200);
+    const memberToken = memberVerifyRes.body.token;
+    console.log('  ✓ Member account created, verified via OTP, & logged in');
 
     // -------------------------------------------------------------------------
     // TEST 3: Autocomplete & Email Check Endpoints
@@ -195,13 +209,20 @@ async function runTests() {
     // -------------------------------------------------------------------------
     // TEST 10: Third Person Declines Group Invitation
     // -------------------------------------------------------------------------
-    console.log('▶ TEST 10: Third person auto-sign-in and declines invitation...');
-    const thirdLogin = await request('POST', '/api/auth/login', {
+    console.log('▶ TEST 10: Third person signs up, verifies OTP, and declines invitation...');
+    const thirdSignup = await request('POST', '/api/auth/signup', {
       email: thirdEmail,
       password: 'ThirdPassword123!',
       name: 'Third Person'
     });
-    const thirdToken = thirdLogin.body.token;
+    assert.strictEqual(thirdSignup.status, 201);
+    const thirdUser = await User.findOne({ email: thirdEmail });
+    const thirdVerify = await request('POST', '/api/auth/verify-otp', {
+      email: thirdEmail,
+      otp: thirdUser.emailVerificationOtp
+    });
+    assert.strictEqual(thirdVerify.status, 200);
+    const thirdToken = thirdVerify.body.token;
 
     const declineRes = await request('POST', `/api/groups/${group._id}/decline-invite`, {}, thirdToken);
     assert.strictEqual(declineRes.status, 200);
