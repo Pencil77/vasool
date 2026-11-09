@@ -9,7 +9,7 @@ const User = require('../models/User');
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-fallback-secret-override-in-infisical';
-const SUPER_ADMIN_EMAIL = 'mrzoromit3@gmail.com';
+const SUPER_ADMIN_EMAIL = 'mdzubair7592@gmail.com';
 
 function isSuperAdminEmail(email) {
   if (!email) return false;

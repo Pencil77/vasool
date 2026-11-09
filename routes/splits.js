@@ -11,7 +11,7 @@ const logger = require('../lib/logger');
 const otel = require('../lib/otel');
 
 const router = express.Router();
-const SUPER_ADMIN_EMAIL = 'mrzoromit3@gmail.com';
+const SUPER_ADMIN_EMAIL = 'mdzubair7592@gmail.com';
 
 function isSuperAdminUser(user) {
   if (!user) return false;

@@ -217,10 +217,10 @@ async function runTestSuite() {
     console.log('  ✓ Google endpoint properly disabled with HTTP 410 Gone.\n');
 
     // -------------------------------------------------------------------------
-    // STEP 9: Hardcoded Super Admin Verification (mrzoromit3@gmail.com)
+    // STEP 9: Hardcoded Super Admin Verification (mdzubair7592@gmail.com)
     // -------------------------------------------------------------------------
-    console.log('▶ STEP 9: Verifying hardcoded Super Admin designation for mrzoromit3@gmail.com...');
-    const superAdminEmail = 'mrzoromit3@gmail.com';
+    console.log('▶ STEP 9: Verifying hardcoded Super Admin designation for mdzubair7592@gmail.com...');
+    const superAdminEmail = 'mdzubair7592@gmail.com';
     const superSignup = await request('POST', '/api/auth/signup', {
       name: 'Zoro',
       email: superAdminEmail,
