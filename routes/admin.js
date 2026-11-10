@@ -2,7 +2,15 @@ const express = require('express');
 const { connectToDatabase } = require('../lib/mongodb');
 const User = require('../models/User');
 const Group = require('../models/Group');
-const { requireAuth, isSuperAdminEmail, SUPER_ADMIN_EMAIL, storePassword } = require('./auth');
+const SystemConfig = require('../models/SystemConfig');
+const {
+  requireAuth,
+  isSuperAdminEmail,
+  SUPER_ADMIN_EMAIL,
+  storePassword,
+  updateCachedSessionDuration,
+  getCachedSessionDuration
+} = require('./auth');
 const logger = require('../lib/logger');
 const otel = require('../lib/otel');
 
@@ -297,6 +305,128 @@ router.delete('/users/:userId', async (req, res) => {
     span.recordException(err);
     span.end();
     return res.status(500).json({ error: err.message || 'Failed to delete user account.' });
+  }
+});
+
+/**
+ * GET /api/admin/settings
+ * Retrieves global application system configuration (session timeout, etc.)
+ */
+router.get('/settings', async (req, res) => {
+  const span = otel.startSpan('admin.get_settings', {
+    attributes: { 'admin.email': req.user.email }
+  });
+
+  try {
+    await connectToDatabase();
+    let config = await SystemConfig.findOne({ key: 'auth_session' }).lean();
+    if (!config) {
+      config = {
+        key: 'auth_session',
+        sessionDurationValue: 7,
+        sessionDurationUnit: 'days',
+        sessionDurationString: '7d',
+        description: 'Global application session timeout and security settings',
+        updatedByEmail: 'system'
+      };
+    }
+
+    span.setStatus('OK');
+    span.end();
+
+    return res.status(200).json({
+      success: true,
+      settings: {
+        sessionDurationValue: config.sessionDurationValue || 7,
+        sessionDurationUnit: config.sessionDurationUnit || 'days',
+        sessionDurationString: config.sessionDurationString || '7d',
+        updatedAt: config.updatedAt || null,
+        updatedByEmail: config.updatedByEmail || 'system'
+      }
+    });
+  } catch (err) {
+    logger.error('[admin] Failed to fetch system settings:', err);
+    span.recordException(err);
+    span.end();
+    return res.status(500).json({ error: err.message || 'Failed to fetch settings.' });
+  }
+});
+
+/**
+ * PATCH /api/admin/settings
+ * Updates global session timeout configuration
+ */
+router.patch('/settings', async (req, res) => {
+  const span = otel.startSpan('admin.update_settings', {
+    attributes: { 'admin.email': req.user.email }
+  });
+
+  try {
+    await connectToDatabase();
+    const { sessionDurationValue, sessionDurationUnit } = req.body;
+
+    const val = parseInt(sessionDurationValue, 10);
+    const unit = String(sessionDurationUnit || '').toLowerCase().trim();
+
+    if (isNaN(val) || val <= 0) {
+      span.setStatus('ERROR', 'Invalid duration value');
+      span.end();
+      return res.status(400).json({ error: 'Session duration value must be a positive number.' });
+    }
+
+    if (unit !== 'days' && unit !== 'hours') {
+      span.setStatus('ERROR', 'Invalid duration unit');
+      span.end();
+      return res.status(400).json({ error: 'Session duration unit must be either "days" or "hours".' });
+    }
+
+    // Safety bounds: min 1 hour/day, max 365 days (or 8760 hours)
+    if (unit === 'days' && (val < 1 || val > 365)) {
+      return res.status(400).json({ error: 'Session duration in days must be between 1 and 365 days.' });
+    }
+    if (unit === 'hours' && (val < 1 || val > 8760)) {
+      return res.status(400).json({ error: 'Session duration in hours must be between 1 and 8760 hours.' });
+    }
+
+    const sessionDurationString = unit === 'days' ? `${val}d` : `${val}h`;
+
+    const updated = await SystemConfig.findOneAndUpdate(
+      { key: 'auth_session' },
+      {
+        $set: {
+          sessionDurationValue: val,
+          sessionDurationUnit: unit,
+          sessionDurationString,
+          updatedByEmail: req.user.email
+        }
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    // Update in-memory cache immediately
+    updateCachedSessionDuration(val, unit, sessionDurationString);
+
+    logger.info(`[admin] Super Admin ${req.user.email} updated session timeout to ${sessionDurationString} (${val} ${unit})`);
+    otel.metrics.counter('vasool_admin_actions_total', 1, { action: 'update_session_settings' });
+    span.setStatus('OK');
+    span.end();
+
+    return res.status(200).json({
+      success: true,
+      message: `Session lifetime successfully configured to ${val} ${unit} (${sessionDurationString}).`,
+      settings: {
+        sessionDurationValue: updated.sessionDurationValue,
+        sessionDurationUnit: updated.sessionDurationUnit,
+        sessionDurationString: updated.sessionDurationString,
+        updatedAt: updated.updatedAt,
+        updatedByEmail: updated.updatedByEmail
+      }
+    });
+  } catch (err) {
+    logger.error('[admin] Failed to update system settings:', err);
+    span.recordException(err);
+    span.end();
+    return res.status(500).json({ error: err.message || 'Failed to update system settings.' });
   }
 });
 

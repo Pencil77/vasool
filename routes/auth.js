@@ -6,10 +6,55 @@ const { connectToDatabase } = require('../lib/mongodb');
 const { sendVerificationEmail, sendPasswordResetEmail } = require('../lib/mailer');
 const otel = require('../lib/otel');
 const User = require('../models/User');
+const SystemConfig = require('../models/SystemConfig');
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-fallback-secret-override-in-infisical';
 const SUPER_ADMIN_EMAIL = 'mdzubair7592@gmail.com';
+
+// In-memory cache for dynamically configurable session duration
+let cachedSessionConfig = {
+  value: 7,
+  unit: 'days',
+  string: '7d',
+  lastFetchedAt: 0
+};
+
+async function refreshSessionDurationCache(force = false) {
+  const now = Date.now();
+  if (!force && now - cachedSessionConfig.lastFetchedAt < 60000) {
+    return cachedSessionConfig.string || '7d';
+  }
+  try {
+    const config = await SystemConfig.findOne({ key: 'auth_session' }).lean();
+    if (config && config.sessionDurationString) {
+      cachedSessionConfig = {
+        value: Number(config.sessionDurationValue) || 7,
+        unit: config.sessionDurationUnit || 'days',
+        string: config.sessionDurationString,
+        lastFetchedAt: now
+      };
+    } else {
+      cachedSessionConfig.lastFetchedAt = now;
+    }
+  } catch (err) {
+    // Keep cached config on error
+  }
+  return cachedSessionConfig.string || '7d';
+}
+
+function updateCachedSessionDuration(value, unit, string) {
+  cachedSessionConfig = {
+    value: Number(value),
+    unit: String(unit),
+    string: String(string),
+    lastFetchedAt: Date.now()
+  };
+}
+
+function getCachedSessionDuration() {
+  return cachedSessionConfig.string || '7d';
+}
 
 function isSuperAdminEmail(email) {
   if (!email) return false;
@@ -54,6 +99,7 @@ async function verifyPassword(inputPassword, storedPassword) {
 
 function signAuthToken(user) {
   const isSuper = Boolean(user.isSuperAdmin) || isSuperAdminEmail(user.email);
+  const expiresIn = cachedSessionConfig.string || '7d';
   return jwt.sign(
     {
       sub: user._id.toString(),
@@ -64,7 +110,7 @@ function signAuthToken(user) {
       authProviders: user.authProviders
     },
     JWT_SECRET,
-    { expiresIn: '7d' }
+    { expiresIn }
   );
 }
 
@@ -305,6 +351,7 @@ router.post('/login', async (req, res) => {
 
     user.lastLoginAt = new Date();
     await user.save();
+    await refreshSessionDurationCache();
     const token = signAuthToken(user);
     otel.metrics.counter('vasool_auth_operations_total', 1, { provider: 'email', action: 'login' });
     return res.status(200).json({
@@ -407,6 +454,7 @@ router.post('/reset-password', async (req, res) => {
     user.lastLoginAt = new Date();
     await user.save();
 
+    await refreshSessionDurationCache();
     const authToken = signAuthToken(user);
     otel.metrics.counter('vasool_auth_operations_total', 1, { provider: 'email', action: 'reset_password' });
 
@@ -538,6 +586,7 @@ router.post('/verify-otp', async (req, res) => {
     }
 
     if (user.isEmailVerified) {
+      await refreshSessionDurationCache();
       const token = signAuthToken(user);
       return res.status(200).json({
         token,
@@ -563,6 +612,7 @@ router.post('/verify-otp', async (req, res) => {
     user.lastLoginAt = new Date();
     await user.save();
 
+    await refreshSessionDurationCache();
     const token = signAuthToken(user);
     otel.metrics.counter('vasool_auth_operations_total', 1, { provider: 'email', action: 'verify_otp' });
     return res.status(200).json({
@@ -612,6 +662,7 @@ router.get('/verify', async (req, res) => {
     user.lastLoginAt = new Date();
     await user.save();
 
+    await refreshSessionDurationCache();
     const authToken = signAuthToken(user);
     return res.redirect(`${baseUrl}/?verified=true&token=${encodeURIComponent(authToken)}`);
   } catch (err) {
@@ -730,5 +781,9 @@ module.exports = {
   SUPER_ADMIN_EMAIL,
   storePassword,
   sanitizeUser,
-  isUserSuspended
+  isUserSuspended,
+  signAuthToken,
+  refreshSessionDurationCache,
+  updateCachedSessionDuration,
+  getCachedSessionDuration
 };

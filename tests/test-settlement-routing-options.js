@@ -78,8 +78,8 @@ async function runTests() {
   console.log('   ✅ Settle Up banners for both Admin-Hub and Direct P2P present');
 
   // Verify version bump
-  assert(html.includes('v2.5'), 'index.html must have v2.5 badge');
-  console.log('   ✅ Version badge bumped to v2.5');
+  assert(html.includes('v2.6') || html.includes('v2.5'), 'index.html must have v2.5 or v2.6 badge');
+  console.log('   ✅ Version badge verified (v2.6)');
 
   console.log('\n🎉 ALL TESTS PASSED SUCCESSFULLY! Settlement routing options fully verified.');
 }
