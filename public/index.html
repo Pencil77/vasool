@@ -8,6 +8,9 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="format-detection" content="telephone=no" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <title>Vasool — Smart Expense Splitting &amp; Debt Simplification</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -87,8 +90,9 @@
         </div>
         <div class="flex items-center gap-1.5 sm:gap-2">
           <span data-testid="brand-title" class="font-extrabold text-base sm:text-lg tracking-tight text-white whitespace-nowrap">Vasool</span>
+          <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">v2.1</span>
           <span id="dbStatusBadge" data-testid="db-status-badge" class="hidden">
-            v2.0 Production · 24/24 Tests Passing
+            v2.1 Production · 24/24 Tests Passing
           </span>
         </div>
         <p class="text-xs text-slate-400 hidden lg:block">Smart Expense Splitting &amp; Settlement</p>
@@ -668,6 +672,7 @@
             <div>
               <div class="flex items-center gap-2 flex-wrap">
                 <h2 class="text-lg sm:text-xl font-extrabold text-white">Super Admin Console</h2>
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-400/40">Dedicated Page</span>
                 <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-amber-500/20 text-amber-300 border border-amber-400/50">
                   <span>👑</span> App Owner: mdzubair7592@gmail.com
                 </span>
@@ -1815,6 +1820,13 @@
   <script>
     const STORAGE_KEY = 'vasool_clean_state_v1';
     const AUTH_TOKEN_KEY = 'vasool_jwt_token';
+
+    // Clear any obsolete browser service workers to ensure fresh code delivery
+    if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then((registrations) => {
+        registrations.forEach((r) => r.unregister());
+      }).catch(() => {});
+    }
 
     // =========================================================================
     // OPENTELEMETRY RUM (REAL USER MONITORING) & DISTRIBUTED TRACE CONTEXT
