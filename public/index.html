@@ -2755,6 +2755,15 @@ exec node server.js`
         await syncWithBackend();
         await checkAndProcessPendingJoin();
       } catch (err) {
+        if (err.message && err.message.toLowerCase().includes('no account found')) {
+          switchAuthTab('signup');
+          const signupEmail = document.getElementById('signupEmail');
+          const signupPwd = document.getElementById('signupPassword');
+          if (signupEmail) signupEmail.value = email;
+          if (signupPwd) signupPwd.value = password;
+          showToast('No account found with this email. Switched to "Create Account" — enter your name to complete registration!', 'info');
+          return;
+        }
         if (err.data && err.data.requiresVerification) {
           openEmailVerificationModal(err.data.email || email);
           showToast(err.message || 'Please verify your email address to continue.', 'info');
