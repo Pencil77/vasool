@@ -90,9 +90,9 @@
         </div>
         <div class="flex items-center gap-1.5 sm:gap-2">
           <span data-testid="brand-title" class="font-extrabold text-base sm:text-lg tracking-tight text-white whitespace-nowrap">Vasool</span>
-          <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">v2.4</span>
+          <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">v2.5</span>
           <span id="dbStatusBadge" data-testid="db-status-badge" class="hidden">
-            v2.4 Production · 24/24 Tests Passing
+            v2.5 Production · 24/24 Tests Passing
           </span>
         </div>
         <p class="text-xs text-slate-400 hidden lg:block">Smart Expense Splitting &amp; Settlement</p>
@@ -960,6 +960,18 @@
           <label for="newGroupMembersInput" class="block text-xs font-medium text-slate-300 mb-1">Initial Members (Name &lt;email&gt; or comma-separated names)</label>
           <textarea id="newGroupMembersInput" data-testid="input-new-group-members" rows="3" placeholder="Bharath <bharath@gmail.com>, Kashvi Saraswat <kashvi@gmail.com>, Anshuman Barik" class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs sm:text-sm text-white focus:outline-none focus:border-emerald-500"></textarea>
         </div>
+        <!-- Setting: Settlement Routing Mode (Admin Hub vs Direct P2P) -->
+        <div class="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+          <div class="flex items-center justify-between">
+            <label for="newGroupAdminHub" class="text-xs font-bold text-white flex items-center gap-1.5 cursor-pointer">
+              <span>👑 Centralized Admin Settlement</span>
+            </label>
+            <input id="newGroupAdminHub" data-testid="input-new-group-admin-hub" type="checkbox" class="w-4 h-4 rounded text-amber-500 focus:ring-amber-500 bg-slate-800 border-slate-700 cursor-pointer" />
+          </div>
+          <p class="text-[11px] text-slate-400 leading-relaxed">
+            <strong>Standard (Default OFF):</strong> Direct peer-to-peer settlement (members settle directly with creditors). When enabled, everyone pays the group Admin, and the Admin settles with creditors. You can change this anytime.
+          </p>
+        </div>
         <div class="flex justify-end gap-2 pt-2">
           <button type="button" onclick="closeModal('newGroupModal')" class="px-4 py-2 rounded-xl bg-slate-800 text-xs font-semibold text-slate-300">Cancel</button>
           <button type="submit" data-testid="btn-submit-new-group" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-xs font-bold text-slate-950">Create Group</button>
@@ -1078,13 +1090,26 @@
           </p>
         </div>
 
+        <!-- Setting: Settlement Routing Mode (Admin Hub vs Direct P2P) -->
+        <div class="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+          <div class="flex items-center justify-between">
+            <label for="settingAdminHubSettlement" class="text-xs font-bold text-white flex items-center gap-1.5 cursor-pointer">
+              <span>👑 Centralized Admin Settlement</span>
+            </label>
+            <input id="settingAdminHubSettlement" data-testid="input-setting-admin-hub" type="checkbox" class="w-4 h-4 rounded text-amber-500 focus:ring-amber-500 bg-slate-800 border-slate-700 cursor-pointer" />
+          </div>
+          <p class="text-[11px] text-slate-400 leading-relaxed">
+            <strong>Standard (Default OFF):</strong> Direct peer-to-peer settlement. When enabled, all debtor payments route through the group Admin, and the Admin pays out to creditors.
+          </p>
+        </div>
+
         <!-- Setting: Debt Minimization -->
         <div class="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
           <label for="settingMinimizeDebts" class="text-xs font-bold text-white block">
-            ⚡ Settle Up Debt Mode
+            ⚡ Debt Calculation Mode
           </label>
           <select id="settingMinimizeDebts" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white focus:outline-none focus:border-emerald-500">
-            <option value="true">Fewest Transfers (Admin-Hub calibration / Minimized)</option>
+            <option value="true">Fewest Transfers (Minimized Net Cash Flow)</option>
             <option value="false">Direct Pair-Wise (Exact person-to-person debts)</option>
           </select>
         </div>
@@ -1979,6 +2004,7 @@
             inviteCode: g.inviteCode,
             splitsVisibility: g.splitsVisibility || 'personal_only',
             minimizeDebts: g.minimizeDebts !== false,
+            adminHubSettlement: Boolean(g.adminHubSettlement),
             allowMembersToAddOthers: Boolean(g.allowMembersToAddOthers),
             isArchived: Boolean(g.isArchived),
             adminEmail: g.adminEmail || (g.members?.find((m) => m.role === 'admin' || m.role === 'owner')?.email),
@@ -3897,53 +3923,57 @@ exec node server.js`
 
         simplified.sort((a, b) => b.amount - a.amount);
       } else {
-        // Admin-Hub Debt Calibration:
-        // Everyone pays to the group Admin, and the Admin settles back to all creditors.
-        let activeAdmin = null;
-        if (activeGroups.length >= 1) {
-          const primary = activeGroups[0];
-          activeAdmin = primary.members?.find((m) => m.role === 'admin' || (primary.adminEmail && primary.adminEmail.toLowerCase() === m.email.toLowerCase())) || primary.members?.[0];
-        }
+        const useAdminHub = activeGroups.length > 0 && activeGroups.some((g) => g.adminHubSettlement === true);
 
-        if (activeAdmin && activeAdmin.email) {
-          const adminEmail = String(activeAdmin.email).toLowerCase().trim();
-          const adminName = activeAdmin.name || 'Admin';
+        if (useAdminHub) {
+          // Admin-Hub Debt Calibration:
+          // Everyone pays to the group Admin, and the Admin settles back to all creditors.
+          let activeAdmin = null;
+          if (activeGroups.length >= 1) {
+            const primary = activeGroups[0];
+            activeAdmin = primary.members?.find((m) => m.role === 'admin' || (primary.adminEmail && primary.adminEmail.toLowerCase() === m.email.toLowerCase())) || primary.members?.[0];
+          }
 
-          Object.values(balanceMap).forEach((p) => {
-            const pEmail = String(p.email).toLowerCase().trim();
-            if (pEmail === adminEmail) return;
+          if (activeAdmin && activeAdmin.email) {
+            const adminEmail = String(activeAdmin.email).toLowerCase().trim();
+            const adminName = activeAdmin.name || 'Admin';
 
-            const rounded = Math.round(p.net * 100) / 100;
-            if (rounded < -0.01) {
-              simplified.push({
-                fromEmail: p.email,
-                fromName: p.name,
-                toEmail: adminEmail,
-                toName: adminName,
-                amount: Math.round(Math.abs(rounded) * 100) / 100,
-                isAdminTransfer: true,
-                type: 'pay_to_admin'
-              });
-            } else if (rounded > 0.01) {
-              simplified.push({
-                fromEmail: adminEmail,
-                fromName: adminName,
-                toEmail: p.email,
-                toName: p.name,
-                amount: Math.round(rounded * 100) / 100,
-                isAdminTransfer: true,
-                type: 'admin_payout'
-              });
-            }
-          });
+            Object.values(balanceMap).forEach((p) => {
+              const pEmail = String(p.email).toLowerCase().trim();
+              if (pEmail === adminEmail) return;
 
-          simplified.sort((a, b) => {
-            if (a.toEmail === adminEmail && b.toEmail !== adminEmail) return -1;
-            if (a.toEmail !== adminEmail && b.toEmail === adminEmail) return 1;
-            return b.amount - a.amount;
-          });
+              const rounded = Math.round(p.net * 100) / 100;
+              if (rounded < -0.01) {
+                simplified.push({
+                  fromEmail: p.email,
+                  fromName: p.name,
+                  toEmail: adminEmail,
+                  toName: adminName,
+                  amount: Math.round(Math.abs(rounded) * 100) / 100,
+                  isAdminTransfer: true,
+                  type: 'pay_to_admin'
+                });
+              } else if (rounded > 0.01) {
+                simplified.push({
+                  fromEmail: adminEmail,
+                  fromName: adminName,
+                  toEmail: p.email,
+                  toName: p.name,
+                  amount: Math.round(rounded * 100) / 100,
+                  isAdminTransfer: true,
+                  type: 'admin_payout'
+                });
+              }
+            });
+
+            simplified.sort((a, b) => {
+              if (a.toEmail === adminEmail && b.toEmail !== adminEmail) return -1;
+              if (a.toEmail !== adminEmail && b.toEmail === adminEmail) return 1;
+              return b.amount - a.amount;
+            });
+          }
         } else {
-          // Fallback greedy simplification
+          // Standard / Default: Greedy Peer-to-Peer Minimum Cash Flow Simplification
           const debtors = [];
           const creditors = [];
           Object.values(balanceMap).forEach((p) => {
@@ -3967,7 +3997,9 @@ exec node server.js`
                 fromName: d.name,
                 toEmail: c.email,
                 toName: c.name,
-                amount: amt
+                amount: amt,
+                isAdminTransfer: false,
+                type: 'standard_greedy'
               });
             }
             d.amount = Math.round((d.amount - amt) * 100) / 100;
@@ -4617,6 +4649,9 @@ exec node server.js`
                       <button data-testid="btn-group-settings-${escapeHtml(g.id)}" onclick="openGroupSettingsModal('${escapeHtml(g.id)}')" title="Group Admin Settings" class="text-[10px] font-semibold px-2 py-0.5 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 transition flex items-center gap-1">
                         ⚙️ Settings
                       </button>
+                      <button data-testid="btn-toggle-adminhub-${escapeHtml(g.id)}" onclick="toggleGroupAdminHub('${escapeHtml(g.id)}')" title="Admin control: Toggle Admin-Hub routing vs Direct Peer-to-Peer" class="text-[10px] font-semibold px-2 py-0.5 rounded-lg border transition ${g.adminHubSettlement === true ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'}">
+                        ${g.adminHubSettlement === true ? '👑 Admin-Hub' : '⚡ Direct P2P'}
+                      </button>
                       <button data-testid="btn-toggle-minimize-${escapeHtml(g.id)}" onclick="toggleGroupMinimizeDebts('${escapeHtml(g.id)}')" title="Toggle Settle Up Debt Minimization mode" class="text-[10px] font-semibold px-2 py-0.5 rounded-lg border transition ${g.minimizeDebts !== false ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'}">
                         ${g.minimizeDebts !== false ? '⚡ Minimized' : '🤝 Direct'}
                       </button>
@@ -4624,6 +4659,9 @@ exec node server.js`
                         ${isPersonalOnly ? '🔒 Personal' : '🌐 All'}
                       </button>
                     ` : `
+                      <span class="text-[10px] font-medium px-2 py-0.5 rounded-lg border ${g.adminHubSettlement === true ? 'bg-amber-500/15 text-amber-300 border-amber-500/30' : 'bg-slate-800/80 text-slate-400 border-slate-700/50'}">
+                        ${g.adminHubSettlement === true ? '👑 Admin-Hub' : '⚡ Direct P2P'}
+                      </span>
                       <span class="text-[10px] font-medium px-2 py-0.5 rounded-lg border ${g.minimizeDebts !== false ? 'bg-amber-500/15 text-amber-300 border-amber-500/30' : 'bg-slate-800/80 text-slate-400 border-slate-700/50'}">
                         ${g.minimizeDebts !== false ? '⚡ Minimized' : '🤝 Direct'}
                       </span>
@@ -4693,6 +4731,34 @@ exec node server.js`
         );
       } catch (err) {
         alert('Error updating split visibility: ' + err.message);
+      }
+    }
+
+    async function toggleGroupAdminHub(groupId) {
+      const grp = appState.groups.find((g) => g.id === groupId);
+      if (!grp) return;
+      const next = !grp.adminHubSettlement;
+      try {
+        if (localStorage.getItem(AUTH_TOKEN_KEY)) {
+          const res = await apiFetch(`/api/groups/${groupId}/settings`, {
+            method: 'PATCH',
+            body: JSON.stringify({ adminHubSettlement: next })
+          });
+          if (res && res.error) {
+            alert('Failed to update settlement routing: ' + res.error);
+            return;
+          }
+        }
+        grp.adminHubSettlement = next;
+        saveState();
+        refreshAllViews();
+        showToast(
+          next
+            ? '👑 Admin-Hub Routing ON: Debts route through Group Admin.'
+            : '⚡ Direct Peer-to-Peer ON: Members settle directly with each other.'
+        );
+      } catch (err) {
+        alert('Error updating settlement routing: ' + err.message);
       }
     }
 
@@ -4939,15 +5005,27 @@ exec node server.js`
         `;
       }
 
-      // 3. Admin-Hub Debt Calibration Banner
-      html += `
-        <div class="mb-3 px-3.5 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-between text-xs text-amber-300">
-          <span class="flex items-center gap-2">
-            <span class="text-base">👑</span>
-            <span><strong>Admin-Hub Calibration Active:</strong> Everyone pays their share to the group Admin, and the Admin settles payouts to creditors.</span>
-          </span>
-        </div>
-      `;
+      // 3. Routing Mode Banner
+      const isHubActive = activeGroups.length > 0 && activeGroups.some((g) => g.adminHubSettlement === true);
+      if (isHubActive) {
+        html += `
+          <div class="mb-3 px-3.5 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-between text-xs text-amber-300">
+            <span class="flex items-center gap-2">
+              <span class="text-base">👑</span>
+              <span><strong>Admin-Hub Routing Active:</strong> Everyone pays their share to the group Admin, and the Admin settles payouts to creditors.</span>
+            </span>
+          </div>
+        `;
+      } else {
+        html += `
+          <div class="mb-3 px-3.5 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-between text-xs text-emerald-300">
+            <span class="flex items-center gap-2">
+              <span class="text-base">⚡</span>
+              <span><strong>Direct Peer-to-Peer Settlement (Standard):</strong> Minimized cash flow calculates the fewest direct transfers between debtors and creditors.</span>
+            </span>
+          </div>
+        `;
+      }
 
       // 4. Simplified Transactions List
       if (!simplified.length) {
@@ -4971,6 +5049,7 @@ exec node server.js`
                     <strong class="text-emerald-300">${escapeHtml(t.toName)}</strong>
                     ${t.type === 'pay_to_admin' ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">Pay to Admin 👑</span>' : ''}
                     ${t.type === 'admin_payout' ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/20 text-teal-300 border border-teal-500/40">Admin Settlement 💸</span>' : ''}
+                    ${t.type === 'standard_greedy' || (!t.isAdminTransfer && !t.type) ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">Direct P2P ⚡</span>' : ''}
                   </div>
                   <div class="text-[11px] text-slate-400 mt-0.5">${escapeHtml(t.fromEmail)} &rarr; ${escapeHtml(t.toEmail)}</div>
                   ${pendingAmt > 0 ? `
@@ -5368,6 +5447,7 @@ exec node server.js`
       const name = document.getElementById('newGroupName').value.trim();
       const category = document.getElementById('newGroupCategory').value;
       const rawMembers = document.getElementById('newGroupMembersInput').value;
+      const adminHubSettlement = Boolean(document.getElementById('newGroupAdminHub')?.checked);
 
       const creator = appState.currentUser || { name: 'Guest User', email: 'guest@vasool.app' };
       const members = [{ name: creator.name, email: creator.email.toLowerCase(), role: 'admin' }];
@@ -5405,7 +5485,7 @@ exec node server.js`
         try {
           const res = await apiFetch('/api/groups', {
             method: 'POST',
-            body: JSON.stringify({ name, category, currency: 'INR', members })
+            body: JSON.stringify({ name, category, currency: 'INR', members, adminHubSettlement })
           });
           if (res && res.group) {
             grpId = res.group._id ? res.group._id.toString() : grpId;
@@ -5422,12 +5502,16 @@ exec node server.js`
         category,
         currency: 'INR',
         inviteCode: invCode,
+        adminHubSettlement,
         members
       };
 
       appState.groups.unshift(newGrp);
       document.getElementById('newGroupName').value = '';
       document.getElementById('newGroupMembersInput').value = '';
+      if (document.getElementById('newGroupAdminHub')) {
+        document.getElementById('newGroupAdminHub').checked = false;
+      }
       closeModal('newGroupModal');
       saveState();
       refreshAllViews();
@@ -5643,6 +5727,7 @@ exec node server.js`
       document.getElementById('settingAllowMembersAdd').checked = Boolean(grp.allowMembersToAddOthers);
       document.getElementById('settingSplitVisibility').value = grp.splitsVisibility || 'personal_only';
       document.getElementById('settingMinimizeDebts').value = grp.minimizeDebts !== false ? 'true' : 'false';
+      document.getElementById('settingAdminHubSettlement').checked = Boolean(grp.adminHubSettlement);
 
       // Populate transfer admin dropdown
       const transferSel = document.getElementById('settingTransferAdminSelect');
@@ -5665,13 +5750,14 @@ exec node server.js`
       const allowMembersToAddOthers = document.getElementById('settingAllowMembersAdd').checked;
       const splitsVisibility = document.getElementById('settingSplitVisibility').value;
       const minimizeDebts = document.getElementById('settingMinimizeDebts').value === 'true';
+      const adminHubSettlement = document.getElementById('settingAdminHubSettlement').checked;
       const newAdminEmail = document.getElementById('settingTransferAdminSelect').value;
 
       try {
         if (localStorage.getItem(AUTH_TOKEN_KEY)) {
           const res = await apiFetch(`/api/groups/${groupId}/settings`, {
             method: 'PATCH',
-            body: JSON.stringify({ allowMembersToAddOthers, splitsVisibility, minimizeDebts })
+            body: JSON.stringify({ allowMembersToAddOthers, splitsVisibility, minimizeDebts, adminHubSettlement })
           });
           if (res && res.error) {
             showToast(res.error, 'error');
@@ -5688,6 +5774,7 @@ exec node server.js`
         grp.allowMembersToAddOthers = allowMembersToAddOthers;
         grp.splitsVisibility = splitsVisibility;
         grp.minimizeDebts = minimizeDebts;
+        grp.adminHubSettlement = adminHubSettlement;
         if (newAdminEmail) {
           grp.members.forEach((m) => {
             m.role = m.email.toLowerCase() === newAdminEmail.toLowerCase() ? 'admin' : 'member';
@@ -6135,26 +6222,39 @@ exec node server.js`
         return '0 transfers required';
       });
 
-      runCase('Unit', 'UT-08: Admin-Hub Debt Calibration routes debtor payments to Admin & Admin settles to creditors', () => {
-        const mockState = {
-          groups: [{ id: 'g', members: [{ email: 'a', name: 'A', role: 'member' }, { email: 'b', name: 'B', role: 'admin' }, { email: 'c', name: 'C', role: 'member' }] }],
+      runCase('Unit', 'UT-08: Settlement Routing respects Direct P2P (standard) vs Admin-Hub (opt-in)', () => {
+        const standardState = {
+          groups: [{ id: 'g1', adminHubSettlement: false, members: [{ email: 'a', name: 'A', role: 'member' }, { email: 'b', name: 'B', role: 'admin' }, { email: 'c', name: 'C', role: 'member' }] }],
           expenses: [
-            { groupId: 'g', amount: 1000, paidByEmail: 'b', paidByName: 'B', splits: [{ memberEmail: 'a', memberName: 'A', amount: 1000 }] },
-            { groupId: 'g', amount: 1000, paidByEmail: 'c', paidByName: 'C', splits: [{ memberEmail: 'b', memberName: 'B', amount: 1000 }] }
+            { groupId: 'g1', amount: 1000, paidByEmail: 'b', paidByName: 'B', splits: [{ memberEmail: 'a', memberName: 'A', amount: 1000 }] },
+            { groupId: 'g1', amount: 1000, paidByEmail: 'c', paidByName: 'C', splits: [{ memberEmail: 'b', memberName: 'B', amount: 1000 }] }
           ],
           settlements: []
         };
-        const out = computeBalancesAndSimplifications('g', mockState);
+        const p2pOut = computeBalancesAndSimplifications('g1', standardState);
+        if (p2pOut.simplified.length !== 1 || p2pOut.simplified[0].fromEmail !== 'a' || p2pOut.simplified[0].toEmail !== 'c') {
+          throw new Error('Direct P2P greedy simplification failed');
+        }
+
+        const adminHubState = {
+          groups: [{ id: 'g2', adminHubSettlement: true, members: [{ email: 'a', name: 'A', role: 'member' }, { email: 'b', name: 'B', role: 'admin' }, { email: 'c', name: 'C', role: 'member' }] }],
+          expenses: [
+            { groupId: 'g2', amount: 1000, paidByEmail: 'b', paidByName: 'B', splits: [{ memberEmail: 'a', memberName: 'A', amount: 1000 }] },
+            { groupId: 'g2', amount: 1000, paidByEmail: 'c', paidByName: 'C', splits: [{ memberEmail: 'b', memberName: 'B', amount: 1000 }] }
+          ],
+          settlements: []
+        };
+        const hubOut = computeBalancesAndSimplifications('g2', adminHubState);
         if (
-          out.simplified.length !== 2 ||
-          out.simplified[0].fromEmail !== 'a' ||
-          out.simplified[0].toEmail !== 'b' ||
-          out.simplified[1].fromEmail !== 'b' ||
-          out.simplified[1].toEmail !== 'c'
+          hubOut.simplified.length !== 2 ||
+          hubOut.simplified[0].fromEmail !== 'a' ||
+          hubOut.simplified[0].toEmail !== 'b' ||
+          hubOut.simplified[1].fromEmail !== 'b' ||
+          hubOut.simplified[1].toEmail !== 'c'
         ) {
           throw new Error('Admin-Hub routing failed');
         }
-        return 'Admin-Hub verified: A pays Admin B (₹1,000) & Admin B settles C (₹1,000)';
+        return 'Standard Direct P2P (1 direct transfer A->C) & Admin-Hub (2 routed transfers A->B->C) verified';
       });
 
       runCase('Unit', 'UT-09: Password Strength Evaluator scores weak vs strong passwords', () => {

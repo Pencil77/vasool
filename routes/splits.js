@@ -52,7 +52,9 @@ function simplifyDebtsGreedy(balanceMap) {
         fromName: debtor.name,
         toEmail: creditor.email,
         toName: creditor.name,
-        amount: settledAmount
+        amount: settledAmount,
+        isAdminTransfer: false,
+        type: 'standard_greedy'
       });
     }
 
@@ -245,7 +247,7 @@ router.get('/groups', requireAuth, async (req, res) => {
 router.post('/groups', requireAuth, async (req, res) => {
   try {
     await connectToDatabase();
-    const { name, description, category, currency, members = [], splitsVisibility = 'personal_only', allowMembersToAddOthers = false } = req.body;
+    const { name, description, category, currency, members = [], splitsVisibility = 'personal_only', allowMembersToAddOthers = false, adminHubSettlement = false, minimizeDebts = true } = req.body;
     if (!name) {
       return res.status(400).json({ error: 'Group name is required.' });
     }
@@ -291,6 +293,8 @@ router.post('/groups', requireAuth, async (req, res) => {
       adminEmail: normalizedCreator.email,
       splitsVisibility: splitsVisibility || 'personal_only',
       allowMembersToAddOthers: Boolean(allowMembersToAddOthers),
+      adminHubSettlement: Boolean(adminHubSettlement),
+      minimizeDebts: minimizeDebts !== false,
       members: finalMembers
     });
 
@@ -502,6 +506,35 @@ router.patch('/groups/:id/minimize-debts', requireAuth, async (req, res) => {
   }
 });
 
+// PATCH /api/groups/:id/admin-hub-settlement - Toggle Admin-Hub settlement routing vs Direct Peer-to-Peer (Admin only)
+router.patch('/groups/:id/admin-hub-settlement', requireAuth, async (req, res) => {
+  try {
+    await connectToDatabase();
+    const group = await Group.findById(req.params.id);
+    if (!group) return res.status(404).json({ error: 'Group not found.' });
+
+    const requesterEmail = req.user.email.toLowerCase().trim();
+    const currentAdmin = group.members.find((m) => m.role === 'admin') ||
+      (group.adminEmail ? group.members.find((m) => m.email.toLowerCase() === group.adminEmail.toLowerCase()) : null) ||
+      group.members[0];
+
+    const isCurrentAdmin = isSuperAdminUser(req.user) || (currentAdmin && currentAdmin.email.toLowerCase().trim() === requesterEmail);
+    if (!isCurrentAdmin) {
+      return res.status(403).json({ error: 'Only the group admin can change settlement routing.' });
+    }
+
+    group.adminHubSettlement = req.body.adminHubSettlement !== undefined ? Boolean(req.body.adminHubSettlement) : !group.adminHubSettlement;
+    await group.save();
+
+    return res.status(200).json({
+      message: `Settlement routing set to ${group.adminHubSettlement ? 'Centralized Admin-Hub' : 'Direct Peer-to-Peer (Standard)'}.`,
+      group
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // PATCH /api/groups/:id/archive - Archive or unarchive group (Admin only)
 router.patch('/groups/:id/archive', requireAuth, async (req, res) => {
   try {
@@ -686,6 +719,9 @@ router.patch('/groups/:id/settings', requireAuth, async (req, res) => {
     }
     if (req.body.minimizeDebts !== undefined) {
       group.minimizeDebts = Boolean(req.body.minimizeDebts);
+    }
+    if (req.body.adminHubSettlement !== undefined) {
+      group.adminHubSettlement = Boolean(req.body.adminHubSettlement);
     }
     if (req.body.name && String(req.body.name).trim()) {
       group.name = String(req.body.name).trim();
@@ -913,11 +949,13 @@ router.get('/balances', requireAuth, async (req, res) => {
       const isMinimized = g.minimizeDebts !== false;
       if (!isMinimized) {
         simplifiedTransactions = calculateDirectDebts(expenses, settlements);
-      } else {
+      } else if (g.adminHubSettlement === true) {
         const adminMember = g.members.find((m) => m.role === 'admin') ||
           (g.adminEmail ? g.members.find((m) => m.email.toLowerCase() === g.adminEmail.toLowerCase()) : null) ||
           g.members[0];
         simplifiedTransactions = simplifyDebtsAdminHub(balanceMap, adminMember);
+      } else {
+        simplifiedTransactions = simplifyDebtsGreedy(balanceMap);
       }
     } else if (groups.length > 1) {
       // Calculate transactions for each group
@@ -971,10 +1009,14 @@ router.get('/balances', requireAuth, async (req, res) => {
             }
           });
 
-          const adminMember = g.members.find((m) => m.role === 'admin') ||
-            (g.adminEmail ? g.members.find((m) => m.email.toLowerCase() === g.adminEmail.toLowerCase()) : null) ||
-            g.members[0];
-          simplifiedTransactions.push(...simplifyDebtsAdminHub(groupBalanceMap, adminMember));
+          if (g.adminHubSettlement === true) {
+            const adminMember = g.members.find((m) => m.role === 'admin') ||
+              (g.adminEmail ? g.members.find((m) => m.email.toLowerCase() === g.adminEmail.toLowerCase()) : null) ||
+              g.members[0];
+            simplifiedTransactions.push(...simplifyDebtsAdminHub(groupBalanceMap, adminMember));
+          } else {
+            simplifiedTransactions.push(...simplifyDebtsGreedy(groupBalanceMap));
+          }
         }
       });
     } else {
@@ -1284,4 +1326,4 @@ router.get('/users/check-email', requireAuth, async (req, res) => {
   }
 });
 
-module.exports = { splitsRouter: router };
+module.exports = { splitsRouter: router, simplifyDebtsGreedy, simplifyDebtsAdminHub, calculateDirectDebts };

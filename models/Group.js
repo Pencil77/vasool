@@ -26,6 +26,7 @@ const GroupSchema = new mongoose.Schema(
     adminEmail: { type: String, lowercase: true, trim: true },
     splitsVisibility: { type: String, enum: ['personal_only', 'show_all'], default: 'personal_only' },
     minimizeDebts: { type: Boolean, default: true },
+    adminHubSettlement: { type: Boolean, default: false },
     allowMembersToAddOthers: { type: Boolean, default: false },
     isArchived: { type: Boolean, default: false },
     members: { type: [MemberSubSchema], default: [] }
