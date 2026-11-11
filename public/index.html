@@ -1582,6 +1582,56 @@
   </div>
 
   <!-- ===================================================================== -->
+  <!-- MODAL 3C-3: REMOVE MEMBER CONFIRMATION MODAL (ADMIN ONLY)             -->
+  <!-- ===================================================================== -->
+  <div id="removeMemberModal" data-testid="remove-member-modal" class="fixed inset-0 z-50 hidden bg-slate-950/85 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
+    <div class="glass-panel rounded-t-3xl sm:rounded-2xl max-w-md w-full p-5 sm:p-6 border border-rose-500/40 shadow-2xl my-0 sm:my-8 max-h-[90vh] overflow-y-auto">
+      <div class="w-12 h-1.5 bg-slate-700/80 rounded-full mx-auto mb-3 sm:hidden"></div>
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div class="flex items-center gap-2">
+          <span class="text-xl">🗑️</span>
+          <h3 class="text-base font-bold text-white">Remove Member</h3>
+        </div>
+        <button type="button" onclick="closeModal('removeMemberModal')" class="text-slate-400 hover:text-white text-sm px-2 py-1 rounded">✕</button>
+      </div>
+
+      <div class="space-y-4 mt-4">
+        <div>
+          <p class="text-xs text-slate-300">
+            As Group Admin, are you sure you want to remove <strong id="removeMemberTargetName" class="text-white"></strong> (<span id="removeMemberTargetEmail" class="text-slate-400 font-mono text-[11px]"></span>) from <strong id="removeMemberGroupName" class="text-white"></strong>?
+          </p>
+          <p class="text-[11px] text-slate-400 mt-1">
+            They will lose access to this group and will no longer participate in new splits.
+          </p>
+        </div>
+
+        <!-- Dynamic Balance Notice Banner -->
+        <div id="removeMemberBalanceNotice" class="p-3.5 rounded-xl text-xs space-y-1.5">
+          <!-- Filled dynamically by JS -->
+        </div>
+
+        <!-- Force Removal Checkbox (Shown only if member has an unsettled balance) -->
+        <div id="removeMemberForceContainer" class="hidden p-3 rounded-xl bg-slate-900 border border-amber-500/30">
+          <label class="flex items-start gap-2 cursor-pointer text-xs text-amber-200">
+            <input type="checkbox" id="chkRemoveMemberForce" class="mt-0.5 rounded text-rose-500 focus:ring-rose-500 bg-slate-800 border-slate-700" />
+            <span id="removeMemberForceLabel">I confirm force removal despite the outstanding balance.</span>
+          </label>
+        </div>
+
+        <!-- Modal Actions -->
+        <div class="pt-3 border-t border-slate-800 flex items-center justify-end gap-2.5">
+          <button type="button" onclick="closeModal('removeMemberModal')" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition">
+            Cancel
+          </button>
+          <button id="btnConfirmRemoveMember" type="button" onclick="executeRemoveMember()" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-bold text-white transition flex items-center gap-1.5 shadow-lg shadow-rose-950/40">
+            🗑️ Remove Member
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
   <!-- MODAL 3D: UNREGISTERED USER MULTI-CHANNEL INVITE PROMPT               -->
   <!-- ===================================================================== -->
   <div id="unregisteredInviteModal" data-testid="unregistered-invite-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
@@ -5726,6 +5776,7 @@ exec node server.js`
                 .toUpperCase();
 
               const canTransfer = isCurrentUserAdmin && !isAdmin && !isPending;
+              const canRemove = isCurrentUserAdmin && !isAdmin && (m.email || '').toLowerCase().trim() !== currentEmail;
 
               return `
                 <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl ${isAdmin ? 'bg-amber-500/15 border-amber-500/40 text-amber-200' : isPending ? 'bg-amber-500/10 border-amber-500/30 text-amber-200' : 'bg-slate-900/90 border-slate-800 text-slate-200'} border text-xs shadow-sm">
@@ -5739,6 +5790,11 @@ exec node server.js`
                   ${canTransfer ? `
                     <button data-testid="btn-transfer-admin-${escapeHtml(m.email)}" onclick="promptTransferAdmin('${escapeHtml(g.id)}', '${escapeHtml(m.email)}', '${escapeHtml(m.name)}')" title="Transfer Adminship to ${escapeHtml(m.name)}" class="ml-1 text-[10px] text-amber-300/80 hover:text-amber-200 underline font-semibold">
                       Make Admin
+                    </button>
+                  ` : ''}
+                  ${canRemove ? `
+                    <button data-testid="btn-card-remove-member-${escapeHtml(m.email)}" onclick="openRemoveMemberModal('${escapeHtml(g.id)}', '${escapeHtml(m.email)}', '${escapeHtml(m.name)}')" title="Remove ${escapeHtml(m.name)} from group" class="ml-1 text-[11px] text-rose-400 hover:text-rose-200 font-bold px-1 rounded hover:bg-rose-500/20 transition">
+                      ✕
                     </button>
                   ` : ''}
                 </span>
@@ -6234,6 +6290,7 @@ exec node server.js`
             }
 
             const canTransfer = isCurrentUserAdmin && !isAdmin && !isPending;
+            const canRemove = isCurrentUserAdmin && !isAdmin && !isMe;
 
             return `
               <div class="p-3 rounded-2xl bg-slate-900/90 border ${isMe ? 'border-teal-500/40 bg-teal-950/20' : 'border-slate-800'} flex items-center justify-between gap-2 flex-wrap">
@@ -6258,6 +6315,11 @@ exec node server.js`
                   ${canTransfer ? `
                     <button onclick="promptTransferAdmin('${escapeHtml(grp.id)}', '${escapeHtml(m.email)}', '${escapeHtml(m.name)}')" title="Transfer Admin privileges" class="text-[10px] text-amber-300 hover:text-amber-200 underline font-semibold px-2 py-1 rounded bg-amber-500/10 border border-amber-500/20">
                       👑 Make Admin
+                    </button>
+                  ` : ''}
+                  ${canRemove ? `
+                    <button data-testid="btn-details-remove-member-${escapeHtml(m.email)}" onclick="openRemoveMemberModal('${escapeHtml(grp.id)}', '${escapeHtml(m.email)}', '${escapeHtml(m.name)}', ${mBal.net})" title="Remove member from group" class="text-[10px] text-rose-400 hover:text-rose-300 font-semibold px-2 py-1 rounded bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 transition flex items-center gap-1">
+                      🗑️ Remove
                     </button>
                   ` : ''}
                 </div>
@@ -6571,6 +6633,190 @@ exec node server.js`
         if (btnConfirm) {
           btnConfirm.disabled = false;
           btnConfirm.textContent = 'Exit Group';
+        }
+      }
+    }
+
+    let activeRemoveGroupId = null;
+    let activeRemoveTargetEmail = null;
+    let activeRemoveTargetName = null;
+    let activeRemoveNetBalance = 0;
+
+    function openRemoveMemberModal(groupId, targetEmail, targetName, netBalance = null) {
+      activeRemoveGroupId = groupId;
+      activeRemoveTargetEmail = targetEmail;
+      activeRemoveTargetName = targetName;
+
+      const grp = appState.groups.find((g) => g.id === groupId);
+      if (!grp) return;
+
+      const targetMember = grp.members.find((m) => (m.email || '').toLowerCase().trim() === targetEmail.toLowerCase().trim());
+      if (!targetMember) return;
+
+      if (netBalance === null || typeof netBalance === 'undefined' || isNaN(netBalance)) {
+        const { balanceList } = computeBalancesAndSimplifications(groupId);
+        const balEntry = balanceList.find((b) => (b.email || '').toLowerCase().trim() === targetEmail.toLowerCase().trim());
+        netBalance = balEntry ? balEntry.net : 0;
+      }
+      activeRemoveNetBalance = Math.round(netBalance * 100) / 100;
+
+      const nameEl = document.getElementById('removeMemberTargetName');
+      const emailEl = document.getElementById('removeMemberTargetEmail');
+      const groupEl = document.getElementById('removeMemberGroupName');
+      const noticeEl = document.getElementById('removeMemberBalanceNotice');
+      const forceContainer = document.getElementById('removeMemberForceContainer');
+      const forceCheckbox = document.getElementById('chkRemoveMemberForce');
+      const forceLabel = document.getElementById('removeMemberForceLabel');
+      const btnConfirm = document.getElementById('btnConfirmRemoveMember');
+
+      if (nameEl) nameEl.textContent = targetName;
+      if (emailEl) emailEl.textContent = targetEmail;
+      if (groupEl) groupEl.textContent = grp.name;
+
+      if (forceCheckbox) forceCheckbox.checked = false;
+
+      const isPending = targetMember.status === 'pending_acceptance';
+
+      if (isPending) {
+        noticeEl.className = 'p-3.5 rounded-xl text-xs space-y-1.5 bg-amber-950/40 border border-amber-500/40 text-amber-200';
+        noticeEl.innerHTML = `
+          <div class="font-bold flex items-center gap-1.5 text-amber-300">
+            <span>⏳</span> Pending Invitation
+          </div>
+          <p class="leading-relaxed">
+            This member has not yet accepted their invitation to join "${escapeHtml(grp.name)}". Removing them will revoke the invite link immediately.
+          </p>
+        `;
+        if (forceContainer) forceContainer.classList.add('hidden');
+        if (btnConfirm) {
+          btnConfirm.disabled = false;
+          btnConfirm.textContent = 'Revoke Invite & Remove';
+        }
+      } else if (activeRemoveNetBalance < -0.01) {
+        noticeEl.className = 'p-3.5 rounded-xl text-xs space-y-1.5 bg-rose-950/40 border border-rose-500/40 text-rose-200';
+        noticeEl.innerHTML = `
+          <div class="font-bold flex items-center gap-1.5 text-rose-300">
+            <span>⚠️</span> Unsettled Debt: -${formatINR(Math.abs(activeRemoveNetBalance))}
+          </div>
+          <p class="leading-relaxed">
+            <strong class="text-white">${escapeHtml(targetName)}</strong> currently owes <strong class="text-rose-300">-${formatINR(Math.abs(activeRemoveNetBalance))}</strong> to others in this group.
+          </p>
+          <p class="text-[11px] text-slate-300 leading-normal">
+            As Group Admin, you have full authority to remove them (e.g. if settled outside the app, via cash, or forgiven). Check below to confirm force removal.
+          </p>
+        `;
+        if (forceContainer) forceContainer.classList.remove('hidden');
+        if (forceLabel) forceLabel.textContent = `I confirm force removal of ${targetName} with an outstanding debt of -${formatINR(Math.abs(activeRemoveNetBalance))}.`;
+        if (btnConfirm) {
+          btnConfirm.disabled = true;
+          btnConfirm.textContent = 'Confirm Force Removal';
+        }
+
+        if (forceCheckbox) {
+          forceCheckbox.onchange = () => {
+            btnConfirm.disabled = !forceCheckbox.checked;
+          };
+        }
+      } else if (activeRemoveNetBalance > 0.01) {
+        noticeEl.className = 'p-3.5 rounded-xl text-xs space-y-1.5 bg-amber-950/40 border border-amber-500/40 text-amber-200';
+        noticeEl.innerHTML = `
+          <div class="font-bold flex items-center gap-1.5 text-amber-300">
+            <span>⚠️</span> Outstanding Credit: +${formatINR(activeRemoveNetBalance)}
+          </div>
+          <p class="leading-relaxed">
+            <strong class="text-white">${escapeHtml(targetName)}</strong> is owed <strong class="text-emerald-300">+${formatINR(activeRemoveNetBalance)}</strong> by group members.
+          </p>
+          <p class="text-[11px] text-slate-300 leading-normal">
+            As Group Admin, you can remove them if they have agreed to settle outside the platform or waive this credit balance.
+          </p>
+        `;
+        if (forceContainer) forceContainer.classList.remove('hidden');
+        if (forceLabel) forceLabel.textContent = `I confirm force removal of ${targetName} with an outstanding credit of +${formatINR(activeRemoveNetBalance)}.`;
+        if (btnConfirm) {
+          btnConfirm.disabled = true;
+          btnConfirm.textContent = 'Confirm Force Removal';
+        }
+
+        if (forceCheckbox) {
+          forceCheckbox.onchange = () => {
+            btnConfirm.disabled = !forceCheckbox.checked;
+          };
+        }
+      } else {
+        noticeEl.className = 'p-3.5 rounded-xl text-xs space-y-1.5 bg-emerald-950/40 border border-emerald-500/30 text-emerald-200';
+        noticeEl.innerHTML = `
+          <div class="font-bold flex items-center gap-1.5 text-emerald-300">
+            <span>✓</span> All Settled (₹0.00)
+          </div>
+          <p class="leading-relaxed">
+            <strong class="text-white">${escapeHtml(targetName)}</strong> has a clean zero balance in this group. They can be removed safely without financial discrepancies.
+          </p>
+        `;
+        if (forceContainer) forceContainer.classList.add('hidden');
+        if (btnConfirm) {
+          btnConfirm.disabled = false;
+          btnConfirm.textContent = '🗑️ Remove Member';
+        }
+      }
+
+      openModal('removeMemberModal');
+    }
+
+    async function executeRemoveMember() {
+      if (!activeRemoveGroupId || !activeRemoveTargetEmail) return;
+
+      const grp = appState.groups.find((g) => g.id === activeRemoveGroupId);
+      if (!grp) return;
+
+      const forceCheckbox = document.getElementById('chkRemoveMemberForce');
+      const force = forceCheckbox ? forceCheckbox.checked : false;
+      const btnConfirm = document.getElementById('btnConfirmRemoveMember');
+
+      if (btnConfirm) {
+        btnConfirm.disabled = true;
+        btnConfirm.innerHTML = `<span class="inline-block animate-spin mr-1">🌀</span> Removing...`;
+      }
+
+      try {
+        if (localStorage.getItem(AUTH_TOKEN_KEY)) {
+          const res = await apiFetch(`/api/groups/${activeRemoveGroupId}/remove-member`, {
+            method: 'POST',
+            body: JSON.stringify({
+              targetEmail: activeRemoveTargetEmail,
+              force: Boolean(force)
+            })
+          });
+
+          if (res && res.error) {
+            alert('Failed to remove member: ' + res.error);
+            if (btnConfirm) {
+              btnConfirm.disabled = false;
+              btnConfirm.textContent = force ? 'Confirm Force Removal' : '🗑️ Remove Member';
+            }
+            return;
+          }
+        }
+
+        // Update local appState.groups
+        const cleanTarget = activeRemoveTargetEmail.toLowerCase().trim();
+        grp.members = grp.members.filter((m) => (m.email || '').toLowerCase().trim() !== cleanTarget);
+
+        saveState();
+        closeModal('removeMemberModal');
+
+        // If Group Details modal is currently open, refresh it live
+        const detailsModal = document.getElementById('groupDetailsModal');
+        if (detailsModal && !detailsModal.classList.contains('hidden')) {
+          renderGroupDetailsData(grp);
+        }
+
+        refreshAllViews();
+        showToast(`Member ${activeRemoveTargetName} was successfully removed from "${grp.name}".`);
+      } catch (err) {
+        alert('Error removing member: ' + err.message);
+        if (btnConfirm) {
+          btnConfirm.disabled = false;
+          btnConfirm.textContent = force ? 'Confirm Force Removal' : '🗑️ Remove Member';
         }
       }
     }
@@ -8305,6 +8551,8 @@ exec node server.js`
       window.updateAdminFeedbackStatus = updateAdminFeedbackStatus;
       window.saveAdminFeedbackNotes = saveAdminFeedbackNotes;
       window.deleteAdminFeedback = deleteAdminFeedback;
+      window.openRemoveMemberModal = openRemoveMemberModal;
+      window.executeRemoveMember = executeRemoveMember;
       window.handleOtpVerificationSubmit = handleOtpVerificationSubmit;
       window.handleResendOtp = handleResendOtp;
       window.handleJoinGroupSubmit = handleJoinGroupSubmit;

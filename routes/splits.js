@@ -646,7 +646,7 @@ router.post('/groups/:id/leave', requireAuth, async (req, res) => {
 router.post('/groups/:id/remove-member', requireAuth, async (req, res) => {
   try {
     await connectToDatabase();
-    const { targetEmail } = req.body;
+    const { targetEmail, force } = req.body;
     if (!targetEmail) {
       return res.status(400).json({ error: 'targetEmail is required.' });
     }
@@ -661,13 +661,23 @@ router.post('/groups/:id/remove-member', requireAuth, async (req, res) => {
       (group.adminEmail ? group.members.find((m) => m.email.toLowerCase() === group.adminEmail.toLowerCase()) : null) ||
       group.members[0];
 
-    const isCurrentAdmin = isSuperAdminUser(req.user) || (currentAdmin && currentAdmin.email.toLowerCase().trim() === requesterEmail);
+    const isCurrentAdmin =
+      isSuperAdminUser(req.user) ||
+      (group.adminEmail && group.adminEmail.toLowerCase().trim() === requesterEmail) ||
+      (group.createdByEmail && group.createdByEmail.toLowerCase().trim() === requesterEmail) ||
+      (currentAdmin && currentAdmin.email.toLowerCase().trim() === requesterEmail) ||
+      group.members.some((m) => m.email.toLowerCase().trim() === requesterEmail && (m.role === 'admin' || m.role === 'owner'));
+
     if (!isCurrentAdmin) {
       return res.status(403).json({ error: 'Only the group admin can remove members.' });
     }
 
-    if (cleanTargetEmail === currentAdmin.email.toLowerCase().trim()) {
-      return res.status(400).json({ error: 'Cannot remove the group admin. Transfer adminship first or use Leave Group.' });
+    if (cleanTargetEmail === requesterEmail) {
+      return res.status(400).json({ error: 'Cannot remove yourself as admin. Use "Exit Group" or transfer adminship first.' });
+    }
+
+    if (group.adminEmail && cleanTargetEmail === group.adminEmail.toLowerCase().trim()) {
+      return res.status(400).json({ error: 'Cannot remove the primary group admin. Transfer adminship first.' });
     }
 
     const targetMember = group.members.find((m) => m.email.toLowerCase().trim() === cleanTargetEmail);
@@ -684,17 +694,20 @@ router.post('/groups/:id/remove-member', requireAuth, async (req, res) => {
     const targetBalance = balanceMap[cleanTargetEmail] || { net: 0 };
     const netAmount = Math.round(targetBalance.net * 100) / 100;
 
-    if (Math.abs(netAmount) > 0.01 && !req.body.force) {
+    if (Math.abs(netAmount) > 0.01 && !force) {
       return res.status(400).json({
-        error: `Cannot remove member: ${targetMember.name} has an unsettled balance of ₹${netAmount.toFixed(2)}. Settle all balances first.`,
-        netBalance: netAmount
+        error: `Cannot remove member: ${targetMember.name} has an unsettled balance of ₹${netAmount.toFixed(2)}. Settle all balances first, or confirm force removal.`,
+        netBalance: netAmount,
+        canForce: true
       });
     }
 
     group.members = group.members.filter((m) => m.email.toLowerCase().trim() !== cleanTargetEmail);
     await group.save();
 
-    logger.info(`[splits:remove-member] Admin ${requesterEmail} removed member ${cleanTargetEmail} from "${group.name}".`);
+    logger.info(`[splits:remove-member] Admin ${requesterEmail} removed member ${cleanTargetEmail} (${targetMember.name}) from "${group.name}". (force: ${Boolean(force)})`);
+    otel.metrics.counter('vasool_group_member_removals_total', 1, { group: group.name, status: 'success' });
+
     return res.status(200).json({
       success: true,
       message: `Member ${targetMember.name} (${cleanTargetEmail}) has been removed from "${group.name}".`,
