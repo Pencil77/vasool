@@ -57,8 +57,9 @@ async function runTests() {
   console.log('================================================================\n');
 
   await connectToDatabase();
-  await User.deleteMany({});
-  await Group.deleteMany({});
+  // Only remove prior test runs with vasooltest.com domain - never wipe real users
+  await User.deleteMany({ email: { $regex: /@vasooltest\.com$/i } });
+  await Group.deleteMany({ name: { $regex: /test/i } });
 
   server = http.createServer(app);
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -290,14 +291,12 @@ async function runTests() {
     console.log('  ✓ User account successfully deleted by Super Admin.\n');
 
     // -------------------------------------------------------------------------
-    // CLEANUP: Reset Database to 0 users for Zoro fresh registration
+    // CLEANUP: Clean up test accounts ONLY (never delete real users or groups)
     // -------------------------------------------------------------------------
-    console.log('▶ Resetting database so Zoro can register fresh with mdzubair7592@gmail.com...');
-    await User.deleteMany({});
-    await Group.deleteMany({});
-    const finalUserCount = await User.countDocuments();
-    assert.strictEqual(finalUserCount, 0);
-    console.log('  ✓ Database clean: 0 users, 0 groups.\n');
+    console.log('▶ Cleaning up temporary test accounts from database...');
+    await User.deleteMany({ email: { $regex: /@vasooltest\.com$/i } });
+    await Group.deleteMany({ name: { $regex: /test/i } });
+    console.log('  ✓ Temporary test accounts removed safely.\n');
 
     console.log('================================================================');
     console.log('  ✅ ALL TESTS PASSED! SUPER ADMIN CONTROLS FULLY VERIFIED');

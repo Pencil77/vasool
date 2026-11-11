@@ -243,13 +243,11 @@ async function runTestSuite() {
     console.log('  ✓ Hardcoded Super Admin role and isSuperAdmin verified in MongoDB & JWT token.\n');
 
     // -------------------------------------------------------------------------
-    // CLEANUP (Leave DB with 0 users for Zoro fresh registration)
+    // CLEANUP (Safely clean up test accounts without touching real users)
     // -------------------------------------------------------------------------
-    console.log('▶ Cleaning up test accounts from database so Zoro can register fresh...');
-    await User.deleteMany({});
-    const finalCount = await User.countDocuments();
-    assert.strictEqual(finalCount, 0, 'Database must be empty for fresh registration');
-    console.log(`  ✓ All test users deleted. Database user count: ${finalCount}\n`);
+    console.log('▶ Cleaning up temporary test accounts from database...');
+    await User.deleteMany({ email: { $regex: /@vasooltest\.com$/i } });
+    console.log(`  ✓ All test users deleted safely.\n`);
 
     console.log('================================================================');
     console.log('  ✅ ALL TESTS PASSED! EMAIL & OTP AUTH SYSTEM VERIFIED 100%');
