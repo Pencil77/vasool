@@ -23,42 +23,65 @@
       --sab: env(safe-area-inset-bottom, 0px);
     }
     body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      background-color: #060b16;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: #050814;
       background-image:
-        radial-gradient(at 12% 8%, rgba(16, 185, 129, 0.11) 0px, transparent 45%),
-        radial-gradient(at 88% 12%, rgba(20, 184, 166, 0.09) 0px, transparent 45%),
-        radial-gradient(at 50% 95%, rgba(6, 182, 212, 0.06) 0px, transparent 50%);
+        radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.13) 0px, transparent 48%),
+        radial-gradient(at 100% 0%, rgba(20, 184, 166, 0.11) 0px, transparent 48%),
+        radial-gradient(at 50% 45%, rgba(99, 102, 241, 0.05) 0px, transparent 60%),
+        radial-gradient(at 50% 100%, rgba(6, 182, 212, 0.08) 0px, transparent 50%);
+      background-attachment: fixed;
       color: #f1f5f9;
       overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
     }
     .font-mono-code {
       font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
     }
     .glass-panel {
-      background: linear-gradient(145deg, rgba(15, 23, 42, 0.88), rgba(9, 14, 28, 0.92));
-      backdrop-filter: blur(16px);
-      border: 1px solid rgba(51, 65, 85, 0.65);
-      box-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.65);
+      background: linear-gradient(135deg, rgba(15, 23, 42, 0.80) 0%, rgba(8, 14, 28, 0.90) 100%);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 16px 36px -12px rgba(0, 0, 0, 0.75), inset 0 1px 1px 0 rgba(255, 255, 255, 0.09), inset 0 0 0 1px rgba(255, 255, 255, 0.02);
     }
     .glass-card-hover {
-      transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+      transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.22s ease, box-shadow 0.22s ease;
     }
     .glass-card-hover:hover {
-      transform: translateY(-2px);
-      border-color: rgba(16, 185, 129, 0.45);
-      box-shadow: 0 16px 36px -12px rgba(16, 185, 129, 0.14);
+      transform: translateY(-3px);
+      border-color: rgba(52, 211, 153, 0.40);
+      box-shadow: 0 20px 42px -12px rgba(16, 185, 129, 0.18), inset 0 1px 1px 0 rgba(255, 255, 255, 0.16);
+    }
+    .glow-emerald {
+      box-shadow: 0 0 24px -4px rgba(16, 185, 129, 0.35);
+    }
+    .glow-amber {
+      box-shadow: 0 0 24px -4px rgba(245, 158, 11, 0.35);
+    }
+    .glow-teal {
+      box-shadow: 0 0 24px -4px rgba(20, 184, 166, 0.35);
+    }
+    .glow-cyan {
+      box-shadow: 0 0 24px -4px rgba(6, 182, 212, 0.35);
     }
     .custom-scroll::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
+      width: 5px;
+      height: 5px;
     }
     .custom-scroll::-webkit-scrollbar-track {
-      background: rgba(15, 23, 42, 0.4);
+      background: rgba(15, 23, 42, 0.5);
+      border-radius: 9999px;
     }
     .custom-scroll::-webkit-scrollbar-thumb {
-      background: rgba(71, 85, 105, 0.7);
+      background: rgba(71, 85, 105, 0.65);
       border-radius: 9999px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .custom-scroll::-webkit-scrollbar-thumb:hover {
+      background: rgba(52, 211, 153, 0.6);
     }
     .no-scrollbar::-webkit-scrollbar {
       display: none;
@@ -71,6 +94,14 @@
       touch-action: manipulation;
       -webkit-tap-highlight-color: transparent;
     }
+    button:active:not(:disabled) {
+      transform: scale(0.98);
+      transition: transform 0.1s ease;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.25);
+    }
   </style>
 </head>
 <body class="min-h-screen bg-slate-950 text-slate-100 antialiased selection:bg-emerald-500 selection:text-slate-950">
@@ -79,18 +110,18 @@
   <div id="toastContainer" data-testid="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
 
   <!-- Top Global Header -->
-  <header class="sticky top-0 z-30 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md">
+  <header class="sticky top-0 z-30 border-b border-slate-800/70 bg-slate-950/85 backdrop-blur-xl shadow-lg shadow-black/20">
     <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-3">
       <!-- Brand Logo -->
       <div class="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-        <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-emerald-400 via-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/25 ring-1 ring-emerald-300/30 flex-shrink-0">
-          <svg class="w-5 h-5 sm:w-6 sm:h-6 text-slate-950" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+        <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-br from-emerald-400 via-teal-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/25 ring-1 ring-emerald-300/40 flex-shrink-0">
+          <svg class="w-5 h-5 sm:w-6 sm:h-6 text-slate-950" fill="none" stroke="currentColor" stroke-width="2.3" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         </div>
         <div class="flex items-center gap-1.5 sm:gap-2">
-          <span data-testid="brand-title" class="font-extrabold text-base sm:text-lg tracking-tight text-white whitespace-nowrap">Vasool</span>
-          <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">v2.7</span>
+          <span data-testid="brand-title" class="font-extrabold text-base sm:text-lg tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-300 bg-clip-text text-transparent whitespace-nowrap">Vasool</span>
+          <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 shadow-sm shadow-emerald-500/10">v2.7</span>
           <span id="dbStatusBadge" data-testid="db-status-badge" class="hidden">
             v2.7 Production · Group Details &amp; Exit Workflow
           </span>
@@ -101,7 +132,7 @@
       <!-- Right Controls -->
       <div class="flex items-center gap-1.5 sm:gap-2.5 flex-shrink-0">
         <!-- Currency Selector -->
-        <select id="currencySelector" data-testid="currency-selector" onchange="handleCurrencyChange(this.value)" aria-label="Select Currency" class="px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold bg-slate-900 text-slate-200 border border-slate-700 focus:outline-none focus:border-emerald-500 cursor-pointer">
+        <select id="currencySelector" data-testid="currency-selector" onchange="handleCurrencyChange(this.value)" aria-label="Select Currency" class="px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-semibold bg-slate-900/90 text-slate-200 border border-slate-700/80 hover:border-slate-600 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 cursor-pointer shadow-sm transition">
           <option value="INR">₹ INR</option>
           <option value="USD">$ USD</option>
           <option value="EUR">€ EUR</option>
@@ -124,7 +155,7 @@
             <span>👑</span>
             <span class="hidden md:inline">Admin Console</span>
           </button>
-          <div id="headerUserAvatar" onclick="openAccountSettingsModal()" title="Account Settings & Profile" data-testid="header-user-avatar" class="cursor-pointer w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-emerald-500/30 to-teal-500/30 border border-emerald-400/40 flex items-center justify-center text-[11px] sm:text-xs font-bold text-emerald-300 flex-shrink-0 hover:border-emerald-400 transition">
+          <div id="headerUserAvatar" onclick="openAccountSettingsModal()" title="Account Settings & Profile" data-testid="header-user-avatar" class="cursor-pointer w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-emerald-500/30 to-teal-500/30 border border-emerald-400/50 flex items-center justify-center text-[11px] sm:text-xs font-bold text-emerald-300 flex-shrink-0 hover:border-emerald-300 hover:shadow-md hover:shadow-emerald-500/20 transition">
             --
           </div>
           <div onclick="openAccountSettingsModal()" title="Account Settings & Profile" class="hidden lg:block text-left cursor-pointer hover:opacity-90 transition">
@@ -307,8 +338,10 @@
   <main id="appWorkspaceSection" data-testid="app-workspace-section" class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-5 sm:space-y-6 pb-24 md:pb-8">
 
     <!-- Top Action & Summary Banner -->
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 bg-gradient-to-r from-slate-900/95 via-slate-900/90 to-emerald-950/50 p-4 sm:p-6 rounded-2xl border border-slate-800 shadow-xl">
-      <div>
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 bg-gradient-to-r from-slate-900/95 via-slate-900/90 to-teal-950/40 p-4 sm:p-6 rounded-3xl border border-slate-800/80 shadow-2xl relative overflow-hidden">
+      <div class="absolute -top-12 -right-12 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+      <div class="absolute -bottom-8 -left-8 w-36 h-36 bg-teal-500/10 rounded-full blur-2xl pointer-events-none"></div>
+      <div class="relative z-10">
         <div class="flex flex-wrap items-center gap-2">
           <h2 class="text-lg sm:text-2xl font-extrabold text-white tracking-tight">Welcome back, <span id="welcomeUserName" data-testid="welcome-user-name" class="text-emerald-400">Friend</span></h2>
           <span id="activeGroupPill" data-testid="active-group-pill" class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
@@ -319,23 +352,23 @@
           Track shared group bills, split expenses (equal, exact, %, or shares), and easily settle balances with one tap.
         </p>
       </div>
-      <div class="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 sm:gap-2.5">
-        <button data-testid="btn-open-add-expense" onclick="openAddExpenseModal()" class="col-span-1 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 hover:from-emerald-300 hover:to-teal-400 text-slate-950 font-bold text-xs sm:text-sm shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-1.5 sm:gap-2 transition">
+      <div class="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 sm:gap-2.5 relative z-10">
+        <button data-testid="btn-open-add-expense" onclick="openAddExpenseModal()" class="col-span-1 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-emerald-400 via-emerald-500 to-teal-500 hover:from-emerald-300 hover:to-teal-400 text-slate-950 font-bold text-xs sm:text-sm shadow-lg shadow-emerald-500/25 ring-1 ring-emerald-300/30 flex items-center justify-center gap-1.5 sm:gap-2 transition">
           <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
           </svg>
           <span class="truncate">Add Expense</span>
         </button>
-        <button data-testid="btn-open-new-group" onclick="openModal('newGroupModal')" class="col-span-1 px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-100 font-semibold text-xs sm:text-sm border border-slate-700 flex items-center justify-center gap-1.5 transition">
+        <button data-testid="btn-open-new-group" onclick="openModal('newGroupModal')" class="col-span-1 px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-100 font-semibold text-xs sm:text-sm border border-slate-700/80 hover:border-slate-600 flex items-center justify-center gap-1.5 shadow-sm transition">
           <svg class="w-4 h-4 text-emerald-400 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
           </svg>
           <span class="truncate">New Group</span>
         </button>
-        <button data-testid="btn-quick-settle-up" onclick="switchMainTab('settle')" class="col-span-1 px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl bg-teal-500/15 hover:bg-teal-500/25 text-teal-300 font-semibold text-xs sm:text-sm border border-teal-500/30 text-center justify-center transition truncate">
+        <button data-testid="btn-quick-settle-up" onclick="switchMainTab('settle')" class="col-span-1 px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl bg-teal-500/15 hover:bg-teal-500/25 text-teal-300 font-semibold text-xs sm:text-sm border border-teal-500/30 text-center justify-center shadow-sm shadow-teal-500/10 transition truncate">
           Settle Up
         </button>
-        <button data-testid="btn-quick-view-bills" onclick="switchMainTab('expenses')" class="col-span-1 px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 font-semibold text-xs sm:text-sm border border-cyan-500/30 flex items-center justify-center gap-1.5 transition">
+        <button data-testid="btn-quick-view-bills" onclick="switchMainTab('expenses')" class="col-span-1 px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 font-semibold text-xs sm:text-sm border border-cyan-500/30 flex items-center justify-center gap-1.5 shadow-sm shadow-cyan-500/10 transition">
           <svg class="w-4 h-4 text-cyan-400 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
           </svg>
@@ -345,9 +378,9 @@
     </div>
 
     <!-- Settle Up Feature: "Who Should Pay Next?" Banner -->
-    <div id="whoPaysNextBanner" data-testid="who-pays-next-banner" class="hidden p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-amber-500/10 to-yellow-500/15 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg shadow-amber-500/5">
+    <div id="whoPaysNextBanner" data-testid="who-pays-next-banner" class="hidden p-3.5 sm:p-4 rounded-3xl bg-gradient-to-r from-amber-500/15 via-amber-500/10 to-yellow-500/15 border border-amber-500/35 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xl shadow-amber-500/5 relative overflow-hidden">
       <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-300 flex items-center justify-center font-bold text-lg flex-shrink-0 border border-amber-500/30">
+        <div class="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-300 flex items-center justify-center font-bold text-lg flex-shrink-0 border border-amber-500/35 shadow-sm shadow-amber-500/20">
           👑
         </div>
         <div>
@@ -360,7 +393,7 @@
           </p>
         </div>
       </div>
-      <button id="btnPayNextBill" onclick="openExpenseWithSuggestedPayer()" class="px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs sm:text-sm whitespace-nowrap shadow-md shadow-amber-500/20 transition flex items-center justify-center gap-1.5 flex-shrink-0">
+      <button id="btnPayNextBill" onclick="openExpenseWithSuggestedPayer()" class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-400 hover:from-amber-300 hover:to-yellow-300 text-slate-950 font-bold text-xs sm:text-sm whitespace-nowrap shadow-md shadow-amber-500/25 transition flex items-center justify-center gap-1.5 flex-shrink-0">
         <span>Add Bill for <span id="whoPaysNextBtnName">Member</span></span>
         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
       </button>
@@ -368,55 +401,85 @@
 
     <!-- 4 KPI Cards: 2x2 on Mobile, 4-col on Large Screens -->
     <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
-      <div class="glass-panel glass-card-hover rounded-2xl p-3.5 sm:p-5">
+      <div class="glass-panel glass-card-hover rounded-3xl p-3.5 sm:p-5 relative overflow-hidden">
+        <div class="h-1 bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-500 rounded-t-3xl -mt-3.5 sm:-mt-5 -mx-3.5 sm:-mx-5 mb-3 sm:mb-4"></div>
         <div class="flex items-center justify-between text-[11px] sm:text-xs text-slate-400 mb-1">
-          <span>Your Net Balance</span>
-          <span class="px-1.5 sm:px-2 py-0.5 rounded bg-slate-800 text-slate-300 text-[9px] sm:text-[10px] font-semibold">NET</span>
+          <span class="font-medium">Your Net Balance</span>
+          <span class="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider">NET</span>
         </div>
-        <div id="kpiNetBalance" data-testid="kpi-net-balance" class="text-lg sm:text-2xl font-extrabold text-emerald-400 truncate">+₹0.00</div>
+        <div id="kpiNetBalance" data-testid="kpi-net-balance" class="text-xl sm:text-2xl font-black text-emerald-400 tracking-tight truncate">+₹0.00</div>
         <p id="kpiNetSubtext" class="text-[11px] sm:text-xs text-slate-400 mt-0.5 sm:mt-1 truncate">Across active groups</p>
       </div>
 
-      <div class="glass-panel glass-card-hover rounded-2xl p-3.5 sm:p-5">
+      <div class="glass-panel glass-card-hover rounded-3xl p-3.5 sm:p-5 relative overflow-hidden">
+        <div class="h-1 bg-gradient-to-r from-teal-400 via-emerald-400 to-cyan-400 rounded-t-3xl -mt-3.5 sm:-mt-5 -mx-3.5 sm:-mx-5 mb-3 sm:mb-4"></div>
         <div class="flex items-center justify-between text-[11px] sm:text-xs text-slate-400 mb-1">
-          <span>You Are Owed</span>
-          <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+          <span class="font-medium">You Are Owed</span>
+          <span class="w-2 h-2 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50"></span>
         </div>
-        <div id="kpiYouAreOwed" data-testid="kpi-you-are-owed" class="text-lg sm:text-2xl font-extrabold text-emerald-400 truncate">₹0.00</div>
+        <div id="kpiYouAreOwed" data-testid="kpi-you-are-owed" class="text-xl sm:text-2xl font-black text-emerald-400 tracking-tight truncate">₹0.00</div>
         <p id="kpiOwedByCount" class="text-[11px] sm:text-xs text-slate-400 mt-0.5 sm:mt-1 truncate">Incoming receivables</p>
       </div>
 
-      <div class="glass-panel glass-card-hover rounded-2xl p-3.5 sm:p-5">
+      <div class="glass-panel glass-card-hover rounded-3xl p-3.5 sm:p-5 relative overflow-hidden">
+        <div class="h-1 bg-gradient-to-r from-rose-500 via-pink-500 to-amber-500 rounded-t-3xl -mt-3.5 sm:-mt-5 -mx-3.5 sm:-mx-5 mb-3 sm:mb-4"></div>
         <div class="flex items-center justify-between text-[11px] sm:text-xs text-slate-400 mb-1">
-          <span>You Owe</span>
-          <span class="w-2 h-2 rounded-full bg-rose-400"></span>
+          <span class="font-medium">You Owe</span>
+          <span class="w-2 h-2 rounded-full bg-rose-400 shadow-sm shadow-rose-400/50"></span>
         </div>
-        <div id="kpiYouOwe" data-testid="kpi-you-owe" class="text-lg sm:text-2xl font-extrabold text-rose-400 truncate">₹0.00</div>
+        <div id="kpiYouOwe" data-testid="kpi-you-owe" class="text-xl sm:text-2xl font-black text-rose-400 tracking-tight truncate">₹0.00</div>
         <p id="kpiOweToCount" class="text-[11px] sm:text-xs text-slate-400 mt-0.5 sm:mt-1 truncate">Pending splits</p>
       </div>
 
-      <div class="glass-panel glass-card-hover rounded-2xl p-3.5 sm:p-5">
+      <div class="glass-panel glass-card-hover rounded-3xl p-3.5 sm:p-5 relative overflow-hidden">
+        <div class="h-1 bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-400 rounded-t-3xl -mt-3.5 sm:-mt-5 -mx-3.5 sm:-mx-5 mb-3 sm:mb-4"></div>
         <div class="flex items-center justify-between text-[11px] sm:text-xs text-slate-400 mb-1">
-          <span class="truncate">Group Spend</span>
-          <span id="kpiExpenseCountBadge" data-testid="kpi-expense-count-badge" class="px-1.5 sm:px-2 py-0.5 rounded bg-slate-800 text-emerald-300 text-[9px] sm:text-[10px] font-semibold flex-shrink-0">0 bills</span>
+          <span class="font-medium truncate">Group Spend</span>
+          <span id="kpiExpenseCountBadge" data-testid="kpi-expense-count-badge" class="px-2 py-0.5 rounded-full bg-slate-800 text-cyan-300 border border-cyan-500/30 text-[9px] sm:text-[10px] font-semibold flex-shrink-0">0 bills</span>
         </div>
-        <div id="kpiTotalSpend" data-testid="kpi-total-spend" class="text-lg sm:text-2xl font-extrabold text-white truncate">₹0.00</div>
+        <div id="kpiTotalSpend" data-testid="kpi-total-spend" class="text-xl sm:text-2xl font-black text-white tracking-tight truncate">₹0.00</div>
         <p id="kpiSimplifiedCount" data-testid="kpi-simplified-count" class="text-[11px] sm:text-xs text-slate-400 mt-0.5 sm:mt-1 truncate">0 transfers needed</p>
       </div>
     </div>
 
     <!-- Workspace Navigation Bar & Group Filter -->
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-2.5 sm:gap-3 border-b border-slate-800 pb-3">
-      <div id="desktopNavTabsContainer" class="hidden md:flex overflow-x-auto no-scrollbar items-center gap-1.5 pb-1 sm:pb-0">
-        <button id="navTabDashboard" data-testid="nav-tab-dashboard" onclick="switchMainTab('dashboard')" class="whitespace-nowrap px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-emerald-500 text-slate-950 transition">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-2.5 sm:gap-3 border-b border-slate-800/80 pb-3">
+      <div id="desktopNavTabsContainer" class="hidden md:flex overflow-x-auto no-scrollbar items-center gap-1.5 p-1 bg-slate-900/60 rounded-2xl border border-slate-800/60 backdrop-blur-md">
+        <button id="navTabDashboard" data-testid="nav-tab-dashboard" onclick="switchMainTab('dashboard')" class="whitespace-nowrap px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20 transition flex items-center gap-1.5">
           Overview &amp; Analytics
         </button>
-        <button id="navTabExpenses" data-testid="nav-tab-expenses" onclick="switchMainTab('expenses')" class="whitespace-nowrap px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-slate-300 hover:bg-slate-800 transition">
+        <button id="navTabExpenses" data-testid="nav-tab-expenses" onclick="switchMainTab('expenses')" class="whitespace-nowrap px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-slate-300 hover:bg-slate-800/80 transition flex items-center gap-1.5">
           Expenses &amp; Splits
         </button>
-        <button id="navTabGroups" data-testid="nav-tab-groups" onclick="switchMainTab('groups')" class="whitespace-nowrap px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-slate-300 hover:bg-slate-800 transition">
+        <button id="navTabGroups" data-testid="nav-tab-groups" onclick="switchMainTab('groups')" class="whitespace-nowrap px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-slate-300 hover:bg-slate-800/80 transition flex items-center gap-1.5">
           Groups &amp; Friends
         </button>
+        <button id="navTabSettle" data-testid="nav-tab-settle" onclick="switchMainTab('settle')" class="whitespace-nowrap px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-slate-300 hover:bg-slate-800/80 transition flex items-center gap-1.5">
+          Smart Settle-Up
+        </button>
+        <button id="navTabTests" data-testid="nav-tab-tests" onclick="switchMainTab('tests')" class="hidden">
+          <span>QA &amp; Pipelines</span>
+          <span id="navTabTestsBadge" class="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">24/24</span>
+        </button>
+        <button id="navTabAdmin" data-testid="nav-tab-admin" onclick="switchMainTab('admin')" class="hidden whitespace-nowrap px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition items-center gap-1.5 border border-amber-500/40 text-amber-300 hover:bg-amber-500/20">
+          <span>👑</span>
+          <span>Super Admin</span>
+        </button>
+      </div>
+
+      <!-- Group Filter Select -->
+      <div class="flex items-center justify-between gap-2 pt-1 sm:pt-0 w-full md:w-auto">
+        <label for="groupFilterSelect" class="text-xs text-slate-400 whitespace-nowrap font-medium flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" />
+          </svg>
+          Filter Group:
+        </label>
+        <select id="groupFilterSelect" data-testid="group-filter-select" onchange="handleGroupFilterChange(this.value)" class="flex-1 md:flex-none px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700/80 text-xs sm:text-sm text-white focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 shadow-sm transition">
+          <option value="ALL">All Groups</option>
+        </select>
+      </div>
+    </div>
         <button id="navTabSettle" data-testid="nav-tab-settle" onclick="switchMainTab('settle')" class="whitespace-nowrap px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-slate-300 hover:bg-slate-800 transition">
           Smart Settle-Up
         </button>
@@ -860,7 +923,7 @@
   <!-- ===================================================================== -->
 
   <!-- Mobile Floating Action Button (FAB) for Instant Bill/Expense Entry -->
-  <button id="mobileFabAddExpense" data-testid="mobile-fab-add-expense" onclick="openAddExpenseModal()" aria-label="Add Expense" class="md:hidden fixed bottom-20 right-4 z-40 flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 via-emerald-400 to-teal-500 text-slate-950 font-bold px-4 py-3 rounded-full shadow-2xl shadow-emerald-500/40 hover:scale-105 active:scale-95 transition-all">
+  <button id="mobileFabAddExpense" data-testid="mobile-fab-add-expense" onclick="openAddExpenseModal()" aria-label="Add Expense" class="md:hidden fixed bottom-20 right-4 z-40 flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-400 via-emerald-500 to-teal-500 text-slate-950 font-bold px-4 py-3 rounded-full shadow-2xl shadow-emerald-500/40 ring-1 ring-emerald-300/40 hover:scale-105 active:scale-95 transition-all">
     <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2.6" viewBox="0 0 24 24">
       <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
     </svg>
@@ -868,37 +931,37 @@
   </button>
 
   <!-- Mobile Fixed Bottom Navigation Bar (Android Thumb-Friendly Viewport) -->
-  <nav id="mobileBottomNav" data-testid="mobile-bottom-nav" class="md:hidden fixed bottom-0 inset-x-0 bg-slate-950/95 border-t border-slate-800/90 z-40 backdrop-blur-xl pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-1 px-1">
-    <div id="mobileBottomNavGrid" class="grid grid-cols-4 items-center justify-around">
-      <button id="mobileNavDashboard" data-testid="mobile-nav-dashboard" onclick="switchMainTab('dashboard')" class="flex flex-col items-center justify-center py-1 px-1 text-emerald-400 font-bold transition-colors">
-        <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+  <nav id="mobileBottomNav" data-testid="mobile-bottom-nav" class="md:hidden fixed bottom-0 inset-x-0 bg-slate-950/85 border-t border-slate-800/80 z-40 backdrop-blur-2xl shadow-2xl pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-1.5 px-2">
+    <div id="mobileBottomNavGrid" class="grid grid-cols-4 items-center justify-around gap-1">
+      <button id="mobileNavDashboard" data-testid="mobile-nav-dashboard" onclick="switchMainTab('dashboard')" class="flex flex-col items-center justify-center py-1.5 px-1 text-emerald-400 font-bold transition-all">
+        <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
         </svg>
         <span class="text-[10px] tracking-tight">Home</span>
       </button>
 
-      <button id="mobileNavExpenses" data-testid="mobile-nav-expenses" onclick="switchMainTab('expenses')" class="flex flex-col items-center justify-center py-1 px-1 text-slate-400 hover:text-slate-200 transition-colors">
+      <button id="mobileNavExpenses" data-testid="mobile-nav-expenses" onclick="switchMainTab('expenses')" class="flex flex-col items-center justify-center py-1.5 px-1 text-slate-400 hover:text-slate-200 transition-all">
         <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" />
         </svg>
         <span class="text-[10px] tracking-tight">Bills</span>
       </button>
 
-      <button id="mobileNavGroups" data-testid="mobile-nav-groups" onclick="switchMainTab('groups')" class="flex flex-col items-center justify-center py-1 px-1 text-slate-400 hover:text-slate-200 transition-colors">
+      <button id="mobileNavGroups" data-testid="mobile-nav-groups" onclick="switchMainTab('groups')" class="flex flex-col items-center justify-center py-1.5 px-1 text-slate-400 hover:text-slate-200 transition-all">
         <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
         </svg>
         <span class="text-[10px] tracking-tight">Groups</span>
       </button>
 
-      <button id="mobileNavSettle" data-testid="mobile-nav-settle" onclick="switchMainTab('settle')" class="flex flex-col items-center justify-center py-1 px-1 text-slate-400 hover:text-slate-200 transition-colors">
+      <button id="mobileNavSettle" data-testid="mobile-nav-settle" onclick="switchMainTab('settle')" class="flex flex-col items-center justify-center py-1.5 px-1 text-slate-400 hover:text-slate-200 transition-all">
         <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
         </svg>
         <span class="text-[10px] tracking-tight">Settle</span>
       </button>
 
-      <button id="mobileNavAdmin" data-testid="mobile-nav-admin" onclick="switchMainTab('admin')" class="hidden flex-col items-center justify-center py-1 px-1 text-amber-400/70 hover:text-amber-300 transition-colors">
+      <button id="mobileNavAdmin" data-testid="mobile-nav-admin" onclick="switchMainTab('admin')" class="hidden flex-col items-center justify-center py-1.5 px-1 text-amber-400/70 hover:text-amber-300 transition-all">
         <span class="text-base mb-0.5 leading-none">👑</span>
         <span class="text-[10px] tracking-tight">Admin</span>
       </button>
@@ -1256,41 +1319,41 @@
       <!-- Scrollable Body -->
       <div class="overflow-y-auto flex-1 pr-1 py-3 space-y-4">
         <!-- Summary Cards Grid -->
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          <div class="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800/80 shadow-sm">
             <span class="text-[10px] uppercase tracking-wider text-slate-400 font-bold block">Total Spend</span>
-            <span id="groupDetailsTotalSpend" class="text-sm font-bold text-white mt-0.5 block">₹0.00</span>
+            <span id="groupDetailsTotalSpend" class="text-sm sm:text-base font-extrabold text-white mt-0.5 block truncate">₹0.00</span>
           </div>
-          <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+          <div class="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800/80 shadow-sm">
             <span class="text-[10px] uppercase tracking-wider text-slate-400 font-bold block">Your Balance</span>
-            <span id="groupDetailsMyBalance" class="text-sm font-bold text-emerald-400 mt-0.5 block">₹0.00</span>
+            <span id="groupDetailsMyBalance" class="text-sm sm:text-base font-extrabold text-emerald-400 mt-0.5 block truncate">₹0.00</span>
           </div>
-          <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+          <div class="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800/80 shadow-sm">
             <span class="text-[10px] uppercase tracking-wider text-slate-400 font-bold block">Members</span>
-            <span id="groupDetailsMemberCount" class="text-sm font-bold text-white mt-0.5 block">0</span>
+            <span id="groupDetailsMemberCount" class="text-sm sm:text-base font-extrabold text-white mt-0.5 block truncate">0</span>
           </div>
-          <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+          <div class="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800/80 shadow-sm">
             <span class="text-[10px] uppercase tracking-wider text-slate-400 font-bold block">Total Bills</span>
-            <span id="groupDetailsBillCount" class="text-sm font-bold text-white mt-0.5 block">0</span>
+            <span id="groupDetailsBillCount" class="text-sm sm:text-base font-extrabold text-white mt-0.5 block truncate">0</span>
           </div>
         </div>
 
         <!-- Mode Tags -->
         <div class="flex items-center gap-1.5 flex-wrap text-[10px]">
-          <span id="groupDetailsHubBadge" class="px-2 py-0.5 rounded-lg border bg-slate-800 text-slate-300 border-slate-700">👑 Direct P2P</span>
-          <span id="groupDetailsMinimizeBadge" class="px-2 py-0.5 rounded-lg border bg-slate-800 text-slate-300 border-slate-700">⚡ Minimized Debts</span>
-          <span id="groupDetailsVisibilityBadge" class="px-2 py-0.5 rounded-lg border bg-slate-800 text-slate-300 border-slate-700">🔒 Personal Only</span>
+          <span id="groupDetailsHubBadge" class="px-2.5 py-0.5 rounded-full border bg-slate-800/80 text-slate-300 border-slate-700/80 font-medium">👑 Direct P2P</span>
+          <span id="groupDetailsMinimizeBadge" class="px-2.5 py-0.5 rounded-full border bg-slate-800/80 text-slate-300 border-slate-700/80 font-medium">⚡ Minimized Debts</span>
+          <span id="groupDetailsVisibilityBadge" class="px-2.5 py-0.5 rounded-full border bg-slate-800/80 text-slate-300 border-slate-700/80 font-medium">🔒 Personal Only</span>
         </div>
 
         <!-- Section Navigation Tabs -->
-        <div class="flex items-center gap-1 p-1 bg-slate-900/90 rounded-xl border border-slate-800">
-          <button id="btnGroupTabMembers" onclick="switchGroupDetailsTab('members')" class="flex-1 py-1.5 text-xs font-bold rounded-lg bg-emerald-500/20 text-emerald-300 transition">
+        <div class="flex items-center gap-1 p-1 bg-slate-900/90 rounded-2xl border border-slate-800 shadow-inner">
+          <button id="btnGroupTabMembers" onclick="switchGroupDetailsTab('members')" class="flex-1 py-1.5 text-xs font-bold rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-sm shadow-emerald-500/10 transition">
             👥 Members (<span id="tabCountMembers">0</span>)
           </button>
-          <button id="btnGroupTabBills" onclick="switchGroupDetailsTab('bills')" class="flex-1 py-1.5 text-xs font-semibold rounded-lg text-slate-400 hover:text-slate-200 transition">
+          <button id="btnGroupTabBills" onclick="switchGroupDetailsTab('bills')" class="flex-1 py-1.5 text-xs font-semibold rounded-xl text-slate-400 hover:text-slate-200 transition">
             🧾 Bills &amp; Splits (<span id="tabCountBills">0</span>)
           </button>
-          <button id="btnGroupTabSettle" onclick="switchGroupDetailsTab('settle')" class="flex-1 py-1.5 text-xs font-semibold rounded-lg text-slate-400 hover:text-slate-200 transition">
+          <button id="btnGroupTabSettle" onclick="switchGroupDetailsTab('settle')" class="flex-1 py-1.5 text-xs font-semibold rounded-xl text-slate-400 hover:text-slate-200 transition">
             🤝 Settle Up (<span id="tabCountSettle">0</span>)
           </button>
         </div>
@@ -4497,9 +4560,9 @@ exec node server.js`
               btn.className = 'whitespace-nowrap px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold border border-amber-500/40 text-amber-300 hover:bg-amber-500/20 transition flex items-center gap-1.5';
             }
           } else if (t === tab) {
-            btn.className = 'whitespace-nowrap px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-emerald-500 text-slate-950 transition flex items-center gap-1.5';
+            btn.className = 'whitespace-nowrap px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20 transition flex items-center gap-1.5';
           } else {
-            btn.className = 'whitespace-nowrap px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-slate-300 hover:bg-slate-800 transition flex items-center gap-1.5';
+            btn.className = 'whitespace-nowrap px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-slate-300 hover:bg-slate-800/80 transition flex items-center gap-1.5';
           }
         }
         if (mobileBtn) {
@@ -4509,14 +4572,14 @@ exec node server.js`
             if (!isSuper) {
               mobileBtn.className = 'hidden';
             } else if (tab === 'admin') {
-              mobileBtn.className = 'flex flex-col items-center justify-center py-1 px-1 text-amber-400 font-bold transition-colors';
+              mobileBtn.className = 'flex flex-col items-center justify-center py-1.5 px-1 text-amber-400 font-bold transition-all';
             } else {
-              mobileBtn.className = 'flex flex-col items-center justify-center py-1 px-1 text-amber-400/60 hover:text-amber-300 transition-colors';
+              mobileBtn.className = 'flex flex-col items-center justify-center py-1.5 px-1 text-amber-400/60 hover:text-amber-300 transition-all';
             }
           } else if (t === tab) {
-            mobileBtn.className = 'flex flex-col items-center justify-center py-1 px-1 text-emerald-400 font-bold transition-colors';
+            mobileBtn.className = 'flex flex-col items-center justify-center py-1.5 px-1 text-emerald-400 font-bold transition-all';
           } else {
-            mobileBtn.className = 'flex flex-col items-center justify-center py-1 px-1 text-slate-400 hover:text-slate-200 transition-colors';
+            mobileBtn.className = 'flex flex-col items-center justify-center py-1.5 px-1 text-slate-400 hover:text-slate-200 transition-all';
           }
         }
       });
@@ -4989,7 +5052,7 @@ exec node server.js`
               const canTransfer = isCurrentUserAdmin && !isAdmin && !isPending;
 
               return `
-                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg ${isAdmin ? 'bg-amber-500/15 border-amber-500/40 text-amber-200' : isPending ? 'bg-amber-500/10 border-amber-500/30 text-amber-200' : 'bg-slate-900 border-slate-800 text-slate-200'} border text-xs">
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl ${isAdmin ? 'bg-amber-500/15 border-amber-500/40 text-amber-200' : isPending ? 'bg-amber-500/10 border-amber-500/30 text-amber-200' : 'bg-slate-900/90 border-slate-800 text-slate-200'} border text-xs shadow-sm">
                   <span class="w-4 h-4 rounded-full ${isAdmin ? 'bg-amber-400 text-slate-950 font-bold' : isPending ? 'bg-amber-500/30 text-amber-300 font-bold' : 'bg-emerald-500/20 text-emerald-300 font-bold'} text-[9px] flex items-center justify-center">
                     ${isAdmin ? '👑' : isPending ? '⏳' : escapeHtml(ini)}
                   </span>
@@ -5008,11 +5071,11 @@ exec node server.js`
             .join('');
 
           return `
-            <div data-testid="group-card-${escapeHtml(g.id)}" class="glass-panel glass-card-hover rounded-2xl p-5 flex flex-col justify-between space-y-4">
+            <div data-testid="group-card-${escapeHtml(g.id)}" class="glass-panel glass-card-hover rounded-3xl p-5 flex flex-col justify-between space-y-4 border border-slate-800/80 shadow-xl">
               <div>
                 <div class="flex items-center justify-between gap-2 flex-wrap">
                   <div class="flex items-center gap-1.5 flex-wrap">
-                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-teal-500/15 text-teal-300 border border-teal-500/30">${escapeHtml(g.category)}</span>
+                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/15 text-teal-300 border border-teal-500/30 shadow-sm shadow-teal-500/10">${escapeHtml(g.category)}</span>
                     <button onclick="copyTextToClipboard('${escapeHtml(g.inviteCode)}', 'Invite code ${escapeHtml(g.inviteCode)} copied!')" class="text-[11px] font-mono-code text-slate-400 hover:text-emerald-300">
                       Code: ${escapeHtml(g.inviteCode)} 📋
                     </button>
@@ -5070,15 +5133,15 @@ exec node server.js`
               </div>
 
               <div class="flex items-center gap-2 pt-3 border-t border-slate-800/80">
-                <button data-testid="btn-group-details-${escapeHtml(g.id)}" onclick="openGroupDetailsModal('${escapeHtml(g.id)}')" class="flex-1 py-2 rounded-xl bg-teal-500/15 hover:bg-teal-500/25 text-xs font-semibold text-teal-300 border border-teal-500/30 transition flex items-center justify-center gap-1">
+                <button data-testid="btn-group-details-${escapeHtml(g.id)}" onclick="openGroupDetailsModal('${escapeHtml(g.id)}')" class="flex-1 py-2 rounded-xl bg-teal-500/15 hover:bg-teal-500/25 text-xs font-bold text-teal-300 border border-teal-500/30 shadow-sm shadow-teal-500/10 transition flex items-center justify-center gap-1.5">
                   📋 Details &amp; Bills
                 </button>
                 ${canAddMember ? `
-                  <button data-testid="btn-add-member-${escapeHtml(g.id)}" onclick="openAddMemberModal('${escapeHtml(g.id)}')" class="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 transition">
+                  <button data-testid="btn-add-member-${escapeHtml(g.id)}" onclick="openAddMemberModal('${escapeHtml(g.id)}')" class="py-2 px-3 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-xs font-semibold text-slate-200 border border-slate-700/60 shadow-sm transition">
                     + Member
                   </button>
                 ` : ''}
-                <button data-testid="btn-view-bills-${escapeHtml(g.id)}" onclick="selectGroupAndOpenExpenses('${escapeHtml(g.id)}')" class="py-2 px-3 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-xs font-semibold text-slate-300 border border-slate-700/60 transition">
+                <button data-testid="btn-view-bills-${escapeHtml(g.id)}" onclick="selectGroupAndOpenExpenses('${escapeHtml(g.id)}')" class="py-2 px-3 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-xs font-semibold text-slate-300 border border-slate-700/60 shadow-sm transition">
                   Bills Tab
                 </button>
               </div>
@@ -5655,12 +5718,12 @@ exec node server.js`
         if (t === tab) {
           if (sec) sec.classList.remove('hidden');
           if (btn) {
-            btn.className = 'flex-1 py-1.5 text-xs font-bold rounded-lg bg-emerald-500/20 text-emerald-300 transition';
+            btn.className = 'flex-1 py-1.5 text-xs font-bold rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-sm shadow-emerald-500/10 transition';
           }
         } else {
           if (sec) sec.classList.add('hidden');
           if (btn) {
-            btn.className = 'flex-1 py-1.5 text-xs font-semibold rounded-lg text-slate-400 hover:text-slate-200 transition';
+            btn.className = 'flex-1 py-1.5 text-xs font-semibold rounded-xl text-slate-400 hover:text-slate-200 transition';
           }
         }
       });
