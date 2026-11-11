@@ -90,9 +90,9 @@
         </div>
         <div class="flex items-center gap-1.5 sm:gap-2">
           <span data-testid="brand-title" class="font-extrabold text-base sm:text-lg tracking-tight text-white whitespace-nowrap">Vasool</span>
-          <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">v2.6</span>
+          <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">v2.7</span>
           <span id="dbStatusBadge" data-testid="db-status-badge" class="hidden">
-            v2.6 Production · 24/24 Tests Passing
+            v2.7 Production · Group Details &amp; Exit Workflow
           </span>
         </div>
         <p class="text-xs text-slate-400 hidden lg:block">Smart Expense Splitting &amp; Settlement</p>
@@ -1217,6 +1217,184 @@
           <button type="submit" id="btnSaveGroupSettings" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-xs font-bold text-slate-950">Save Settings</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 3C-2: GROUP DETAILS & ACTIVITY (MEMBERS, BILLS, SPLITS, EXIT)  -->
+  <!-- ===================================================================== -->
+  <div id="groupDetailsModal" data-testid="group-details-modal" class="fixed inset-0 z-50 hidden bg-slate-950/85 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
+    <div class="glass-panel rounded-t-3xl sm:rounded-3xl max-w-2xl w-full p-4 sm:p-6 border border-slate-700/80 shadow-2xl my-0 sm:my-8 max-h-[92vh] sm:max-h-[88vh] flex flex-col justify-between overflow-hidden">
+      <!-- Mobile Pull Bar -->
+      <div class="w-12 h-1.5 bg-slate-700/80 rounded-full mx-auto mb-2 sm:hidden flex-shrink-0"></div>
+
+      <!-- Header -->
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800/80 flex-shrink-0">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <span id="groupDetailsCategoryIcon" class="text-2xl p-2 rounded-2xl bg-teal-500/10 border border-teal-500/20 flex-shrink-0">🏕️</span>
+          <div class="min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <h3 id="groupDetailsName" class="text-base sm:text-lg font-bold text-white truncate">Group Name</h3>
+              <span id="groupDetailsCategoryBadge" class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-teal-500/15 text-teal-300 border border-teal-500/30">Trip</span>
+            </div>
+            <div class="flex items-center gap-2 text-xs text-slate-400 mt-0.5 flex-wrap">
+              <span id="groupDetailsInviteCode" class="font-mono-code text-[11px] text-slate-300">Code: ...</span>
+              <button id="btnGroupDetailsCopyCode" class="text-[10px] text-slate-400 hover:text-emerald-300 font-medium">📋 Copy</button>
+              <button id="btnGroupDetailsShareLink" class="text-[10px] text-emerald-400 hover:text-emerald-300 font-semibold px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20">🔗 Share</button>
+              <span id="groupDetailsAdminBadge" class="text-[10px] font-semibold text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/25">👑 Admin</span>
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center gap-1.5 flex-shrink-0">
+          <button id="btnGroupDetailsSettings" title="Group Settings" class="hidden p-2 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 transition">
+            ⚙️
+          </button>
+          <button type="button" onclick="closeModal('groupDetailsModal')" class="text-slate-400 hover:text-white text-base p-2 rounded-xl hover:bg-slate-800 transition">✕</button>
+        </div>
+      </div>
+
+      <!-- Scrollable Body -->
+      <div class="overflow-y-auto flex-1 pr-1 py-3 space-y-4">
+        <!-- Summary Cards Grid -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+            <span class="text-[10px] uppercase tracking-wider text-slate-400 font-bold block">Total Spend</span>
+            <span id="groupDetailsTotalSpend" class="text-sm font-bold text-white mt-0.5 block">₹0.00</span>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+            <span class="text-[10px] uppercase tracking-wider text-slate-400 font-bold block">Your Balance</span>
+            <span id="groupDetailsMyBalance" class="text-sm font-bold text-emerald-400 mt-0.5 block">₹0.00</span>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+            <span class="text-[10px] uppercase tracking-wider text-slate-400 font-bold block">Members</span>
+            <span id="groupDetailsMemberCount" class="text-sm font-bold text-white mt-0.5 block">0</span>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+            <span class="text-[10px] uppercase tracking-wider text-slate-400 font-bold block">Total Bills</span>
+            <span id="groupDetailsBillCount" class="text-sm font-bold text-white mt-0.5 block">0</span>
+          </div>
+        </div>
+
+        <!-- Mode Tags -->
+        <div class="flex items-center gap-1.5 flex-wrap text-[10px]">
+          <span id="groupDetailsHubBadge" class="px-2 py-0.5 rounded-lg border bg-slate-800 text-slate-300 border-slate-700">👑 Direct P2P</span>
+          <span id="groupDetailsMinimizeBadge" class="px-2 py-0.5 rounded-lg border bg-slate-800 text-slate-300 border-slate-700">⚡ Minimized Debts</span>
+          <span id="groupDetailsVisibilityBadge" class="px-2 py-0.5 rounded-lg border bg-slate-800 text-slate-300 border-slate-700">🔒 Personal Only</span>
+        </div>
+
+        <!-- Section Navigation Tabs -->
+        <div class="flex items-center gap-1 p-1 bg-slate-900/90 rounded-xl border border-slate-800">
+          <button id="btnGroupTabMembers" onclick="switchGroupDetailsTab('members')" class="flex-1 py-1.5 text-xs font-bold rounded-lg bg-emerald-500/20 text-emerald-300 transition">
+            👥 Members (<span id="tabCountMembers">0</span>)
+          </button>
+          <button id="btnGroupTabBills" onclick="switchGroupDetailsTab('bills')" class="flex-1 py-1.5 text-xs font-semibold rounded-lg text-slate-400 hover:text-slate-200 transition">
+            🧾 Bills &amp; Splits (<span id="tabCountBills">0</span>)
+          </button>
+          <button id="btnGroupTabSettle" onclick="switchGroupDetailsTab('settle')" class="flex-1 py-1.5 text-xs font-semibold rounded-lg text-slate-400 hover:text-slate-200 transition">
+            🤝 Settle Up (<span id="tabCountSettle">0</span>)
+          </button>
+        </div>
+
+        <!-- Tab 1: Members List -->
+        <div id="groupDetailsSectionMembers" class="space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-white">Group Members</span>
+            <button id="btnGroupDetailsAddMember" class="text-xs font-semibold text-emerald-400 hover:text-emerald-300 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/25">
+              + Add Member
+            </button>
+          </div>
+          <div id="groupDetailsMembersList" class="space-y-2">
+            <!-- Dynamically Rendered -->
+          </div>
+        </div>
+
+        <!-- Tab 2: Bills & Splits List -->
+        <div id="groupDetailsSectionBills" class="hidden space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-white">Bills &amp; Expenses in this Group</span>
+            <button id="btnGroupDetailsAddExpense" class="text-xs font-semibold text-emerald-400 hover:text-emerald-300 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/25">
+              + Add Bill
+            </button>
+          </div>
+          <div id="groupDetailsBillsList" class="space-y-2">
+            <!-- Dynamically Rendered -->
+          </div>
+        </div>
+
+        <!-- Tab 3: Settle Up Transfers -->
+        <div id="groupDetailsSectionSettle" class="hidden space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-white">Settle Up &amp; Balances</span>
+            <span class="text-[11px] text-slate-400">Simplified transfers to square off debts</span>
+          </div>
+          <div id="groupDetailsSettleList" class="space-y-2">
+            <!-- Dynamically Rendered -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer Action Bar -->
+      <div class="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2 flex-shrink-0">
+        <button id="btnGroupDetailsExit" type="button" class="px-4 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs font-bold transition flex items-center gap-1.5">
+          🚪 Exit Group
+        </button>
+        <button type="button" onclick="closeModal('groupDetailsModal')" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exit Group Confirmation Modal -->
+  <div id="exitGroupConfirmModal" data-testid="exit-group-confirm-modal" class="fixed inset-0 z-50 hidden bg-slate-950/85 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
+    <div class="glass-panel rounded-t-3xl sm:rounded-2xl max-w-md w-full p-5 sm:p-6 border border-rose-500/40 shadow-2xl my-0 sm:my-8 max-h-[90vh] overflow-y-auto">
+      <div class="w-12 h-1.5 bg-slate-700/80 rounded-full mx-auto mb-3 sm:hidden"></div>
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div class="flex items-center gap-2">
+          <span class="text-xl">🚪</span>
+          <h3 class="text-base font-bold text-white">Exit Group</h3>
+        </div>
+        <button type="button" onclick="closeModal('exitGroupConfirmModal')" class="text-slate-400 hover:text-white text-sm px-2 py-1 rounded">✕</button>
+      </div>
+
+      <div class="space-y-4 mt-4">
+        <p class="text-xs text-slate-300">
+          Are you sure you want to exit <strong id="exitGroupName" class="text-white">this group</strong>? You will no longer receive updates or split expenses in this group.
+        </p>
+
+        <!-- Dynamic Balance Notice Banner -->
+        <div id="exitGroupBalanceNotice" class="p-3.5 rounded-xl text-xs space-y-1.5">
+          <!-- Filled by JS -->
+        </div>
+
+        <!-- Admin Transfer Selector (Shown only if exiting user is Admin and others remain) -->
+        <div id="exitGroupAdminSelectorContainer" class="hidden p-3.5 rounded-xl bg-slate-900 border border-amber-500/30 space-y-2">
+          <label for="exitGroupSuccessorSelect" class="text-xs font-bold text-amber-300 block">
+            👑 Hand over Adminship before leaving:
+          </label>
+          <select id="exitGroupSuccessorSelect" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-400">
+            <!-- Filled dynamically -->
+          </select>
+          <p class="text-[11px] text-slate-400">
+            You are the current Admin. You must designate a successor from the remaining members.
+          </p>
+        </div>
+
+        <!-- Forfeiture Checkbox (Shown only if user is owed money) -->
+        <div id="exitGroupForfeitContainer" class="hidden p-3 rounded-xl bg-slate-900 border border-amber-500/30">
+          <label class="flex items-start gap-2 cursor-pointer text-xs text-amber-200">
+            <input type="checkbox" id="chkExitGroupConfirmForfeit" class="mt-0.5 rounded text-amber-500 focus:ring-amber-500 bg-slate-800 border-slate-700" />
+            <span>I confirm that I am forfeiting my positive balance in this group and wish to exit now.</span>
+          </label>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="closeModal('exitGroupConfirmModal')" class="px-4 py-2 rounded-xl bg-slate-800 text-xs font-semibold text-slate-300">Cancel</button>
+          <button type="button" id="btnConfirmExecuteExit" onclick="executeLeaveGroup()" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-xs font-bold text-white transition disabled:opacity-40 disabled:cursor-not-allowed">
+            Exit Group
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -4870,9 +5048,17 @@ exec node server.js`
                     `}
                   </div>
                 </div>
-                <h4 class="text-base font-bold text-white mt-2">${escapeHtml(g.name)}</h4>
-                <div class="text-xs text-slate-400 mt-1">
-                  Total Spend: <strong class="text-white">${formatINR(totalSpend)}</strong> · ${simplified.length} open settlement(s)
+                <div class="cursor-pointer group/cardtitle" onclick="openGroupDetailsModal('${escapeHtml(g.id)}')" title="Click to view Group Details, Members, Bills &amp; Exit Option">
+                  <div class="flex items-center justify-between gap-2 mt-2">
+                    <h4 class="text-base font-bold text-white group-hover/cardtitle:text-teal-300 transition flex items-center gap-1.5">
+                      <span>${escapeHtml(g.name)}</span>
+                      <span class="text-xs text-teal-400 opacity-70 group-hover/cardtitle:opacity-100">↗</span>
+                    </h4>
+                    <span class="text-[11px] font-semibold text-teal-400 group-hover/cardtitle:underline">Details &amp; Bills →</span>
+                  </div>
+                  <div class="text-xs text-slate-400 mt-1">
+                    Total Spend: <strong class="text-white">${formatINR(totalSpend)}</strong> · ${simplified.length} open settlement(s)
+                  </div>
                 </div>
                 <div class="mt-3">
                   <div class="text-[11px] text-slate-400 mb-1.5 flex items-center justify-between">
@@ -4884,17 +5070,16 @@ exec node server.js`
               </div>
 
               <div class="flex items-center gap-2 pt-3 border-t border-slate-800/80">
+                <button data-testid="btn-group-details-${escapeHtml(g.id)}" onclick="openGroupDetailsModal('${escapeHtml(g.id)}')" class="flex-1 py-2 rounded-xl bg-teal-500/15 hover:bg-teal-500/25 text-xs font-semibold text-teal-300 border border-teal-500/30 transition flex items-center justify-center gap-1">
+                  📋 Details &amp; Bills
+                </button>
                 ${canAddMember ? `
-                  <button data-testid="btn-add-member-${escapeHtml(g.id)}" onclick="openAddMemberModal('${escapeHtml(g.id)}')" class="flex-1 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 transition">
-                    + Add Member
+                  <button data-testid="btn-add-member-${escapeHtml(g.id)}" onclick="openAddMemberModal('${escapeHtml(g.id)}')" class="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 transition">
+                    + Member
                   </button>
-                ` : `
-                  <div title="Only the group admin can add members (changeable in group settings)" class="flex-1 py-2 rounded-xl bg-slate-900/60 border border-slate-800 text-center text-xs text-slate-500 font-medium cursor-not-allowed">
-                    🔒 Admin-Only Invites
-                  </div>
-                `}
-                <button data-testid="btn-view-bills-${escapeHtml(g.id)}" onclick="selectGroupAndOpenExpenses('${escapeHtml(g.id)}')" class="flex-1 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-xs font-semibold text-emerald-300 border border-emerald-500/30 transition">
-                  View Bills
+                ` : ''}
+                <button data-testid="btn-view-bills-${escapeHtml(g.id)}" onclick="selectGroupAndOpenExpenses('${escapeHtml(g.id)}')" class="py-2 px-3 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-xs font-semibold text-slate-300 border border-slate-700/60 transition">
+                  Bills Tab
                 </button>
               </div>
             </div>
@@ -5089,6 +5274,566 @@ exec node server.js`
       document.getElementById('groupFilterSelect').value = groupId;
       handleGroupFilterChange(groupId);
       switchMainTab('expenses');
+    }
+
+    // =========================================================================
+    // GROUP DETAILS VIEW, BILLS & SPLITS ACTIVITY, AND EXIT GROUP WORKFLOW
+    // =========================================================================
+    let activeDetailsGroupId = null;
+    let activeDetailsTab = 'members';
+    let activeExitGroupId = null;
+
+    async function openGroupDetailsModal(groupId) {
+      activeDetailsGroupId = groupId;
+      const grp = appState.groups.find((g) => g.id === groupId);
+      if (!grp) {
+        showToast('Group not found.', 'error');
+        return;
+      }
+
+      const currentEmail = (appState.currentUser?.email || '').toLowerCase().trim();
+      const currentAdmin = grp.members.find((m) => m.role === 'admin' || (grp.adminEmail && grp.adminEmail.toLowerCase() === m.email.toLowerCase())) || grp.members[0];
+      const isCurrentUserAdmin = currentAdmin && currentAdmin.email.toLowerCase().trim() === currentEmail;
+
+      // Group Header Info
+      const iconMap = {
+        'Trip': '🏕️',
+        'Home': '🏠',
+        'Couple': '❤️',
+        'Project': '💼',
+        'Event': '🎉',
+        'Other': '👥'
+      };
+      document.getElementById('groupDetailsCategoryIcon').textContent = iconMap[grp.category] || '👥';
+      document.getElementById('groupDetailsName').textContent = grp.name;
+      document.getElementById('groupDetailsCategoryBadge').textContent = grp.category || 'Trip';
+      document.getElementById('groupDetailsInviteCode').textContent = `Code: ${grp.inviteCode}`;
+
+      // Copy & Share buttons
+      document.getElementById('btnGroupDetailsCopyCode').onclick = () => {
+        copyTextToClipboard(grp.inviteCode, `Invite code ${grp.inviteCode} copied!`);
+      };
+      document.getElementById('btnGroupDetailsShareLink').onclick = () => {
+        copyInviteLink(grp.inviteCode, grp.name);
+      };
+
+      // Admin badge
+      document.getElementById('groupDetailsAdminBadge').innerHTML = currentAdmin
+        ? `👑 Admin: ${escapeHtml(currentAdmin.name)}`
+        : '👑 Admin';
+
+      // Settings button
+      const btnSettings = document.getElementById('btnGroupDetailsSettings');
+      if (btnSettings) {
+        if (isCurrentUserAdmin) {
+          btnSettings.classList.remove('hidden');
+          btnSettings.onclick = () => {
+            closeModal('groupDetailsModal');
+            openGroupSettingsModal(groupId);
+          };
+        } else {
+          btnSettings.classList.add('hidden');
+        }
+      }
+
+      // Add Member button inside modal
+      const btnAddMem = document.getElementById('btnGroupDetailsAddMember');
+      const canAddMember = isCurrentUserAdmin || Boolean(grp.allowMembersToAddOthers);
+      if (btnAddMem) {
+        if (canAddMember) {
+          btnAddMem.classList.remove('hidden');
+          btnAddMem.onclick = () => {
+            openAddMemberModal(groupId);
+          };
+        } else {
+          btnAddMem.classList.add('hidden');
+        }
+      }
+
+      // Add Expense button inside modal
+      const btnAddExp = document.getElementById('btnGroupDetailsAddExpense');
+      if (btnAddExp) {
+        btnAddExp.onclick = () => {
+          closeModal('groupDetailsModal');
+          selectedGroupId = groupId;
+          if (document.getElementById('groupFilterSelect')) {
+            document.getElementById('groupFilterSelect').value = groupId;
+          }
+          openAddExpenseModal();
+        };
+      }
+
+      // Exit Group button
+      const btnExit = document.getElementById('btnGroupDetailsExit');
+      if (btnExit) {
+        btnExit.onclick = () => {
+          openExitGroupConfirmModal(groupId);
+        };
+      }
+
+      // Reset to default tab
+      switchGroupDetailsTab(activeDetailsTab || 'members');
+
+      // Render initial data from memory
+      renderGroupDetailsData(grp);
+
+      // Open Modal
+      openModal('groupDetailsModal');
+
+      // Fetch fresh server details if authenticated
+      if (localStorage.getItem(AUTH_TOKEN_KEY)) {
+        try {
+          const res = await apiFetch(`/api/groups/${groupId}`);
+          if (res && res.group && res.members) {
+            const idx = appState.groups.findIndex((g) => g.id === groupId);
+            if (idx !== -1) {
+              appState.groups[idx] = { ...appState.groups[idx], ...res.group, members: res.members };
+            }
+            if (res.expenses && Array.isArray(res.expenses)) {
+              const otherExp = appState.expenses.filter((e) => e.groupId !== groupId);
+              appState.expenses = [...otherExp, ...res.expenses];
+            }
+            renderGroupDetailsData(appState.groups[idx] || grp, res);
+          }
+        } catch (err) {
+          console.warn('[group-details] Server sync notice:', err.message);
+        }
+      }
+    }
+
+    function renderGroupDetailsData(grp, serverData = null) {
+      const currentEmail = (appState.currentUser?.email || '').toLowerCase().trim();
+      const currentAdmin = grp.members.find((m) => m.role === 'admin' || (grp.adminEmail && grp.adminEmail.toLowerCase() === m.email.toLowerCase())) || grp.members[0];
+      const isCurrentUserAdmin = currentAdmin && currentAdmin.email.toLowerCase().trim() === currentEmail;
+
+      const { totalSpend, simplified, filteredExpenses, filteredSettlements, balanceList } =
+        serverData && serverData.simplifiedTransactions
+          ? {
+              totalSpend: serverData.totalSpend,
+              simplified: serverData.simplifiedTransactions,
+              filteredExpenses: serverData.expenses,
+              filteredSettlements: serverData.settlements,
+              balanceList: serverData.members
+            }
+          : computeBalancesAndSimplifications(grp.id);
+
+      // Quick summary numbers
+      document.getElementById('groupDetailsTotalSpend').textContent = formatINR(totalSpend);
+      document.getElementById('groupDetailsMemberCount').textContent = grp.members.length;
+      document.getElementById('groupDetailsBillCount').textContent = filteredExpenses.length;
+
+      // User's own balance in this group
+      const myBal = balanceList.find((b) => (b.email || '').toLowerCase().trim() === currentEmail) || { net: 0 };
+      const myBalEl = document.getElementById('groupDetailsMyBalance');
+      if (myBal.net > 0.01) {
+        myBalEl.className = 'text-sm font-bold text-emerald-400 mt-0.5 block';
+        myBalEl.textContent = `+${formatINR(myBal.net)} (Owed)`;
+      } else if (myBal.net < -0.01) {
+        myBalEl.className = 'text-sm font-bold text-rose-400 mt-0.5 block';
+        myBalEl.textContent = `-${formatINR(Math.abs(myBal.net))} (Debt)`;
+      } else {
+        myBalEl.className = 'text-sm font-bold text-slate-300 mt-0.5 block';
+        myBalEl.textContent = '₹0.00 (Settled)';
+      }
+
+      // Mode badges
+      const hubEl = document.getElementById('groupDetailsHubBadge');
+      if (hubEl) {
+        hubEl.textContent = grp.adminHubSettlement === true ? '👑 Admin-Hub Routing' : '⚡ Direct P2P';
+        hubEl.className = grp.adminHubSettlement === true
+          ? 'px-2 py-0.5 rounded-lg border bg-amber-500/15 text-amber-300 border-amber-500/30'
+          : 'px-2 py-0.5 rounded-lg border bg-slate-800 text-slate-300 border-slate-700';
+      }
+
+      const minEl = document.getElementById('groupDetailsMinimizeBadge');
+      if (minEl) {
+        minEl.textContent = grp.minimizeDebts !== false ? '⚡ Minimized Debts' : '🤝 Direct Pair-Wise';
+        minEl.className = grp.minimizeDebts !== false
+          ? 'px-2 py-0.5 rounded-lg border bg-amber-500/15 text-amber-300 border-amber-500/30'
+          : 'px-2 py-0.5 rounded-lg border bg-slate-800 text-slate-300 border-slate-700';
+      }
+
+      const visEl = document.getElementById('groupDetailsVisibilityBadge');
+      if (visEl) {
+        const isPersonal = (grp.splitsVisibility || 'personal_only') === 'personal_only';
+        visEl.textContent = isPersonal ? '🔒 Personal Only' : '🌐 All Splits Visible';
+        visEl.className = isPersonal
+          ? 'px-2 py-0.5 rounded-lg border bg-purple-500/15 text-purple-300 border-purple-500/30'
+          : 'px-2 py-0.5 rounded-lg border bg-slate-800 text-slate-300 border-slate-700';
+      }
+
+      // Tab count labels
+      document.getElementById('tabCountMembers').textContent = grp.members.length;
+      document.getElementById('tabCountBills').textContent = filteredExpenses.length;
+      document.getElementById('tabCountSettle').textContent = simplified.length;
+
+      // 1. Render Tab: Members
+      const membersContainer = document.getElementById('groupDetailsMembersList');
+      if (membersContainer) {
+        membersContainer.innerHTML = grp.members
+          .map((m) => {
+            const mEmail = (m.email || '').toLowerCase().trim();
+            const isAdmin = m.role === 'admin' || (grp.adminEmail && grp.adminEmail.toLowerCase() === mEmail);
+            const isPending = m.status === 'pending_acceptance';
+            const isMe = mEmail === currentEmail;
+
+            const mBal = balanceList.find((b) => (b.email || '').toLowerCase().trim() === mEmail) || { net: 0, paid: 0, owed: 0 };
+            const ini = (m.name || 'Member')
+              .split(' ')
+              .map((w) => w[0])
+              .join('')
+              .slice(0, 2)
+              .toUpperCase();
+
+            let balanceChip = '';
+            if (mBal.net > 0.01) {
+              balanceChip = `<span class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Owed +${formatINR(mBal.net)}</span>`;
+            } else if (mBal.net < -0.01) {
+              balanceChip = `<span class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-rose-500/15 text-rose-300 border border-rose-500/30">Owes -${formatINR(Math.abs(mBal.net))}</span>`;
+            } else {
+              balanceChip = `<span class="px-2 py-0.5 rounded-lg text-[10px] font-medium bg-slate-800 text-slate-400 border border-slate-700">Settled (₹0)</span>`;
+            }
+
+            const canTransfer = isCurrentUserAdmin && !isAdmin && !isPending;
+
+            return `
+              <div class="p-3 rounded-2xl bg-slate-900/90 border ${isMe ? 'border-teal-500/40 bg-teal-950/20' : 'border-slate-800'} flex items-center justify-between gap-2 flex-wrap">
+                <div class="flex items-center gap-3 min-w-0">
+                  <div class="w-9 h-9 rounded-xl ${isAdmin ? 'bg-amber-400 text-slate-950 font-black' : isPending ? 'bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30' : 'bg-slate-800 text-slate-200 font-bold border border-slate-700'} flex items-center justify-center text-xs flex-shrink-0">
+                    ${isAdmin ? '👑' : isPending ? '⏳' : escapeHtml(ini)}
+                  </div>
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                      <span class="text-xs font-bold text-white truncate">${escapeHtml(m.name)}</span>
+                      ${isMe ? '<span class="text-[9px] font-black uppercase px-1.5 py-0.2 rounded bg-teal-500/20 text-teal-300 border border-teal-500/30">You</span>' : ''}
+                      ${isAdmin ? '<span class="text-[9px] font-black uppercase px-1.5 py-0.2 rounded bg-amber-400/20 text-amber-300 border border-amber-400/30">Admin</span>' : ''}
+                      ${isPending ? '<span class="text-[9px] font-bold uppercase px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">Pending</span>' : ''}
+                    </div>
+                    <div class="text-[11px] text-slate-400 truncate">${escapeHtml(m.email)}</div>
+                  </div>
+                </div>
+
+                <div class="flex items-center gap-2 flex-wrap">
+                  ${(m.defaultWeight && m.defaultWeight !== 1) ? `<span class="text-[10px] px-2 py-0.5 rounded-lg bg-teal-400/15 text-teal-300 border border-teal-400/30">⚖️ ${m.defaultWeight}x</span>` : ''}
+                  ${balanceChip}
+                  ${canTransfer ? `
+                    <button onclick="promptTransferAdmin('${escapeHtml(grp.id)}', '${escapeHtml(m.email)}', '${escapeHtml(m.name)}')" title="Transfer Admin privileges" class="text-[10px] text-amber-300 hover:text-amber-200 underline font-semibold px-2 py-1 rounded bg-amber-500/10 border border-amber-500/20">
+                      👑 Make Admin
+                    </button>
+                  ` : ''}
+                </div>
+              </div>
+            `;
+          })
+          .join('');
+      }
+
+      // 2. Render Tab: Bills & Splits
+      const billsContainer = document.getElementById('groupDetailsBillsList');
+      if (billsContainer) {
+        if (!filteredExpenses.length) {
+          billsContainer.innerHTML = `
+            <div class="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 text-center text-xs text-slate-400">
+              No bills recorded for this group yet. Click "+ Add Bill" to record your first expense!
+            </div>
+          `;
+        } else {
+          billsContainer.innerHTML = filteredExpenses
+            .map((exp) => {
+              const payerEmail = (exp.paidByEmail || '').toLowerCase().trim();
+              const isPayerMe = payerEmail === currentEmail;
+              const splitsList = Array.isArray(exp.splits) ? exp.splits : [];
+              const mySplit = splitsList.find((s) => (s.memberEmail || '').toLowerCase().trim() === currentEmail);
+
+              const splitChips = splitsList
+                .map((s) => {
+                  const sEmail = (s.memberEmail || '').toLowerCase().trim();
+                  const isThisMe = sEmail === currentEmail;
+                  return `
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] ${isThisMe ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30 font-bold' : 'bg-slate-800 text-slate-300 border border-slate-700'}">
+                      <span>${escapeHtml(s.memberName || s.memberEmail.split('@')[0])}:</span>
+                      <span>${formatINR(s.amount)}</span>
+                    </span>
+                  `;
+                })
+                .join('');
+
+              const canDelete = isCurrentUserAdmin || isPayerMe;
+
+              return `
+                <div class="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2">
+                  <div class="flex items-start justify-between gap-2">
+                    <div class="flex items-start gap-2.5 min-w-0">
+                      <span class="text-xl p-2 rounded-xl bg-slate-800/80 border border-slate-700/80 flex-shrink-0">${escapeHtml(exp.category?.slice(0, 2) || '🧾')}</span>
+                      <div class="min-w-0">
+                        <h4 class="text-xs font-bold text-white truncate">${escapeHtml(exp.description)}</h4>
+                        <div class="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                          <span>Paid by <strong class="${isPayerMe ? 'text-teal-300' : 'text-slate-200'}">${escapeHtml(exp.paidByName || exp.paidByEmail)}</strong></span>
+                          <span>·</span>
+                          <span>${exp.expenseDate ? new Date(exp.expenseDate).toLocaleDateString() : ''}</span>
+                          <span class="px-1.5 py-0.2 rounded text-[9px] uppercase font-bold bg-slate-800 text-slate-400 border border-slate-700">${escapeHtml(exp.splitType || 'equal')}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="text-right flex-shrink-0">
+                      <div class="text-sm font-bold text-white">${formatINR(exp.amount)}</div>
+                      ${mySplit ? `<div class="text-[10px] text-teal-400 font-semibold">Your share: ${formatINR(mySplit.amount)}</div>` : ''}
+                    </div>
+                  </div>
+
+                  <div class="pt-2 border-t border-slate-800/60 flex items-center justify-between gap-2 flex-wrap">
+                    <div class="flex flex-wrap gap-1">${splitChips}</div>
+                    ${canDelete ? `
+                      <button onclick="deleteExpenseById('${escapeHtml(exp.id || exp._id)}')" class="text-[10px] text-rose-400 hover:text-rose-300 font-semibold px-2 py-0.5 rounded bg-rose-500/10 border border-rose-500/20">
+                        Delete
+                      </button>
+                    ` : ''}
+                  </div>
+                </div>
+              `;
+            })
+            .join('');
+        }
+      }
+
+      // 3. Render Tab: Settle Up Transfers
+      const settleContainer = document.getElementById('groupDetailsSettleList');
+      if (settleContainer) {
+        if (!simplified.length) {
+          settleContainer.innerHTML = `
+            <div class="p-6 rounded-2xl bg-emerald-950/20 border border-emerald-500/30 text-center text-xs text-emerald-300">
+              🎉 All settled up! There are no outstanding balances in this group.
+            </div>
+          `;
+        } else {
+          settleContainer.innerHTML = simplified
+            .map((t) => {
+              const fromEmail = (t.fromEmail || '').toLowerCase().trim();
+              const toEmail = (t.toEmail || '').toLowerCase().trim();
+              const isPayer = fromEmail === currentEmail;
+              const isReceiver = toEmail === currentEmail;
+              const dueAmount = t.remainingDue !== undefined ? t.remainingDue : t.amount;
+
+              return `
+                <div class="p-3.5 rounded-2xl bg-slate-900/90 border ${isPayer ? 'border-rose-500/30 bg-rose-950/15' : isReceiver ? 'border-emerald-500/30 bg-emerald-950/15' : 'border-slate-800'} flex items-center justify-between gap-3 flex-wrap">
+                  <div class="flex items-center gap-3 min-w-0">
+                    <div class="w-8 h-8 rounded-xl ${isPayer ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'} flex items-center justify-center text-xs font-bold flex-shrink-0">
+                      ₹
+                    </div>
+                    <div class="min-w-0">
+                      <div class="text-xs text-slate-200">
+                        <strong class="${isPayer ? 'text-rose-300 font-bold' : 'text-white'}">${escapeHtml(t.fromName || t.fromEmail)}</strong>
+                        <span class="text-slate-400">pays</span>
+                        <strong class="${isReceiver ? 'text-emerald-300 font-bold' : 'text-white'}">${escapeHtml(t.toName || t.toEmail)}</strong>
+                      </div>
+                      ${t.isPendingApproval ? `<div class="text-[10px] text-amber-300 font-semibold mt-0.5">⏳ Awaiting confirmation (${formatINR(t.pendingApprovalAmount)})</div>` : ''}
+                    </div>
+                  </div>
+
+                  <div class="flex items-center gap-3 flex-shrink-0">
+                    <div class="text-sm font-bold ${isPayer ? 'text-rose-400' : 'text-white'}">${formatINR(dueAmount)}</div>
+                    ${dueAmount > 0 ? `
+                      <button onclick="handleGroupDetailsSettleClick('${escapeHtml(t.fromEmail)}', '${escapeHtml(t.fromName)}', '${escapeHtml(t.toEmail)}', '${escapeHtml(t.toName)}', ${dueAmount}, '${escapeHtml(grp.id)}')" class="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow-lg transition">
+                        Settle Up
+                      </button>
+                    ` : ''}
+                  </div>
+                </div>
+              `;
+            })
+            .join('');
+        }
+      }
+    }
+
+    function switchGroupDetailsTab(tab) {
+      activeDetailsTab = tab;
+      const tabs = ['members', 'bills', 'settle'];
+      tabs.forEach((t) => {
+        const sec = document.getElementById(`groupDetailsSection${t.charAt(0).toUpperCase() + t.slice(1)}`);
+        const btn = document.getElementById(`btnGroupTab${t.charAt(0).toUpperCase() + t.slice(1)}`);
+        if (t === tab) {
+          if (sec) sec.classList.remove('hidden');
+          if (btn) {
+            btn.className = 'flex-1 py-1.5 text-xs font-bold rounded-lg bg-emerald-500/20 text-emerald-300 transition';
+          }
+        } else {
+          if (sec) sec.classList.add('hidden');
+          if (btn) {
+            btn.className = 'flex-1 py-1.5 text-xs font-semibold rounded-lg text-slate-400 hover:text-slate-200 transition';
+          }
+        }
+      });
+    }
+
+    function handleGroupDetailsSettleClick(fromEmail, fromName, toEmail, toName, amount, groupId) {
+      closeModal('groupDetailsModal');
+      selectedGroupId = groupId;
+      if (document.getElementById('groupFilterSelect')) {
+        document.getElementById('groupFilterSelect').value = groupId;
+      }
+      openSettleConfirm(fromEmail, fromName, toEmail, toName, amount);
+    }
+
+    function openExitGroupConfirmModal(groupId) {
+      activeExitGroupId = groupId;
+      const grp = appState.groups.find((g) => g.id === groupId);
+      if (!grp) return;
+
+      const currentEmail = (appState.currentUser?.email || '').toLowerCase().trim();
+      const currentAdmin = grp.members.find((m) => m.role === 'admin' || (grp.adminEmail && grp.adminEmail.toLowerCase() === m.email.toLowerCase())) || grp.members[0];
+      const isCurrentUserAdmin = currentAdmin && currentAdmin.email.toLowerCase().trim() === currentEmail;
+
+      const { balanceList } = computeBalancesAndSimplifications(grp.id);
+      const myBal = balanceList.find((b) => (b.email || '').toLowerCase().trim() === currentEmail) || { net: 0 };
+      const netAmount = Math.round(myBal.net * 100) / 100;
+
+      document.getElementById('exitGroupName').textContent = `"${grp.name}"`;
+
+      const noticeEl = document.getElementById('exitGroupBalanceNotice');
+      const forfeitContainer = document.getElementById('exitGroupForfeitContainer');
+      const forfeitCheckbox = document.getElementById('chkExitGroupConfirmForfeit');
+      const btnConfirm = document.getElementById('btnConfirmExecuteExit');
+      const adminContainer = document.getElementById('exitGroupAdminSelectorContainer');
+      const successorSelect = document.getElementById('exitGroupSuccessorSelect');
+
+      if (forfeitCheckbox) forfeitCheckbox.checked = false;
+
+      // Balance validation:
+      if (netAmount < -0.01) {
+        // User owes money -> Blocked from leaving
+        noticeEl.className = 'p-3.5 rounded-xl text-xs space-y-1.5 bg-rose-950/40 border border-rose-500/40 text-rose-200';
+        noticeEl.innerHTML = `
+          <div class="font-bold flex items-center gap-1.5 text-rose-300">
+            <span>⛔</span> Cannot Exit: Unsettled Debt
+          </div>
+          <p class="leading-relaxed">
+            You currently owe <strong class="text-white">${formatINR(Math.abs(netAmount))}</strong> in this group. You must settle all your debts before exiting.
+          </p>
+        `;
+        if (forfeitContainer) forfeitContainer.classList.add('hidden');
+        if (btnConfirm) {
+          btnConfirm.disabled = true;
+          btnConfirm.textContent = 'Blocked by Unsettled Debt';
+        }
+      } else if (netAmount > 0.01) {
+        // User is owed money -> Warning about forfeiture
+        noticeEl.className = 'p-3.5 rounded-xl text-xs space-y-1.5 bg-amber-950/40 border border-amber-500/40 text-amber-200';
+        noticeEl.innerHTML = `
+          <div class="font-bold flex items-center gap-1.5 text-amber-300">
+            <span>⚠️</span> Outstanding Credit Balance
+          </div>
+          <p class="leading-relaxed">
+            You are owed <strong class="text-white">${formatINR(netAmount)}</strong> in this group. If you leave now, you will forfeit this balance.
+          </p>
+        `;
+        if (forfeitContainer) forfeitContainer.classList.remove('hidden');
+        if (btnConfirm) {
+          btnConfirm.disabled = true;
+          btnConfirm.textContent = 'Confirm Forfeiture to Exit';
+        }
+
+        if (forfeitCheckbox) {
+          forfeitCheckbox.onchange = () => {
+            btnConfirm.disabled = !forfeitCheckbox.checked;
+            btnConfirm.textContent = forfeitCheckbox.checked ? 'Exit & Forfeit Balance' : 'Confirm Forfeiture to Exit';
+          };
+        }
+      } else {
+        // Net balance == 0 -> Safe to leave
+        noticeEl.className = 'p-3.5 rounded-xl text-xs space-y-1.5 bg-emerald-950/40 border border-emerald-500/30 text-emerald-200';
+        noticeEl.innerHTML = `
+          <div class="font-bold flex items-center gap-1.5 text-emerald-300">
+            <span>✓</span> All Settled Up
+          </div>
+          <p class="leading-relaxed">
+            Your net balance in this group is <strong>₹0.00</strong>. You have no pending debts or credits and can safely leave.
+          </p>
+        `;
+        if (forfeitContainer) forfeitContainer.classList.add('hidden');
+        if (btnConfirm) {
+          btnConfirm.disabled = false;
+          btnConfirm.textContent = 'Exit Group';
+        }
+      }
+
+      // Admin Handover Check:
+      if (isCurrentUserAdmin) {
+        const remainingMembers = grp.members.filter((m) => (m.email || '').toLowerCase().trim() !== currentEmail);
+        if (remainingMembers.length > 0) {
+          adminContainer.classList.remove('hidden');
+          successorSelect.innerHTML = remainingMembers
+            .map((m) => `<option value="${escapeHtml(m.email)}">${escapeHtml(m.name)} (${escapeHtml(m.email)})</option>`)
+            .join('');
+        } else {
+          adminContainer.classList.add('hidden');
+          noticeEl.innerHTML += `
+            <div class="mt-2 pt-2 border-t border-slate-700/60 text-amber-300">
+              👑 You are the only member in this group. Leaving will archive and close this group.
+            </div>
+          `;
+        }
+      } else {
+        adminContainer.classList.add('hidden');
+      }
+
+      openModal('exitGroupConfirmModal');
+    }
+
+    async function executeLeaveGroup() {
+      if (!activeExitGroupId) return;
+      const grp = appState.groups.find((g) => g.id === activeExitGroupId);
+      if (!grp) return;
+
+      const forfeitCheckbox = document.getElementById('chkExitGroupConfirmForfeit');
+      const confirmForfeit = forfeitCheckbox ? forfeitCheckbox.checked : false;
+      const successorSelect = document.getElementById('exitGroupSuccessorSelect');
+      const successorEmail = successorSelect && !document.getElementById('exitGroupAdminSelectorContainer').classList.contains('hidden')
+        ? successorSelect.value
+        : undefined;
+
+      const btnConfirm = document.getElementById('btnConfirmExecuteExit');
+      if (btnConfirm) {
+        btnConfirm.disabled = true;
+        btnConfirm.textContent = 'Exiting...';
+      }
+
+      try {
+        if (localStorage.getItem(AUTH_TOKEN_KEY)) {
+          const res = await apiFetch(`/api/groups/${activeExitGroupId}/leave`, {
+            method: 'POST',
+            body: JSON.stringify({ confirmForfeit, successorEmail })
+          });
+          if (res && res.error) {
+            alert('Failed to exit group: ' + res.error);
+            if (btnConfirm) {
+              btnConfirm.disabled = false;
+              btnConfirm.textContent = 'Exit Group';
+            }
+            return;
+          }
+        }
+
+        // Remove from local memory
+        const groupName = grp.name;
+        appState.groups = appState.groups.filter((g) => g.id !== activeExitGroupId);
+        appState.expenses = appState.expenses.filter((e) => e.groupId !== activeExitGroupId);
+        if (selectedGroupId === activeExitGroupId) {
+          selectedGroupId = 'ALL';
+        }
+
+        saveState();
+        closeModal('exitGroupConfirmModal');
+        closeModal('groupDetailsModal');
+        refreshAllViews();
+        showToast(`You have successfully exited "${groupName}".`);
+      } catch (err) {
+        alert('Error exiting group: ' + err.message);
+        if (btnConfirm) {
+          btnConfirm.disabled = false;
+          btnConfirm.textContent = 'Exit Group';
+        }
+      }
     }
 
     function renderSettleView(simplified, filteredSettlements) {

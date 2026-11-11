@@ -216,6 +216,107 @@ function calculateDirectDebts(expenses, settlements) {
   return transactions;
 }
 
+/**
+ * Computes exact balanceMap { [email]: { email, name, paid, owed, net } } for a single group.
+ */
+function computeGroupBalanceMap(group, expenses, settlements) {
+  const balanceMap = {};
+  const ensureMember = (email, name) => {
+    const key = String(email || '').toLowerCase().trim();
+    if (!key) return null;
+    if (!balanceMap[key]) {
+      balanceMap[key] = { email: key, name: name || key, paid: 0, owed: 0, net: 0 };
+    }
+    return balanceMap[key];
+  };
+
+  if (Array.isArray(group.members)) {
+    group.members.forEach((m) => ensureMember(m.email, m.name));
+  }
+
+  expenses.forEach((exp) => {
+    const isIncome = exp.type === 'income';
+    const payer = ensureMember(exp.paidByEmail, exp.paidByName);
+
+    if (isIncome) {
+      if (payer) {
+        payer.paid -= exp.amount;
+        payer.net -= exp.amount;
+      }
+      (exp.splits || []).forEach((s) => {
+        const participant = ensureMember(s.memberEmail, s.memberName);
+        if (participant) {
+          participant.owed -= s.amount;
+          participant.net += s.amount;
+        }
+      });
+    } else {
+      if (payer) {
+        payer.paid += exp.amount;
+        payer.net += exp.amount;
+      }
+      (exp.splits || []).forEach((s) => {
+        const participant = ensureMember(s.memberEmail, s.memberName);
+        if (participant) {
+          participant.owed += s.amount;
+          participant.net -= s.amount;
+        }
+      });
+    }
+  });
+
+  settlements.forEach((st) => {
+    if (st.status === 'confirmed') {
+      const payer = ensureMember(st.fromEmail, st.fromName);
+      const receiver = ensureMember(st.toEmail, st.toName);
+      if (payer) payer.net += st.amount;
+      if (receiver) receiver.net -= st.amount;
+    }
+  });
+
+  Object.values(balanceMap).forEach((b) => {
+    b.paid = Math.round(b.paid * 100) / 100;
+    b.owed = Math.round(b.owed * 100) / 100;
+    b.net = Math.round(b.net * 100) / 100;
+  });
+
+  return balanceMap;
+}
+
+/**
+ * Computes simplified transactions for a group respecting its minimization & adminHub settings
+ */
+function computeGroupSimplifiedDebts(group, balanceMap, expenses, settlements) {
+  let simplifiedTransactions = [];
+  const isMinimized = group.minimizeDebts !== false;
+  if (!isMinimized) {
+    simplifiedTransactions = calculateDirectDebts(expenses, settlements);
+  } else if (group.adminHubSettlement === true) {
+    const adminMember = (group.members || []).find((m) => m.role === 'admin') ||
+      (group.adminEmail ? (group.members || []).find((m) => m.email.toLowerCase() === group.adminEmail.toLowerCase()) : null) ||
+      (group.members || [])[0];
+    simplifiedTransactions = simplifyDebtsAdminHub(balanceMap, adminMember);
+  } else {
+    simplifiedTransactions = simplifyDebtsGreedy(balanceMap);
+  }
+
+  const pendingSettlements = settlements.filter((s) => s.status === 'pending_admin_approval');
+  const pendingMap = {};
+  pendingSettlements.forEach((s) => {
+    const key = `${s.fromEmail}->${s.toEmail}`;
+    pendingMap[key] = (pendingMap[key] || 0) + s.amount;
+  });
+
+  simplifiedTransactions.forEach((t) => {
+    const key = `${t.fromEmail}->${t.toEmail}`;
+    t.pendingApprovalAmount = Math.round((pendingMap[key] || 0) * 100) / 100;
+    t.isPendingApproval = t.pendingApprovalAmount > 0;
+    t.remainingDue = Math.max(0, Math.round((t.amount - t.pendingApprovalAmount) * 100) / 100);
+  });
+
+  return simplifiedTransactions;
+}
+
 // GET /api/groups - List groups where user is a member
 router.get('/groups', requireAuth, async (req, res) => {
   try {
@@ -381,6 +482,225 @@ router.post('/groups/join', requireAuth, async (req, res) => {
     });
   } catch (err) {
     logger.error('[splits:join] Error joining group:', err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/groups/:id - Get single group details with members, expenses, balances, and simplified debts
+router.get('/groups/:id', requireAuth, async (req, res) => {
+  try {
+    await connectToDatabase();
+    const group = await Group.findById(req.params.id);
+    if (!group) {
+      return res.status(404).json({ error: 'Group not found.' });
+    }
+
+    const requesterEmail = (req.user.email || '').toLowerCase().trim();
+    const isMember = group.members.some((m) => m.email.toLowerCase().trim() === requesterEmail);
+    const isSuperAdmin = isSuperAdminUser(req.user);
+
+    if (!isMember && !isSuperAdmin) {
+      return res.status(403).json({ error: 'Access denied. You are not a member of this group.' });
+    }
+
+    const [expenses, settlements] = await Promise.all([
+      Expense.find({ groupId: group._id }).sort({ expenseDate: -1, createdAt: -1 }),
+      Settlement.find({ groupId: group._id }).sort({ settledAt: -1, createdAt: -1 })
+    ]);
+
+    const balanceMap = computeGroupBalanceMap(group, expenses, settlements);
+    const simplifiedTransactions = computeGroupSimplifiedDebts(group, balanceMap, expenses, settlements);
+
+    const membersWithBalances = group.members.map((m) => {
+      const mEmail = m.email.toLowerCase().trim();
+      const b = balanceMap[mEmail] || { paid: 0, owed: 0, net: 0 };
+      return {
+        ...(m.toObject ? m.toObject() : m),
+        paid: b.paid,
+        owed: b.owed,
+        net: b.net
+      };
+    });
+
+    const totalSpend = Math.round(expenses.reduce((sum, e) => sum + (e.type === 'income' ? 0 : e.amount), 0) * 100) / 100;
+    const myBalance = balanceMap[requesterEmail] || { paid: 0, owed: 0, net: 0 };
+
+    return res.status(200).json({
+      group,
+      members: membersWithBalances,
+      expenses,
+      settlements,
+      simplifiedTransactions,
+      totalSpend,
+      myBalance
+    });
+  } catch (err) {
+    logger.error('[splits:group-details] Error fetching group details:', err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/groups/:id/leave - Exit / Leave a group
+router.post('/groups/:id/leave', requireAuth, async (req, res) => {
+  try {
+    await connectToDatabase();
+    const group = await Group.findById(req.params.id);
+    if (!group) {
+      return res.status(404).json({ error: 'Group not found.' });
+    }
+
+    const userEmail = (req.user.email || '').toLowerCase().trim();
+    const memberIndex = group.members.findIndex((m) => m.email.toLowerCase().trim() === userEmail);
+    if (memberIndex === -1) {
+      return res.status(400).json({ error: 'You are not a member of this group.' });
+    }
+
+    const [expenses, settlements] = await Promise.all([
+      Expense.find({ groupId: group._id }),
+      Settlement.find({ groupId: group._id })
+    ]);
+
+    const balanceMap = computeGroupBalanceMap(group, expenses, settlements);
+    const myBalance = balanceMap[userEmail] || { paid: 0, owed: 0, net: 0 };
+    const netAmount = Math.round(myBalance.net * 100) / 100;
+
+    // Financial Safety Check:
+    // If user is in debt (owes money to others): CANNOT LEAVE
+    if (netAmount < -0.01) {
+      return res.status(400).json({
+        error: `Cannot exit group: You have an unsettled debt of -₹${Math.abs(netAmount).toFixed(2)} in this group. You must settle all your debts before exiting.`,
+        netBalance: netAmount,
+        canLeave: false
+      });
+    }
+
+    // If user is owed money by others: Can only leave if they explicitly confirm forfeiture
+    if (netAmount > 0.01 && !req.body.confirmForfeit) {
+      return res.status(400).json({
+        error: `Cannot exit group: You are owed ₹${netAmount.toFixed(2)} in this group. Settle up first, or confirm forfeiture of this balance to exit.`,
+        netBalance: netAmount,
+        canForfeit: true,
+        canLeave: false
+      });
+    }
+
+    // Admin Succession Check
+    const currentAdmin = group.members.find((m) => m.role === 'admin') ||
+      (group.adminEmail ? group.members.find((m) => m.email.toLowerCase() === group.adminEmail.toLowerCase()) : null) ||
+      group.members[0];
+
+    const isCurrentAdmin = currentAdmin && currentAdmin.email.toLowerCase().trim() === userEmail;
+    const remainingMembers = group.members.filter((m) => m.email.toLowerCase().trim() !== userEmail);
+
+    if (isCurrentAdmin) {
+      if (remainingMembers.length === 0) {
+        // User was the sole member -> Archive group
+        group.isArchived = true;
+        group.members = [];
+        await group.save();
+        logger.info(`[splits:leave] Sole admin ${userEmail} left group "${group.name}". Group archived.`);
+        otel.metrics.counter('vasool_group_leaves_total', 1, { group: group.name, status: 'archived_empty' });
+        return res.status(200).json({
+          success: true,
+          message: `You have left and closed "${group.name}" because there are no other members.`,
+          isArchived: true
+        });
+      } else {
+        // Designate new admin
+        let successorEmail = req.body.successorEmail ? String(req.body.successorEmail).toLowerCase().trim() : null;
+        let successor = successorEmail ? remainingMembers.find((m) => m.email.toLowerCase().trim() === successorEmail) : null;
+        if (!successor) {
+          // Auto-promote next active member or first remaining member
+          successor = remainingMembers.find((m) => m.status === 'active') || remainingMembers[0];
+        }
+
+        remainingMembers.forEach((m) => {
+          if (m.email.toLowerCase().trim() === successor.email.toLowerCase().trim()) {
+            m.role = 'admin';
+          }
+        });
+        group.adminEmail = successor.email.toLowerCase().trim();
+        logger.info(`[splits:leave] Admin ${userEmail} left group "${group.name}". Admin transferred to ${successor.name} (${successor.email}).`);
+      }
+    }
+
+    group.members = remainingMembers;
+    await group.save();
+
+    logger.info(`[splits:leave] User ${userEmail} successfully exited group "${group.name}".`);
+    otel.metrics.counter('vasool_group_leaves_total', 1, { group: group.name, status: 'success' });
+
+    return res.status(200).json({
+      success: true,
+      message: `You have successfully left the group "${group.name}".`,
+      group
+    });
+  } catch (err) {
+    logger.error('[splits:leave] Error exiting group:', err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/groups/:id/remove-member - Admin removes a member from the group
+router.post('/groups/:id/remove-member', requireAuth, async (req, res) => {
+  try {
+    await connectToDatabase();
+    const { targetEmail } = req.body;
+    if (!targetEmail) {
+      return res.status(400).json({ error: 'targetEmail is required.' });
+    }
+
+    const group = await Group.findById(req.params.id);
+    if (!group) return res.status(404).json({ error: 'Group not found.' });
+
+    const requesterEmail = (req.user.email || '').toLowerCase().trim();
+    const cleanTargetEmail = String(targetEmail).toLowerCase().trim();
+
+    const currentAdmin = group.members.find((m) => m.role === 'admin') ||
+      (group.adminEmail ? group.members.find((m) => m.email.toLowerCase() === group.adminEmail.toLowerCase()) : null) ||
+      group.members[0];
+
+    const isCurrentAdmin = isSuperAdminUser(req.user) || (currentAdmin && currentAdmin.email.toLowerCase().trim() === requesterEmail);
+    if (!isCurrentAdmin) {
+      return res.status(403).json({ error: 'Only the group admin can remove members.' });
+    }
+
+    if (cleanTargetEmail === currentAdmin.email.toLowerCase().trim()) {
+      return res.status(400).json({ error: 'Cannot remove the group admin. Transfer adminship first or use Leave Group.' });
+    }
+
+    const targetMember = group.members.find((m) => m.email.toLowerCase().trim() === cleanTargetEmail);
+    if (!targetMember) {
+      return res.status(404).json({ error: 'Member not found in this group.' });
+    }
+
+    const [expenses, settlements] = await Promise.all([
+      Expense.find({ groupId: group._id }),
+      Settlement.find({ groupId: group._id })
+    ]);
+
+    const balanceMap = computeGroupBalanceMap(group, expenses, settlements);
+    const targetBalance = balanceMap[cleanTargetEmail] || { net: 0 };
+    const netAmount = Math.round(targetBalance.net * 100) / 100;
+
+    if (Math.abs(netAmount) > 0.01 && !req.body.force) {
+      return res.status(400).json({
+        error: `Cannot remove member: ${targetMember.name} has an unsettled balance of ₹${netAmount.toFixed(2)}. Settle all balances first.`,
+        netBalance: netAmount
+      });
+    }
+
+    group.members = group.members.filter((m) => m.email.toLowerCase().trim() !== cleanTargetEmail);
+    await group.save();
+
+    logger.info(`[splits:remove-member] Admin ${requesterEmail} removed member ${cleanTargetEmail} from "${group.name}".`);
+    return res.status(200).json({
+      success: true,
+      message: `Member ${targetMember.name} (${cleanTargetEmail}) has been removed from "${group.name}".`,
+      group
+    });
+  } catch (err) {
+    logger.error('[splits:remove-member] Error removing member:', err);
     return res.status(500).json({ error: err.message });
   }
 });
@@ -1326,4 +1646,11 @@ router.get('/users/check-email', requireAuth, async (req, res) => {
   }
 });
 
-module.exports = { splitsRouter: router, simplifyDebtsGreedy, simplifyDebtsAdminHub, calculateDirectDebts };
+module.exports = {
+  splitsRouter: router,
+  simplifyDebtsGreedy,
+  simplifyDebtsAdminHub,
+  calculateDirectDebts,
+  computeGroupBalanceMap,
+  computeGroupSimplifiedDebts
+};
