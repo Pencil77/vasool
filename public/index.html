@@ -139,6 +139,18 @@
           <option value="GBP">£ GBP</option>
         </select>
 
+        <!-- Feedback Button in Header -->
+        <button
+          id="btnHeaderFeedback"
+          data-testid="btn-header-feedback"
+          onclick="openFeedbackModal()"
+          title="Send feedback or suggestions"
+          class="px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:border-emerald-400/50 cursor-pointer shadow-sm transition flex items-center gap-1.5"
+        >
+          <span>💬</span>
+          <span class="hidden sm:inline">Feedback</span>
+        </button>
+
         <button id="btnToggleViewMode" data-testid="btn-toggle-view-mode" onclick="toggleAuthOrAppView()" class="hidden">
           <span class="hidden sm:inline">Switch to </span>Auth
         </button>
@@ -767,7 +779,7 @@
       </div>
 
       <!-- Quick Metrics Grid -->
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
         <div class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 flex flex-col justify-between">
           <span class="text-xs text-slate-400 font-medium">Total Registered Users</span>
           <span id="adminTotalUsersStat" class="text-2xl font-extrabold text-white mt-2">0</span>
@@ -783,7 +795,18 @@
           <span id="adminSuspendedUsersStat" class="text-2xl font-extrabold text-rose-400 mt-2">0</span>
           <span class="text-[11px] text-slate-500 mt-1">Temporarily / Indefinitely</span>
         </div>
-        <div class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 flex flex-col justify-between">
+        <div class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 flex flex-col justify-between cursor-pointer hover:border-amber-400/50 transition group" onclick="switchAdminSubTab('feedback')">
+          <span class="text-xs text-amber-300 font-medium group-hover:text-amber-200 flex items-center justify-between">
+            <span>User Feedback</span>
+            <span class="text-xs">💬</span>
+          </span>
+          <div class="flex items-baseline gap-2 mt-2">
+            <span id="adminTotalFeedbackStat" class="text-2xl font-extrabold text-white">0</span>
+            <span id="adminNewFeedbackBadge" class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">0 new</span>
+          </div>
+          <span class="text-[11px] text-slate-500 mt-1">Click to view &amp; triage</span>
+        </div>
+        <div class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 flex flex-col justify-between col-span-2 sm:col-span-1">
           <span class="text-xs text-teal-400 font-medium">Outbound Mail Relay</span>
           <span class="text-base font-extrabold text-teal-300 mt-2 truncate">wydia@duck.com</span>
           <span class="text-[11px] text-teal-500/90 mt-1">Privacy Mask Protected</span>
@@ -875,33 +898,116 @@
         </div>
       </div>
 
-      <!-- Search & Filter Controls Card -->
-      <div class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div class="relative flex-1">
-          <input
-            id="adminUserSearchInput"
-            type="text"
-            placeholder="Search accounts by name or email address..."
-            oninput="filterAdminUsers(this.value)"
-            class="w-full px-4 py-2.5 pl-10 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
-          />
-          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">🔍</span>
+      <!-- Admin Sub-Navigation: User Accounts vs User Feedback -->
+      <div class="flex items-center gap-2 border-b border-slate-800/80 pb-3">
+        <button
+          type="button"
+          id="btnAdminTabUsers"
+          data-testid="btn-admin-tab-users"
+          onclick="switchAdminSubTab('users')"
+          class="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 transition flex items-center gap-2"
+        >
+          <span>👥 User Accounts</span>
+          <span id="adminSubTabUsersCount" class="px-1.5 py-0.5 rounded-full text-[10px] bg-slate-950/20 font-extrabold">0</span>
+        </button>
+        <button
+          type="button"
+          id="btnAdminTabFeedback"
+          data-testid="btn-admin-tab-feedback"
+          onclick="switchAdminSubTab('feedback')"
+          class="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-slate-300 hover:bg-slate-800/80 transition flex items-center gap-2"
+        >
+          <span>💬 User Feedback &amp; Suggestions</span>
+          <span id="adminSubTabFeedbackCount" class="px-2 py-0.5 rounded-full text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">0</span>
+        </button>
+      </div>
+
+      <!-- Sub-Section 1: User Accounts -->
+      <div id="adminUsersSubSection" class="space-y-4">
+        <!-- Search & Filter Controls Card -->
+        <div class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="relative flex-1">
+            <input
+              id="adminUserSearchInput"
+              type="text"
+              placeholder="Search accounts by name or email address..."
+              oninput="filterAdminUsers(this.value)"
+              class="w-full px-4 py-2.5 pl-10 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+            />
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">🔍</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-slate-400 whitespace-nowrap">Status:</span>
+            <select id="adminStatusFilter" onchange="filterAdminUsers(document.getElementById('adminUserSearchInput').value)" class="px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-500">
+              <option value="ALL">All Accounts</option>
+              <option value="ACTIVE">Active Only</option>
+              <option value="DISABLED">Disabled Only</option>
+            </select>
+          </div>
         </div>
-        <div class="flex items-center gap-2">
-          <span class="text-xs text-slate-400 whitespace-nowrap">Status:</span>
-          <select id="adminStatusFilter" onchange="filterAdminUsers(document.getElementById('adminUserSearchInput').value)" class="px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-500">
-            <option value="ALL">All Accounts</option>
-            <option value="ACTIVE">Active Only</option>
-            <option value="DISABLED">Disabled Only</option>
-          </select>
+
+        <!-- User Accounts List Container -->
+        <div id="adminUsersListContainer" class="space-y-3">
+          <div class="text-center py-16 text-slate-500 text-xs flex items-center justify-center gap-2">
+            <span class="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin"></span>
+            <span>Loading accounts from MongoDB Atlas...</span>
+          </div>
         </div>
       </div>
 
-      <!-- User Accounts List Container -->
-      <div id="adminUsersListContainer" class="space-y-3">
-        <div class="text-center py-16 text-slate-500 text-xs flex items-center justify-center gap-2">
-          <span class="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin"></span>
-          <span>Loading accounts from MongoDB Atlas...</span>
+      <!-- Sub-Section 2: User Feedback & Suggestions -->
+      <div id="adminFeedbackSubSection" class="hidden space-y-4">
+        <!-- Search & Filter Controls for Feedback -->
+        <div class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div class="relative flex-1">
+            <input
+              id="adminFeedbackSearchInput"
+              type="text"
+              placeholder="Search feedback comments, user names, or emails..."
+              oninput="filterAdminFeedback(this.value)"
+              class="w-full px-4 py-2.5 pl-10 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+            />
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">🔍</span>
+          </div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <div class="flex items-center gap-1.5">
+              <span class="text-xs text-slate-400 whitespace-nowrap">Type:</span>
+              <select id="adminFeedbackTypeFilter" onchange="filterAdminFeedback(document.getElementById('adminFeedbackSearchInput').value)" class="px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-500">
+                <option value="ALL">All Types</option>
+                <option value="feature">💡 Feature Requests</option>
+                <option value="bug">🐛 Bug Reports</option>
+                <option value="ux">✨ Design / UX</option>
+                <option value="general">💬 General</option>
+              </select>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="text-xs text-slate-400 whitespace-nowrap">Status:</span>
+              <select id="adminFeedbackStatusFilter" onchange="filterAdminFeedback(document.getElementById('adminFeedbackSearchInput').value)" class="px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-500">
+                <option value="ALL">All Statuses</option>
+                <option value="new">🟡 New</option>
+                <option value="reviewed">🔵 Reviewed</option>
+                <option value="in_progress">🟣 In Progress</option>
+                <option value="resolved">🟢 Resolved</option>
+              </select>
+            </div>
+            <button
+              type="button"
+              onclick="fetchAdminFeedback()"
+              class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 border border-slate-700 transition flex items-center gap-1.5"
+              title="Refresh Feedback"
+            >
+              <span>🔄</span>
+              <span class="hidden sm:inline">Refresh</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Feedback Items List Container -->
+        <div id="adminFeedbackListContainer" class="space-y-3">
+          <div class="text-center py-16 text-slate-500 text-xs flex items-center justify-center gap-2">
+            <span class="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin"></span>
+            <span>Loading user feedback from MongoDB Atlas...</span>
+          </div>
         </div>
       </div>
     </div>
@@ -910,6 +1016,8 @@
     <footer class="mt-12 py-6 border-t border-slate-900 text-center text-xs text-slate-500">
       <div class="flex flex-wrap items-center justify-center gap-4 mb-2">
         <span>Vasool · Smart Expense Splitting &amp; Debt Simplification</span>
+        <span class="text-slate-700">|</span>
+        <button onclick="openFeedbackModal()" class="text-emerald-400 hover:text-emerald-300 transition underline underline-offset-2">Share Feedback</button>
         <span class="text-slate-700">|</span>
         <button onclick="openModal('cloudModal')" class="text-slate-600 hover:text-slate-400 transition underline underline-offset-2">System Status</button>
       </div>
@@ -928,6 +1036,18 @@
       <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
     </svg>
     <span class="text-xs font-extrabold uppercase tracking-wide">Expense</span>
+  </button>
+
+  <!-- Floating Feedback Button (FAB) -->
+  <button
+    id="fabFeedbackBtn"
+    data-testid="fab-feedback-btn"
+    onclick="openFeedbackModal()"
+    title="Send Feedback or Suggestion"
+    class="fixed bottom-20 left-4 md:bottom-6 md:right-6 md:left-auto z-40 flex items-center justify-center gap-1.5 bg-slate-900/90 hover:bg-slate-800 text-emerald-400 font-bold px-3.5 py-2.5 rounded-full border border-emerald-500/30 shadow-xl shadow-black/40 hover:border-emerald-400/60 hover:scale-105 active:scale-95 backdrop-blur-xl transition-all"
+  >
+    <span class="text-sm sm:text-base">💬</span>
+    <span class="text-xs font-semibold text-slate-200 hidden sm:inline">Feedback</span>
   </button>
 
   <!-- Mobile Fixed Bottom Navigation Bar (Android Thumb-Friendly Viewport) -->
@@ -2160,6 +2280,116 @@
         </button>
         <button type="button" onclick="submitAdminDeleteUser()" id="btnAdminConfirmDelete" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-lg shadow-rose-600/30 transition">
           Yes, Delete Account
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- User Feedback & Comments Modal -->
+  <div id="feedbackModal" data-testid="feedback-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
+    <div class="glass-panel w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto border border-emerald-500/30 shadow-2xl relative">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-400/40 flex items-center justify-center text-lg">
+            💬
+          </div>
+          <div>
+            <h3 class="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+              <span>Send Feedback</span>
+              <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-medium">Direct to Developer</span>
+            </h3>
+            <p class="text-[11px] text-slate-400">Share suggestions, report bugs, or request features.</p>
+          </div>
+        </div>
+        <button onclick="closeModal('feedbackModal')" class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <!-- Feedback Type Selector -->
+      <div>
+        <label class="block text-xs font-semibold text-slate-300 mb-1.5">What kind of feedback is this?</label>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <button type="button" onclick="selectFeedbackType('feature')" id="feedbackTypeBtn_feature" class="feedback-type-btn p-2 rounded-xl text-xs font-medium border border-slate-700 bg-slate-900 text-slate-300 hover:border-emerald-500/50 flex flex-col items-center gap-1 transition">
+            <span class="text-base">💡</span>
+            <span class="text-[11px]">Feature</span>
+          </button>
+          <button type="button" onclick="selectFeedbackType('bug')" id="feedbackTypeBtn_bug" class="feedback-type-btn p-2 rounded-xl text-xs font-medium border border-slate-700 bg-slate-900 text-slate-300 hover:border-emerald-500/50 flex flex-col items-center gap-1 transition">
+            <span class="text-base">🐛</span>
+            <span class="text-[11px]">Bug</span>
+          </button>
+          <button type="button" onclick="selectFeedbackType('ux')" id="feedbackTypeBtn_ux" class="feedback-type-btn p-2 rounded-xl text-xs font-medium border border-slate-700 bg-slate-900 text-slate-300 hover:border-emerald-500/50 flex flex-col items-center gap-1 transition">
+            <span class="text-base">✨</span>
+            <span class="text-[11px]">Design / UX</span>
+          </button>
+          <button type="button" onclick="selectFeedbackType('general')" id="feedbackTypeBtn_general" class="feedback-type-btn p-2 rounded-xl text-xs font-medium border border-emerald-500 bg-emerald-500/15 text-emerald-300 flex flex-col items-center gap-1 transition">
+            <span class="text-base">💬</span>
+            <span class="text-[11px]">General</span>
+          </button>
+        </div>
+        <input type="hidden" id="selectedFeedbackType" value="general" />
+      </div>
+
+      <!-- Star Rating (Optional) -->
+      <div>
+        <label class="block text-xs font-semibold text-slate-300 mb-1">How would you rate your experience? <span class="text-[10px] text-slate-500 font-normal">(optional)</span></label>
+        <div class="flex items-center gap-1.5 text-2xl" id="feedbackStarRatingContainer">
+          <button type="button" onclick="setFeedbackRating(1)" class="star-btn text-slate-600 hover:text-amber-400 transition" data-star="1">★</button>
+          <button type="button" onclick="setFeedbackRating(2)" class="star-btn text-slate-600 hover:text-amber-400 transition" data-star="2">★</button>
+          <button type="button" onclick="setFeedbackRating(3)" class="star-btn text-slate-600 hover:text-amber-400 transition" data-star="3">★</button>
+          <button type="button" onclick="setFeedbackRating(4)" class="star-btn text-slate-600 hover:text-amber-400 transition" data-star="4">★</button>
+          <button type="button" onclick="setFeedbackRating(5)" class="star-btn text-slate-600 hover:text-amber-400 transition" data-star="5">★</button>
+          <span id="feedbackRatingLabel" class="text-xs text-slate-400 ml-2 font-medium"></span>
+        </div>
+        <input type="hidden" id="selectedFeedbackRating" value="" />
+      </div>
+
+      <!-- Feedback Message Textarea -->
+      <div>
+        <div class="flex items-center justify-between mb-1">
+          <label class="text-xs font-semibold text-slate-300">Your Comments &amp; Suggestions <span class="text-rose-400">*</span></label>
+          <span id="feedbackCharCount" class="text-[10px] text-slate-500">0 / 2000</span>
+        </div>
+        <textarea
+          id="feedbackMessageInput"
+          data-testid="feedback-message-input"
+          rows="4"
+          maxlength="2000"
+          oninput="updateFeedbackCharCount(this)"
+          placeholder="Tell us what you liked, what felt confusing, or features you'd like us to build..."
+          class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/90 border border-slate-700 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 transition resize-none custom-scroll"
+        ></textarea>
+      </div>
+
+      <!-- User Identification Status -->
+      <div id="feedbackUserIdentityBanner" class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 text-[11px] flex items-center justify-between">
+        <div class="flex items-center gap-1.5 text-slate-300 truncate mr-2">
+          <span class="text-emerald-400">👤</span>
+          <span id="feedbackUserIdentityText" class="truncate">Submitting as: Guest</span>
+        </div>
+        <label class="flex items-center gap-1 text-[11px] text-slate-400 cursor-pointer flex-shrink-0">
+          <input type="checkbox" id="feedbackAnonymousCheckbox" class="rounded bg-slate-950 border-slate-700 text-emerald-500 focus:ring-0" />
+          <span>Post anonymously</span>
+        </label>
+      </div>
+
+      <!-- Actions -->
+      <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+        <button
+          type="button"
+          onclick="closeModal('feedbackModal')"
+          class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          id="btnSubmitFeedback"
+          data-testid="btn-submit-feedback"
+          onclick="submitUserFeedback()"
+          class="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold text-xs transition flex items-center gap-1.5 shadow-md shadow-emerald-500/20"
+        >
+          <span>Send Feedback 🚀</span>
         </button>
       </div>
     </div>
@@ -4182,6 +4412,452 @@ exec node server.js`
           btn.disabled = false;
           btn.textContent = origText;
         }
+      }
+    }
+
+    // =========================================================================
+    // USER FEEDBACK & COMMENTS CLIENT LOGIC
+    // =========================================================================
+    let currentFeedbackRating = null;
+
+    function openFeedbackModal() {
+      // Pre-fill user state
+      const identityText = document.getElementById('feedbackUserIdentityText');
+      const anonCheckbox = document.getElementById('feedbackAnonymousCheckbox');
+      if (anonCheckbox) anonCheckbox.checked = false;
+
+      if (appState.currentUser && appState.currentUser.email) {
+        const displayName = appState.currentUser.fullName || appState.currentUser.name || appState.currentUser.email;
+        if (identityText) identityText.textContent = `Submitting as: ${displayName} (${appState.currentUser.email})`;
+      } else {
+        if (identityText) identityText.textContent = 'Submitting as: Anonymous Guest';
+      }
+
+      // Reset fields
+      selectFeedbackType('general');
+      setFeedbackRating(null);
+      const msgInput = document.getElementById('feedbackMessageInput');
+      if (msgInput) {
+        msgInput.value = '';
+        updateFeedbackCharCount(msgInput);
+      }
+
+      openModal('feedbackModal');
+    }
+
+    function selectFeedbackType(type) {
+      const typeInput = document.getElementById('selectedFeedbackType');
+      if (typeInput) typeInput.value = type;
+
+      const types = ['feature', 'bug', 'ux', 'general'];
+      types.forEach((t) => {
+        const btn = document.getElementById(`feedbackTypeBtn_${t}`);
+        if (!btn) return;
+        if (t === type) {
+          btn.className = 'feedback-type-btn p-2 rounded-xl text-xs font-medium border border-emerald-500 bg-emerald-500/15 text-emerald-300 flex flex-col items-center gap-1 transition shadow-sm';
+        } else {
+          btn.className = 'feedback-type-btn p-2 rounded-xl text-xs font-medium border border-slate-700 bg-slate-900 text-slate-400 hover:border-emerald-500/50 hover:text-slate-200 flex flex-col items-center gap-1 transition';
+        }
+      });
+    }
+
+    function setFeedbackRating(stars) {
+      currentFeedbackRating = stars ? parseInt(stars, 10) : null;
+      const ratingInput = document.getElementById('selectedFeedbackRating');
+      if (ratingInput) ratingInput.value = currentFeedbackRating || '';
+
+      const starButtons = document.querySelectorAll('#feedbackStarRatingContainer .star-btn');
+      starButtons.forEach((btn) => {
+        const starVal = parseInt(btn.getAttribute('data-star'), 10);
+        if (currentFeedbackRating && starVal <= currentFeedbackRating) {
+          btn.className = 'star-btn text-amber-400 hover:text-amber-300 transition';
+        } else {
+          btn.className = 'star-btn text-slate-700 hover:text-slate-500 transition';
+        }
+      });
+
+      const label = document.getElementById('feedbackRatingLabel');
+      if (label) {
+        const labels = {
+          1: '😞 Poor',
+          2: '😐 Fair',
+          3: '🙂 Good',
+          4: '😃 Great',
+          5: '🌟 Outstanding!'
+        };
+        label.textContent = currentFeedbackRating ? labels[currentFeedbackRating] || '' : '';
+      }
+    }
+
+    function updateFeedbackCharCount(el) {
+      const counter = document.getElementById('feedbackCharCount');
+      if (counter && el) {
+        counter.textContent = `${el.value.length} / 2000`;
+      }
+    }
+
+    async function submitUserFeedback() {
+      const msgInput = document.getElementById('feedbackMessageInput');
+      const message = msgInput ? msgInput.value.trim() : '';
+
+      if (!message || message.length < 3) {
+        showToast('Please enter a feedback message (at least 3 characters).', 'error');
+        if (msgInput) msgInput.focus();
+        return;
+      }
+
+      const type = document.getElementById('selectedFeedbackType') ? document.getElementById('selectedFeedbackType').value : 'general';
+      const rating = currentFeedbackRating;
+      const isAnon = document.getElementById('feedbackAnonymousCheckbox') && document.getElementById('feedbackAnonymousCheckbox').checked;
+      const page = window.location.hash || window.location.pathname || 'dashboard';
+
+      const btn = document.getElementById('btnSubmitFeedback');
+      const origHtml = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<span class="w-3.5 h-3.5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin"></span><span>Sending...</span>`;
+      }
+
+      try {
+        const headers = { 'Content-Type': 'application/json' };
+        if (!isAnon) {
+          const token = localStorage.getItem(AUTH_TOKEN_KEY);
+          if (token) headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const res = await fetch('/api/feedback', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            type,
+            rating,
+            message,
+            page
+          })
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || 'Failed to submit feedback.');
+        }
+
+        closeModal('feedbackModal');
+        showToast('🎉 Thank you! Your feedback has been received and saved.', 'success');
+
+        // If Super Admin is viewing admin panel, live update feedback list
+        if (typeof activeAdminSubTab !== 'undefined' && activeAdminSubTab === 'feedback') {
+          fetchAdminFeedback();
+        }
+      } catch (err) {
+        showToast(err.message || 'Error submitting feedback. Please try again.', 'error');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = origHtml;
+        }
+      }
+    }
+
+    // =========================================================================
+    // SUPER ADMIN FEEDBACK MANAGEMENT LOGIC
+    // =========================================================================
+    let activeAdminSubTab = 'users';
+    let adminFeedbackCache = [];
+
+    function switchAdminSubTab(subTab) {
+      activeAdminSubTab = subTab;
+      const btnUsers = document.getElementById('btnAdminTabUsers');
+      const btnFeedback = document.getElementById('btnAdminTabFeedback');
+      const usersSection = document.getElementById('adminUsersSubSection');
+      const feedbackSection = document.getElementById('adminFeedbackSubSection');
+
+      if (subTab === 'users') {
+        if (btnUsers) btnUsers.className = 'px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 transition flex items-center gap-2';
+        if (btnFeedback) btnFeedback.className = 'px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-slate-300 hover:bg-slate-800/80 transition flex items-center gap-2';
+        if (usersSection) usersSection.classList.remove('hidden');
+        if (feedbackSection) feedbackSection.classList.add('hidden');
+      } else {
+        if (btnUsers) btnUsers.className = 'px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-slate-300 hover:bg-slate-800/80 transition flex items-center gap-2';
+        if (btnFeedback) btnFeedback.className = 'px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 transition flex items-center gap-2';
+        if (usersSection) usersSection.classList.add('hidden');
+        if (feedbackSection) feedbackSection.classList.remove('hidden');
+        fetchAdminFeedback();
+      }
+    }
+
+    async function fetchAdminFeedback(silent = false) {
+      const container = document.getElementById('adminFeedbackListContainer');
+      if (container && !silent) {
+        container.innerHTML = `
+          <div class="text-center py-10 text-slate-500 text-xs flex items-center justify-center gap-2">
+            <span class="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin"></span>
+            <span>Fetching user feedback from MongoDB Atlas...</span>
+          </div>`;
+      }
+
+      try {
+        const res = await apiFetch('/api/admin/feedback');
+        adminFeedbackCache = res.feedbacks || [];
+
+        // Update counts
+        const total = adminFeedbackCache.length;
+        const newCount = adminFeedbackCache.filter((f) => f.status === 'new').length;
+
+        const totalEl = document.getElementById('adminTotalFeedbackStat');
+        const badgeEl = document.getElementById('adminNewFeedbackBadge');
+        const subTabCountEl = document.getElementById('adminSubTabFeedbackCount');
+
+        if (totalEl) totalEl.textContent = total;
+        if (badgeEl) badgeEl.textContent = `${newCount} new`;
+        if (subTabCountEl) subTabCountEl.textContent = newCount > 0 ? `${newCount} new` : total;
+
+        const searchVal = document.getElementById('adminFeedbackSearchInput') ? document.getElementById('adminFeedbackSearchInput').value : '';
+        filterAdminFeedback(searchVal);
+      } catch (err) {
+        if (container && !silent) {
+          container.innerHTML = `
+            <div class="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs text-center">
+              Failed to load feedback: ${escapeHtml(err.message || 'Access restricted')}
+            </div>`;
+        }
+      }
+    }
+
+    function filterAdminFeedback(query) {
+      const q = String(query || '').trim().toLowerCase();
+      const typeSelect = document.getElementById('adminFeedbackTypeFilter');
+      const statusSelect = document.getElementById('adminFeedbackStatusFilter');
+
+      const typeFilter = typeSelect ? typeSelect.value : 'ALL';
+      const statusFilter = statusSelect ? statusSelect.value : 'ALL';
+
+      let filtered = adminFeedbackCache;
+      if (typeFilter !== 'ALL') {
+        filtered = filtered.filter((f) => f.type === typeFilter);
+      }
+      if (statusFilter !== 'ALL') {
+        filtered = filtered.filter((f) => f.status === statusFilter);
+      }
+
+      if (q) {
+        filtered = filtered.filter((f) =>
+          (f.message && f.message.toLowerCase().includes(q)) ||
+          (f.userName && f.userName.toLowerCase().includes(q)) ||
+          (f.userEmail && f.userEmail.toLowerCase().includes(q)) ||
+          (f.adminNotes && f.adminNotes.toLowerCase().includes(q))
+        );
+      }
+
+      renderAdminFeedback(filtered);
+    }
+
+    function renderAdminFeedback(items) {
+      const container = document.getElementById('adminFeedbackListContainer');
+      if (!container) return;
+
+      if (!items || items.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-12 p-6 rounded-2xl bg-slate-900/60 border border-slate-800 text-slate-500 text-xs space-y-1">
+            <span class="text-2xl block mb-2">📬</span>
+            <p class="font-medium text-slate-400">No feedback entries found matching current filters.</p>
+            <p class="text-[11px] text-slate-600">When users submit feedback or comments, they will appear here in real-time.</p>
+          </div>`;
+        return;
+      }
+
+      const typeIcons = {
+        feature: '💡 Feature',
+        bug: '🐛 Bug',
+        ux: '✨ Design/UX',
+        general: '💬 General'
+      };
+
+      const typeBadgeStyles = {
+        feature: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+        bug: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
+        ux: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
+        general: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+      };
+
+      const statusBadgeStyles = {
+        new: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+        reviewed: 'bg-blue-500/20 text-blue-300 border-blue-500/40',
+        in_progress: 'bg-purple-500/20 text-purple-300 border-purple-500/40',
+        resolved: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+      };
+
+      const html = items.map((f) => {
+        const typeLabel = typeIcons[f.type] || '💬 General';
+        const typeStyle = typeBadgeStyles[f.type] || typeBadgeStyles.general;
+        const statusStyle = statusBadgeStyles[f.status] || statusBadgeStyles.new;
+        const statusText = f.status.replace('_', ' ').toUpperCase();
+
+        const createdDate = new Date(f.createdAt);
+        const dateStr = createdDate.toLocaleString([], {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+
+        const userInitial = (f.userName || f.userEmail || 'G').slice(0, 1).toUpperCase();
+        const userDisplay = f.userEmail
+          ? `<span class="font-bold text-white">${escapeHtml(f.userName || 'User')}</span> <span class="text-slate-400 font-mono text-[11px]">(${escapeHtml(f.userEmail)})</span>`
+          : `<span class="font-bold text-slate-300">Anonymous Guest</span>`;
+
+        let starsHtml = '';
+        if (f.rating) {
+          starsHtml = `<span class="text-amber-400 text-xs tracking-tight" title="${f.rating} Stars">${'★'.repeat(f.rating)}${'☆'.repeat(5 - f.rating)}</span>`;
+        }
+
+        const pageBadge = f.page
+          ? `<span class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">Page: ${escapeHtml(f.page)}</span>`
+          : '';
+
+        return `
+          <div class="p-4 sm:p-5 rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 transition space-y-3" id="feedbackCard_${f._id}">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
+              <div class="flex items-center gap-2.5 min-w-0">
+                <div class="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold text-slate-300 flex-shrink-0">
+                  ${userInitial}
+                </div>
+                <div class="min-w-0 truncate">
+                  <div class="text-xs truncate">${userDisplay}</div>
+                  <div class="text-[10px] text-slate-500">${dateStr}</div>
+                </div>
+              </div>
+              <div class="flex items-center gap-1.5 flex-wrap">
+                ${starsHtml}
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold border ${typeStyle}">
+                  ${typeLabel}
+                </span>
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-extrabold border ${statusStyle}">
+                  ${statusText}
+                </span>
+                ${pageBadge}
+              </div>
+            </div>
+
+            <!-- Message Body -->
+            <div class="text-xs sm:text-sm text-slate-200 leading-relaxed whitespace-pre-wrap bg-slate-950/60 p-3.5 rounded-xl border border-slate-800/80">
+              ${escapeHtml(f.message)}
+            </div>
+
+            <!-- Admin Action Row: Status Changer & Notes -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1">
+              <div class="flex items-center gap-2 flex-1">
+                <span class="text-[11px] text-slate-400 whitespace-nowrap">Status:</span>
+                <select
+                  onchange="updateAdminFeedbackStatus('${f._id}', this.value)"
+                  class="px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-700 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
+                >
+                  <option value="new" ${f.status === 'new' ? 'selected' : ''}>🟡 New</option>
+                  <option value="reviewed" ${f.status === 'reviewed' ? 'selected' : ''}>🔵 Reviewed</option>
+                  <option value="in_progress" ${f.status === 'in_progress' ? 'selected' : ''}>🟣 In Progress</option>
+                  <option value="resolved" ${f.status === 'resolved' ? 'selected' : ''}>🟢 Resolved</option>
+                </select>
+
+                <div class="relative flex-1 min-w-[140px]">
+                  <input
+                    type="text"
+                    id="adminNotes_${f._id}"
+                    value="${escapeHtml(f.adminNotes || '')}"
+                    placeholder="Internal developer notes..."
+                    class="w-full px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-700 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onclick="saveAdminFeedbackNotes('${f._id}')"
+                  class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition"
+                  title="Save Notes"
+                >
+                  Save Note
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onclick="deleteAdminFeedback('${f._id}')"
+                class="px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs font-semibold transition flex items-center justify-center gap-1 self-end sm:self-auto"
+                title="Delete this feedback entry"
+              >
+                <span>🗑️</span>
+                <span>Delete</span>
+              </button>
+            </div>
+          </div>`;
+      }).join('');
+
+      container.innerHTML = html;
+    }
+
+    async function updateAdminFeedbackStatus(id, newStatus) {
+      try {
+        const res = await apiFetch(`/api/admin/feedback/${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status: newStatus })
+        });
+        showToast('✓ Feedback status updated.');
+        const item = adminFeedbackCache.find((f) => f._id === id);
+        if (item) item.status = newStatus;
+
+        // Update counts
+        const newCount = adminFeedbackCache.filter((f) => f.status === 'new').length;
+        const badgeEl = document.getElementById('adminNewFeedbackBadge');
+        const subTabCountEl = document.getElementById('adminSubTabFeedbackCount');
+        if (badgeEl) badgeEl.textContent = `${newCount} new`;
+        if (subTabCountEl) subTabCountEl.textContent = newCount > 0 ? `${newCount} new` : adminFeedbackCache.length;
+
+        const searchVal = document.getElementById('adminFeedbackSearchInput') ? document.getElementById('adminFeedbackSearchInput').value : '';
+        filterAdminFeedback(searchVal);
+      } catch (err) {
+        showToast(err.message || 'Failed to update feedback status.', 'error');
+      }
+    }
+
+    async function saveAdminFeedbackNotes(id) {
+      const input = document.getElementById(`adminNotes_${id}`);
+      const notes = input ? input.value : '';
+
+      try {
+        await apiFetch(`/api/admin/feedback/${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ adminNotes: notes })
+        });
+        showToast('✓ Developer note saved.');
+        const item = adminFeedbackCache.find((f) => f._id === id);
+        if (item) item.adminNotes = notes;
+      } catch (err) {
+        showToast(err.message || 'Failed to save note.', 'error');
+      }
+    }
+
+    async function deleteAdminFeedback(id) {
+      if (!confirm('Are you sure you want to permanently delete this feedback entry?')) return;
+
+      try {
+        await apiFetch(`/api/admin/feedback/${id}`, {
+          method: 'DELETE'
+        });
+        showToast('🗑️ Feedback entry deleted.');
+        adminFeedbackCache = adminFeedbackCache.filter((f) => f._id !== id);
+
+        const total = adminFeedbackCache.length;
+        const newCount = adminFeedbackCache.filter((f) => f.status === 'new').length;
+        const totalEl = document.getElementById('adminTotalFeedbackStat');
+        const badgeEl = document.getElementById('adminNewFeedbackBadge');
+        const subTabCountEl = document.getElementById('adminSubTabFeedbackCount');
+
+        if (totalEl) totalEl.textContent = total;
+        if (badgeEl) badgeEl.textContent = `${newCount} new`;
+        if (subTabCountEl) subTabCountEl.textContent = newCount > 0 ? `${newCount} new` : total;
+
+        const searchVal = document.getElementById('adminFeedbackSearchInput') ? document.getElementById('adminFeedbackSearchInput').value : '';
+        filterAdminFeedback(searchVal);
+      } catch (err) {
+        showToast(err.message || 'Failed to delete feedback.', 'error');
       }
     }
 
@@ -7618,6 +8294,17 @@ exec node server.js`
       window.handleDeclineInvite = handleDeclineInvite;
       window.openModal = openModal;
       window.closeModal = closeModal;
+      window.openFeedbackModal = openFeedbackModal;
+      window.selectFeedbackType = selectFeedbackType;
+      window.setFeedbackRating = setFeedbackRating;
+      window.updateFeedbackCharCount = updateFeedbackCharCount;
+      window.submitUserFeedback = submitUserFeedback;
+      window.switchAdminSubTab = switchAdminSubTab;
+      window.fetchAdminFeedback = fetchAdminFeedback;
+      window.filterAdminFeedback = filterAdminFeedback;
+      window.updateAdminFeedbackStatus = updateAdminFeedbackStatus;
+      window.saveAdminFeedbackNotes = saveAdminFeedbackNotes;
+      window.deleteAdminFeedback = deleteAdminFeedback;
       window.handleOtpVerificationSubmit = handleOtpVerificationSubmit;
       window.handleResendOtp = handleResendOtp;
       window.handleJoinGroupSubmit = handleJoinGroupSubmit;

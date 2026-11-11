@@ -5,6 +5,7 @@ const Group = require('../models/Group');
 const Expense = require('../models/Expense');
 const Settlement = require('../models/Settlement');
 const User = require('../models/User');
+const Feedback = require('../models/Feedback');
 const { requireAuth } = require('./auth');
 const { sendGroupInviteEmail } = require('../lib/mailer');
 const logger = require('../lib/logger');
@@ -1644,6 +1645,57 @@ router.get('/users/check-email', requireAuth, async (req, res) => {
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
+});
+
+/**
+ * POST /api/feedback
+ * Submit user feedback (authenticated or anonymous).
+ */
+router.post('/feedback', async (req, res) => {
+  await connectToDatabase();
+  const { type, rating, message, page } = req.body;
+  if (!message || String(message).trim().length < 3) {
+    return res.status(400).json({ error: 'Feedback message must be at least 3 characters.' });
+  }
+  if (String(message).trim().length > 2000) {
+    return res.status(400).json({ error: 'Feedback message too long (max 2000 characters).' });
+  }
+  const allowedTypes = ['bug', 'feature', 'general', 'ux'];
+  const feedbackType = allowedTypes.includes(type) ? type : 'general';
+  const ratingNum = rating ? parseInt(rating, 10) : null;
+  if (ratingNum !== null && (ratingNum < 1 || ratingNum > 5)) {
+    return res.status(400).json({ error: 'Rating must be between 1 and 5.' });
+  }
+
+  // Identify user if logged in (optional — feedback works anonymously too)
+  let userId = null;
+  let userEmail = null;
+  let userName = null;
+  try {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const { verifyAuthToken } = require('./auth');
+      const decoded = verifyAuthToken(authHeader.slice(7));
+      if (decoded && decoded.sub) {
+        userId = decoded.sub;
+        userEmail = decoded.email;
+        userName = decoded.name;
+      }
+    }
+  } catch (_) { /* Anonymous fallback */ }
+
+  const feedback = await Feedback.create({
+    userId,
+    userEmail,
+    userName,
+    type: feedbackType,
+    rating: ratingNum,
+    message: String(message).trim(),
+    page: page ? String(page).trim().slice(0, 100) : null
+  });
+
+  logger.info(`[feedback] New feedback submitted (type=${feedbackType}, user=${userEmail || 'anonymous'})`);
+  return res.status(201).json({ success: true, feedbackId: feedback._id });
 });
 
 module.exports = {

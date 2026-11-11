@@ -114,6 +114,14 @@ function signAuthToken(user) {
   );
 }
 
+function verifyAuthToken(token) {
+  try {
+    return jwt.verify(token, JWT_SECRET);
+  } catch {
+    return null;
+  }
+}
+
 function sanitizeUser(user) {
   const isSuper = Boolean(user.isSuperAdmin) || isSuperAdminEmail(user.email);
   return {
@@ -783,6 +791,7 @@ module.exports = {
   sanitizeUser,
   isUserSuspended,
   signAuthToken,
+  verifyAuthToken,
   refreshSessionDurationCache,
   updateCachedSessionDuration,
   getCachedSessionDuration

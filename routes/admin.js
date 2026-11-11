@@ -14,6 +14,8 @@ const {
 const logger = require('../lib/logger');
 const otel = require('../lib/otel');
 
+const Feedback = require('../models/Feedback');
+
 const router = express.Router();
 
 /**
@@ -428,6 +430,51 @@ router.patch('/settings', async (req, res) => {
     span.end();
     return res.status(500).json({ error: err.message || 'Failed to update system settings.' });
   }
+});
+
+/**
+ * GET /api/admin/feedback
+ * Returns all feedback submissions, newest first.
+ */
+router.get('/feedback', async (req, res) => {
+  await connectToDatabase();
+  const { status, type, limit = 100, skip = 0 } = req.query;
+  const filter = {};
+  if (status) filter.status = status;
+  if (type) filter.type = type;
+  const feedbacks = await Feedback.find(filter)
+    .sort({ createdAt: -1 })
+    .skip(Number(skip))
+    .limit(Number(limit))
+    .lean();
+  const total = await Feedback.countDocuments(filter);
+  return res.json({ feedbacks, total });
+});
+
+/**
+ * PATCH /api/admin/feedback/:id
+ * Update feedback status or admin notes.
+ */
+router.patch('/feedback/:id', async (req, res) => {
+  await connectToDatabase();
+  const { status, adminNotes } = req.body;
+  const allowedStatuses = ['new', 'reviewed', 'in_progress', 'resolved'];
+  const update = {};
+  if (status && allowedStatuses.includes(status)) update.status = status;
+  if (adminNotes !== undefined) update.adminNotes = String(adminNotes).trim().slice(0, 1000);
+  const updated = await Feedback.findByIdAndUpdate(req.params.id, { $set: update }, { new: true });
+  if (!updated) return res.status(404).json({ error: 'Feedback not found.' });
+  return res.json({ success: true, feedback: updated });
+});
+
+/**
+ * DELETE /api/admin/feedback/:id
+ * Permanently delete a feedback entry.
+ */
+router.delete('/feedback/:id', async (req, res) => {
+  await connectToDatabase();
+  await Feedback.findByIdAndDelete(req.params.id);
+  return res.json({ success: true });
 });
 
 module.exports = { adminRouter: router };
