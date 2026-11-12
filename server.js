@@ -114,19 +114,18 @@ app.use((err, req, res, next) => {
 });
 
 // SPA Fallback
-const serveIndexHtml = (req, res) => {
+app.get('*', (req, res) => {
   const htmlPath = path.join(__dirname, 'public', 'index.html');
   let html = fs.readFileSync(htmlPath, 'utf8');
-  if (!html.includes('/vasool-v3-aurora.js')) {
-    html = html.replace('</body>', '<script src="/vasool-v3-aurora.js" defer></script>\n</body>');
+  if (!html.includes('/css/aurora-theme.css')) {
+    html = html.replace('</head>', '<link rel="stylesheet" href="/css/aurora-theme.css" />\n</head>');
   }
+  if (!html.includes('/js/aurora-v3-upgrade.js')) {
+    html = html.replace('</body>', '<script src="/js/aurora-v3-upgrade.js"></script>\n</body>');
+  }
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.send(html);
-};
-
-app.get('/', serveIndexHtml);
-app.get('*, serveIndexHtml);
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+});;
 
 if (require.main === module) {
   connectToDatabase()
