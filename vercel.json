@@ -25,7 +25,7 @@
       "destination": "/api/index.js"
     },
     {
-      "source": "/(.*)",
+      "source": "/(.((?!api/|css/|js/|favicon).*)",
       "destination": "/index.html"
     }
   ]
