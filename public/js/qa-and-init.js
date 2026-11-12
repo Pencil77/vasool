@@ -465,9 +465,31 @@
     // UTILITIES, CLIPBOARD & CLOUD MODAL
     // =========================================================================
     function openModal(id) {
+      if (id === 'cloudModal') {
+        const isSuper = (typeof isSuperAdminUser === 'function')
+          ? isSuperAdminUser(appState && appState.currentUser)
+          : false;
+        if (!isSuper) {
+          showToast('Infrastructure diagnostics are restricted to Super Admin only.', 'warning');
+          return;
+        }
+        updateCloudInspector();
+      }
+      if (id === 'systemStatusModal') {
+        const superNotice = document.getElementById('superAdminDiagnosticNotice');
+        if (superNotice) {
+          const isSuper = (typeof isSuperAdminUser === 'function')
+            ? isSuperAdminUser(appState && appState.currentUser)
+            : false;
+          if (isSuper) {
+            superNotice.classList.remove('hidden');
+          } else {
+            superNotice.classList.add('hidden');
+          }
+        }
+      }
       const el = document.getElementById(id);
       if (el) el.classList.remove('hidden');
-      if (id === 'cloudModal') updateCloudInspector();
     }
 
     function closeModal(id) {
@@ -505,20 +527,23 @@
     }
 
     function updateCloudInspector() {
+      const isSuper = (typeof isSuperAdminUser === 'function')
+        ? isSuperAdminUser(appState && appState.currentUser)
+        : false;
+      if (!isSuper) return;
       const pre = document.getElementById('dbJsonInspector');
       if (!pre) return;
       pre.textContent = JSON.stringify(
         {
-          mongodbDatabase: 'vasool',
-          infisicalDomain: 'https://app.infisical.com',
+          service: 'vasool',
+          status: 'operational',
           collections: {
-            users: appState.users.length,
-            groups: appState.groups.length,
-            expenses: appState.expenses.length,
-            settlements: appState.settlements.length
+            users: (appState.users || []).length,
+            groups: (appState.groups || []).length,
+            expenses: (appState.expenses || []).length,
+            settlements: (appState.settlements || []).length
           },
-          sampleActiveUser: appState.currentUser,
-          groups: appState.groups
+          activeAdmin: appState.currentUser ? { email: appState.currentUser.email, role: appState.currentUser.role } : null
         },
         null,
         2
@@ -526,10 +551,32 @@
     }
 
     function exportDatabaseJson() {
-      copyTextToClipboard(JSON.stringify(appState, null, 2), 'Full MongoDB JSON state copied to clipboard!');
+      const isSuper = (typeof isSuperAdminUser === 'function')
+        ? isSuperAdminUser(appState && appState.currentUser)
+        : false;
+      if (!isSuper) {
+        showToast('Access restricted to Super Admin only.', 'warning');
+        return;
+      }
+      copyTextToClipboard(JSON.stringify({
+        database: 'vasool',
+        stats: {
+          users: (appState.users || []).length,
+          groups: (appState.groups || []).length,
+          expenses: (appState.expenses || []).length,
+          settlements: (appState.settlements || []).length
+        }
+      }, null, 2), 'Database stats copied to clipboard!');
     }
 
     function resetDemoDatabase() {
+      const isSuper = (typeof isSuperAdminUser === 'function')
+        ? isSuperAdminUser(appState && appState.currentUser)
+        : false;
+      if (!isSuper) {
+        showToast('Action restricted to Super Admin only.', 'warning');
+        return;
+      }
       appState = createDefaultState();
       saveState();
       refreshAllViews();

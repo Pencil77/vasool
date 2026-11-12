@@ -477,4 +477,39 @@ router.delete('/feedback/:id', async (req, res) => {
   return res.json({ success: true });
 });
 
+/**
+ * GET /api/admin/system-status
+ * Deep infrastructure & telemetry diagnostics for authenticated Super Admin
+ */
+router.get('/system-status', async (req, res) => {
+  let dbStatus = 'disconnected';
+  try {
+    await connectToDatabase();
+    dbStatus = 'connected';
+  } catch (err) {
+    dbStatus = 'error: ' + err.message;
+  }
+
+  const userCount = await User.countDocuments().catch(() => 0);
+  const groupCount = await Group.countDocuments().catch(() => 0);
+
+  res.status(200).json({
+    service: 'vasool',
+    status: 'operational',
+    version: '3.0.0',
+    mongodb: dbStatus,
+    googleOAuthConfigured: Boolean(process.env.VASOOL_GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID),
+    infisicalConfigured: Boolean(process.env.MONGO_URI || process.env.MONGODB_URI),
+    grafanaLokiConfigured: Boolean(process.env.GRAFANA_CLOUD_TOKEN),
+    openTelemetryConfigured: Boolean(process.env.GRAFANA_CLOUD_TOKEN),
+    stats: {
+      totalUsers: userCount,
+      totalGroups: groupCount
+    },
+    nodeVersion: process.version,
+    uptimeSeconds: Math.floor(process.uptime()),
+    timestamp: new Date().toISOString()
+  });
+});
+
 module.exports = { adminRouter: router };

@@ -4,7 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const logger = require('./lib/logger');
 const otel = require('./lib/otel');
-const { authRouter } = require('./routes/auth');
+const { authRouter, verifyAuthToken, isSuperAdminEmail } = require('./routes/auth');
 const { splitsRouter } = require('./routes/splits');
 const { adminRouter } = require('./routes/admin');
 const { connectToDatabase } = require('./lib/mongodb');
@@ -67,32 +67,52 @@ app.post('/api/telemetry/rum', (req, res) => {
   res.status(204).end();
 });
 
-// Health check & Infisical/MongoDB status endpoint
+// Health check: Abstracted for public & non-admin callers, detailed for Super Admin
 app.get('/api/health', async (req, res) => {
-  let dbStatus = 'disconnected';
+  let isDbConnected = false;
   try {
     const uri = process.env.MONGODB_URI && !process.env.MONGODB_URI.includes('your_mongodb')
       ? process.env.MONGODB_URI
       : process.env.MONGO_URI;
     if (uri) {
       await connectToDatabase();
-      dbStatus = 'connected';
-    } else {
-      dbStatus = 'missing_mongodb_uri';
+      isDbConnected = true;
     }
   } catch (err) {
-    dbStatus = 'error: ' + err.message;
+    logger.warn('[Health Check] DB probe warning:', err.message);
   }
 
+  // Check if request is authenticated as Super Admin
+  const authHeader = req.headers.authorization;
+  let isSuper = false;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.split(' ')[1];
+    const decoded = verifyAuthToken(token);
+    if (decoded && (decoded.isSuperAdmin || (decoded.email && isSuperAdminEmail(decoded.email)))) {
+      isSuper = true;
+    }
+  }
+
+  if (isSuper) {
+    return res.status(200).json({
+      service: 'vasool',
+      status: isDbConnected ? 'operational' : 'degraded',
+      version: '3.0.0',
+      mongodb: isDbConnected ? 'connected' : 'disconnected',
+      googleOAuthConfigured: Boolean(process.env.VASOOL_GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID),
+      infisicalConfigured: Boolean(process.env.MONGO_URI || process.env.MONGODB_URI),
+      grafanaLokiConfigured: Boolean(process.env.GRAFANA_CLOUD_TOKEN),
+      openTelemetryConfigured: Boolean(process.env.GRAFANA_CLOUD_TOKEN),
+      uptimeSeconds: Math.floor(process.uptime()),
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  // Abstracted response for public & non-super-admin users
   res.status(200).json({
     service: 'vasool',
-    status: 'ok',
+    status: isDbConnected ? 'operational' : 'degraded',
     version: '3.0.0',
-    mongodb: dbStatus,
-    googleOAuthConfigured: Boolean(process.env.VASOOL_GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID),
-    infisicalConfigured: Boolean(process.env.MONGO_URI || process.env.MONGODB_URI),
-    grafanaLokiConfigured: Boolean(process.env.GRAFANA_CLOUD_TOKEN),
-    openTelemetryConfigured: Boolean(process.env.GRAFANA_CLOUD_TOKEN),
     timestamp: new Date().toISOString()
   });
 });

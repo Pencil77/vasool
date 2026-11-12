@@ -62,15 +62,16 @@ async function runAllTests() {
   let expenseId = '';
 
   // ==========================================
-  // 1. HEALTH & SYSTEM DIAGNOSTICS
+  // 1. HEALTH & SYSTEM DIAGNOSTICS (ABSTRACTED SECURITY POLICY)
   // ==========================================
-  await assertTest('GET /api/health returns 200 OK & MongoDB connected', 'Health', async () => {
+  await assertTest('GET /api/health returns 200 OK & abstracted operational status (no leaked vendor telemetry)', 'Health Security', async () => {
     const res = await request('/api/health');
     if (res.status !== 200) throw new Error(`Expected 200, got ${res.status}`);
-    if (res.data.status !== 'ok') throw new Error(`Service status not ok`);
-    if (res.data.mongodb !== 'connected') throw new Error(`MongoDB not connected: ${res.data.mongodb}`);
-    if (!res.data.googleOAuthConfigured) throw new Error(`Google OAuth not configured`);
-    return `Service: ${res.data.service}, DB: ${res.data.mongodb}, OAuth: configured`;
+    if (res.data.status !== 'operational' && res.data.status !== 'ok') throw new Error(`Unexpected service status: ${res.data.status}`);
+    if (res.data.infisicalConfigured !== undefined) throw new Error(`Leaked infisicalConfigured to unauthenticated request`);
+    if (res.data.grafanaLokiConfigured !== undefined) throw new Error(`Leaked grafanaLokiConfigured to unauthenticated request`);
+    if (res.data.openTelemetryConfigured !== undefined) throw new Error(`Leaked openTelemetryConfigured to unauthenticated request`);
+    return `Service: ${res.data.service}, Status: ${res.data.status} (Architecture abstracted)`;
   });
 
   await assertTest('GET /api/auth/config returns public Google OAuth Client ID', 'Config', async () => {

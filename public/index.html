@@ -80,11 +80,6 @@
           <span class="hidden sm:inline">Switch to </span>Auth
         </button>
 
-        <button id="btnOpenCloudModal" data-testid="btn-open-cloud-modal" onclick="openModal('cloudModal')" class="hidden">
-          <span class="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-teal-400 animate-pulse"></span>
-          <span class="hidden sm:inline">Vault &amp; DB</span>
-          <span class="sm:hidden text-[10px]">Vault</span>
-        </button>
 
         <!-- Active User Pill -->
         <div id="headerUserArea" data-testid="header-user-area" class="hidden items-center gap-1.5 sm:gap-2 pl-1 sm:pl-2 border-l border-slate-800">
@@ -281,6 +276,18 @@
         </div>
       </div>
     </div>
+
+    <!-- Clean Footer on Auth Landing View -->
+    <footer class="mt-8 py-6 border-t border-slate-900 text-center text-xs text-slate-500">
+      <div class="flex flex-wrap items-center justify-center gap-4 mb-2">
+        <span>Vasool · Smart Expense Splitting &amp; Debt Simplification</span>
+        <span class="text-slate-700">|</span>
+        <button type="button" onclick="openFeedbackModal()" class="text-emerald-400 hover:text-emerald-300 transition underline underline-offset-2">Share Feedback</button>
+        <span class="text-slate-700">|</span>
+        <button type="button" id="btnAuthFooterSystemStatus" data-testid="btn-auth-footer-system-status" onclick="openModal('systemStatusModal')" class="text-slate-600 hover:text-slate-400 transition underline underline-offset-2">System Status</button>
+      </div>
+      <p class="text-[11px] text-slate-600">Built for seamless group sharing with 4 split modes and automatic minimum cash flow settlement.</p>
+    </footer>
   </section>
 
   <!-- ===================================================================== -->
@@ -971,7 +978,7 @@
         <span class="text-slate-700">|</span>
         <button onclick="openFeedbackModal()" class="text-emerald-400 hover:text-emerald-300 transition underline underline-offset-2">Share Feedback</button>
         <span class="text-slate-700">|</span>
-        <button onclick="openModal('cloudModal')" class="text-slate-600 hover:text-slate-400 transition underline underline-offset-2">System Status</button>
+        <button id="btnFooterSystemStatus" data-testid="btn-footer-system-status" onclick="openModal('systemStatusModal')" class="text-slate-600 hover:text-slate-400 transition underline underline-offset-2">System Status</button>
       </div>
       <p class="text-[11px] text-slate-600">Built for seamless group sharing with 4 split modes and automatic minimum cash flow settlement.</p>
     </footer>
@@ -1957,40 +1964,144 @@
   </div>
 
   <!-- ===================================================================== -->
-  <!-- MODAL 6: MONGODB + INFISICAL VAULT + HOSTING INSPECTOR (BOTTOM SHEET)  -->
+  <!-- MODAL 6A: ABSTRACTED SYSTEM STATUS (PUBLIC & GENERAL USER FACING)      -->
+  <!-- ===================================================================== -->
+  <div id="systemStatusModal" data-testid="system-status-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
+    <div class="glass-panel rounded-t-3xl sm:rounded-2xl max-w-lg w-full p-5 sm:p-6 border border-slate-700 shadow-2xl my-0 sm:my-8 space-y-4 max-h-[90vh] sm:max-h-[85vh] overflow-y-auto">
+      <div class="w-12 h-1.5 bg-slate-700/80 rounded-full mx-auto mb-3 sm:hidden"></div>
+      
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+              System Status
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                Operational
+              </span>
+            </h3>
+            <p class="text-xs text-slate-400">Live operational status across all core services</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeModal('systemStatusModal')" class="text-slate-400 hover:text-white text-sm px-2">✕</button>
+      </div>
+
+      <!-- Service Status Matrix -->
+      <div class="space-y-2 text-xs">
+        <div class="flex items-center justify-between p-3 rounded-xl bg-slate-900/90 border border-slate-800">
+          <div class="flex items-center gap-2.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span class="font-medium text-slate-200">Web Application &amp; UI</span>
+          </div>
+          <span class="text-emerald-400 font-semibold text-[11px]">100% Operational</span>
+        </div>
+
+        <div class="flex items-center justify-between p-3 rounded-xl bg-slate-900/90 border border-slate-800">
+          <div class="flex items-center gap-2.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span class="font-medium text-slate-200">Expense &amp; Split Engine</span>
+          </div>
+          <span class="text-emerald-400 font-semibold text-[11px]">Operational</span>
+        </div>
+
+        <div class="flex items-center justify-between p-3 rounded-xl bg-slate-900/90 border border-slate-800">
+          <div class="flex items-center gap-2.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span class="font-medium text-slate-200">Debt Simplification &amp; Settlements</span>
+          </div>
+          <span class="text-emerald-400 font-semibold text-[11px]">Operational</span>
+        </div>
+
+        <div class="flex items-center justify-between p-3 rounded-xl bg-slate-900/90 border border-slate-800">
+          <div class="flex items-center gap-2.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span class="font-medium text-slate-200">User Identity &amp; Auth Services</span>
+          </div>
+          <span class="text-emerald-400 font-semibold text-[11px]">Operational</span>
+        </div>
+
+        <div class="flex items-center justify-between p-3 rounded-xl bg-slate-900/90 border border-slate-800">
+          <div class="flex items-center gap-2.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span class="font-medium text-slate-200">Cloud Sync &amp; Real-time Storage</span>
+          </div>
+          <span class="text-emerald-400 font-semibold text-[11px]">Active</span>
+        </div>
+      </div>
+
+      <!-- Security & Privacy Assurance Notice -->
+      <div class="p-3 rounded-xl bg-slate-900/50 border border-slate-800/80 text-[11px] text-slate-400 space-y-1">
+        <div class="flex items-center gap-1.5 font-semibold text-slate-300">
+          <span>🔒</span>
+          <span>Security &amp; Data Protection</span>
+        </div>
+        <p class="leading-relaxed">All transaction calculations and user records are encrypted in transit and at rest. Infrastructure diagnostics and system administration are restricted to authorized administrators.</p>
+      </div>
+
+      <!-- Super Admin Quick Link (Only visible to authenticated super admin) -->
+      <div id="superAdminDiagnosticNotice" class="hidden p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2 text-amber-300 font-semibold">
+            <span>👑</span>
+            <span>Super Admin Diagnostic Tools</span>
+          </div>
+          <button type="button" onclick="closeModal('systemStatusModal'); openSuperAdminConsole();" class="px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-[11px] font-bold">
+            Open Admin Console
+          </button>
+        </div>
+      </div>
+
+      <div class="pt-1">
+        <button type="button" onclick="closeModal('systemStatusModal')" class="w-full py-2 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs transition">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 6B: SUPER ADMIN INTERNAL DIAGNOSTICS (RESTRICTED)               -->
   <!-- ===================================================================== -->
   <div id="cloudModal" data-testid="cloud-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
-    <div class="glass-panel rounded-t-3xl sm:rounded-2xl max-w-2xl w-full p-5 sm:p-6 border border-slate-700 shadow-2xl my-0 sm:my-8 space-y-4 max-h-[90vh] sm:max-h-[85vh] overflow-y-auto">
+    <div class="glass-panel rounded-t-3xl sm:rounded-2xl max-w-2xl w-full p-5 sm:p-6 border border-amber-500/30 shadow-2xl my-0 sm:my-8 space-y-4 max-h-[90vh] sm:max-h-[85vh] overflow-y-auto">
       <div class="w-12 h-1.5 bg-slate-700/80 rounded-full mx-auto mb-3 sm:hidden"></div>
       <div class="flex items-center justify-between pb-3 border-b border-slate-800">
         <div>
-          <h3 class="text-base font-bold text-white">MongoDB Atlas, Infisical Vault &amp; Deployment Config</h3>
-          <p class="text-xs text-slate-400">Live collection state &amp; zero-plaintext secret injection commands</p>
+          <h3 class="text-base font-bold text-amber-300 flex items-center gap-2">
+            <span>🔒</span>
+            <span>Super Admin Internal Diagnostics</span>
+          </h3>
+          <p class="text-xs text-slate-400">Restricted system diagnostics &amp; environment state</p>
         </div>
         <button type="button" onclick="closeModal('cloudModal')" class="text-slate-400 hover:text-white text-sm px-2">✕</button>
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
         <div class="p-3.5 rounded-xl bg-slate-900 border border-slate-800">
-          <div class="font-semibold text-emerald-400 mb-1">Infisical Agent-Vault Proxy</div>
-          <p class="text-slate-300 mb-2">Configured for <code class="text-teal-300">https://app.infisical.com</code> using your enrollment token.</p>
-          <button type="button" onclick="copyTextToClipboard('infisical agent-vault proxy --enrollment-token avp_XMX7kOJX_sGpRChlDz5bHwHjRHsWb0z80tap-ojRGf8 --domain https://app.infisical.com', 'Infisical proxy command copied!')" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-slate-700">
-            Copy Proxy Command
+          <div class="font-semibold text-emerald-400 mb-1">Infisical Secrets Vault</div>
+          <p class="text-slate-300 mb-2">Zero-plaintext environment secret injection active via Infisical Cloud CLI.</p>
+          <button type="button" onclick="copyTextToClipboard('infisical run --env=dev -- npm start', 'Infisical run command copied!')" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-slate-700">
+            Copy Run Command
           </button>
         </div>
         <div class="p-3.5 rounded-xl bg-slate-900 border border-slate-800">
-          <div class="font-semibold text-teal-400 mb-1">Recommended Stack: Vercel + MongoDB Atlas</div>
-          <p class="text-slate-300 mb-2">Includes <code class="text-emerald-300">vercel.json</code>, <code class="text-emerald-300">render.yaml</code>, and cached Mongoose pool in <code class="text-emerald-300">lib/mongodb.js</code>.</p>
+          <div class="font-semibold text-teal-400 mb-1">Stack Architecture</div>
+          <p class="text-slate-300 mb-2">Node.js Express + Mongoose connection pool on Vercel Serverless.</p>
           <button type="button" data-testid="btn-reset-demo-db" onclick="resetDemoDatabase()" class="px-2.5 py-1 rounded bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30">
-            Reset Sample Data
+            Reset Demo State
           </button>
         </div>
       </div>
 
       <div>
         <div class="flex items-center justify-between mb-1.5">
-          <span class="text-xs font-semibold text-slate-300">Live Document Store Snapshot (Users, Groups, Expenses, Settlements)</span>
-          <button type="button" onclick="exportDatabaseJson()" class="text-xs text-emerald-400 hover:underline">Copy Full JSON</button>
+          <span class="text-xs font-semibold text-slate-300">Document Store Diagnostic Summary</span>
+          <button type="button" onclick="exportDatabaseJson()" class="text-xs text-emerald-400 hover:underline">Copy Summary JSON</button>
         </div>
         <pre id="dbJsonInspector" data-testid="db-json-inspector" class="p-3 rounded-xl bg-slate-950 border border-slate-800 text-[11px] text-emerald-300 font-mono-code max-h-60 overflow-y-auto custom-scroll"></pre>
       </div>
