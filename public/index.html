@@ -139,13 +139,13 @@
           <option value="GBP">£ GBP</option>
         </select>
 
-        <!-- Feedback Button in Header -->
+        <!-- Feedback Button in Header (Desktop / Tablet; mobile has persistent FAB) -->
         <button
           id="btnHeaderFeedback"
           data-testid="btn-header-feedback"
           onclick="openFeedbackModal()"
           title="Send feedback or suggestions"
-          class="px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:border-emerald-400/50 cursor-pointer shadow-sm transition flex items-center gap-1.5"
+          class="hidden md:flex px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:border-emerald-400/50 cursor-pointer shadow-sm transition items-center gap-1.5"
         >
           <span>💬</span>
           <span class="hidden sm:inline">Feedback</span>
@@ -163,7 +163,7 @@
 
         <!-- Active User Pill -->
         <div id="headerUserArea" data-testid="header-user-area" class="hidden items-center gap-1.5 sm:gap-2 pl-1 sm:pl-2 border-l border-slate-800">
-          <button id="btnHeaderSuperAdmin" onclick="openSuperAdminConsole()" title="Super Admin Console" class="hidden items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gradient-to-r from-amber-500/20 to-yellow-500/20 border border-amber-400/50 text-amber-300 hover:bg-amber-500/30 text-xs font-bold transition flex-shrink-0 shadow-sm shadow-amber-500/20">
+          <button id="btnHeaderSuperAdmin" onclick="openSuperAdminConsole()" title="Super Admin Console" class="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gradient-to-r from-amber-500/20 to-yellow-500/20 border border-amber-400/50 text-amber-300 hover:bg-amber-500/30 text-xs font-bold transition flex-shrink-0 shadow-sm shadow-amber-500/20">
             <span>👑</span>
             <span class="hidden md:inline">Admin Console</span>
           </button>
@@ -174,16 +174,17 @@
             <div id="headerUserName" data-testid="header-user-name" class="text-xs font-semibold text-slate-100 leading-tight"></div>
             <div id="headerUserProvider" data-testid="header-user-provider" class="text-[10px] text-emerald-400 leading-tight"></div>
           </div>
-          <button id="btnHeaderAccountSettings" data-testid="btn-header-settings" onclick="openAccountSettingsModal()" title="Account Settings & Password" class="p-1 sm:p-1.5 rounded-lg text-slate-400 hover:text-emerald-400 hover:bg-slate-800/80 transition flex-shrink-0">
+          <button id="btnHeaderAccountSettings" data-testid="btn-header-settings" onclick="openAccountSettingsModal()" title="Account Settings & Password" class="hidden sm:inline-flex p-1 sm:p-1.5 rounded-lg text-slate-400 hover:text-emerald-400 hover:bg-slate-800/80 transition flex-shrink-0">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
               <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
           </button>
-          <button id="btnHeaderLogout" data-testid="btn-header-logout" onclick="promptLogout()" title="Sign out" class="p-1 sm:p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800/80 transition flex-shrink-0">
+          <button id="btnHeaderLogout" data-testid="btn-header-logout" onclick="promptLogout()" title="Sign out of account" class="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 hover:text-white border border-rose-500/30 hover:border-rose-400/50 transition flex-shrink-0 flex items-center gap-1.5 shadow-sm">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
             </svg>
+            <span class="hidden md:inline text-xs font-semibold">Sign Out</span>
           </button>
         </div>
       </div>
@@ -1888,7 +1889,19 @@
           </form>
         </div>
 
-        <div class="flex justify-end pt-2 border-t border-slate-800">
+        <div class="flex items-center justify-between pt-3 border-t border-slate-800 gap-2">
+          <button
+            type="button"
+            id="btnSettingsLogout"
+            data-testid="btn-settings-logout"
+            onclick="closeModal('accountSettingsModal'); promptLogout();"
+            class="px-4 py-2.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-300 hover:text-white text-xs font-bold transition flex items-center gap-2 shadow-sm"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+            </svg>
+            <span>Sign Out</span>
+          </button>
           <button type="button" onclick="closeModal('accountSettingsModal')" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition">
             Close
           </button>
@@ -3174,11 +3187,9 @@ exec node server.js`
         const superBtn = document.getElementById('btnHeaderSuperAdmin');
         if (superBtn) {
           if (isSuper) {
-            superBtn.classList.remove('hidden');
-            superBtn.classList.add('inline-flex');
+            superBtn.className = 'hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gradient-to-r from-amber-500/20 to-yellow-500/20 border border-amber-400/50 text-amber-300 hover:bg-amber-500/30 text-xs font-bold transition flex-shrink-0 shadow-sm shadow-amber-500/20';
           } else {
-            superBtn.classList.add('hidden');
-            superBtn.classList.remove('inline-flex');
+            superBtn.className = 'hidden';
           }
         }
         const navTabAdmin = document.getElementById('navTabAdmin');
@@ -8553,6 +8564,9 @@ exec node server.js`
       window.deleteAdminFeedback = deleteAdminFeedback;
       window.openRemoveMemberModal = openRemoveMemberModal;
       window.executeRemoveMember = executeRemoveMember;
+      window.promptLogout = promptLogout;
+      window.executeLogout = executeLogout;
+      window.handleLogout = handleLogout;
       window.handleOtpVerificationSubmit = handleOtpVerificationSubmit;
       window.handleResendOtp = handleResendOtp;
       window.handleJoinGroupSubmit = handleJoinGroupSubmit;
