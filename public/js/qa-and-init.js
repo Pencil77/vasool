@@ -386,11 +386,10 @@
         return '4 DevOps pipeline configs available';
       });
 
-      runCase('UI E2E', 'UI-08: 1-Click Demo Persona Switcher & Group Activity Tab mounted in DOM', () => {
-        const demoBar = document.querySelector('[data-testid="demo-persona-quick-bar"]');
+      runCase('UI E2E', 'UI-08: Group Activity Tab mounted in DOM', () => {
         const actTab = document.querySelector('[data-testid="btn-group-tab-activity"]');
-        if (!demoBar || !actTab) throw new Error('Demo persona bar or Activity tab missing');
-        return '5-Persona Switcher & Activity Audit Tab mounted';
+        if (!actTab) throw new Error('Activity tab missing');
+        return 'Activity Audit Tab mounted';
       });
 
       runCase('UI E2E', 'UI-09: Printable PDF Statement Modal & Multi-Currency FX Controls mounted', () => {

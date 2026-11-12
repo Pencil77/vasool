@@ -166,7 +166,7 @@
               <span class="px-1.5 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/30">🔐</span>
               <span>Seamless Sign-In</span>
             </div>
-            <p class="text-xs text-slate-300 leading-relaxed">Fast, verified access via Email &amp; Password OTP, Google OAuth, or 1-click Demo Persona cards.</p>
+            <p class="text-xs text-slate-300 leading-relaxed">Fast, verified access via Email &amp; Password OTP or Google OAuth.</p>
           </div>
           <div class="glass-panel glass-card-hover rounded-2xl p-4 relative overflow-hidden">
             <div class="h-0.5 bg-gradient-to-r from-teal-400 to-cyan-500 -mx-4 -mt-4 mb-3"></div>
@@ -278,36 +278,6 @@
               <span>We'll send a 6-digit verification code to your email. Enter the code on the next screen to activate your account.</span>
             </div>
           </form>
-
-          <!-- 3. 1-CLICK DEMO PERSONA SWITCHER (FOR INSTANT MULTI-ROLE TESTING) -->
-          <div id="demoPersonaQuickBar" data-testid="demo-persona-quick-bar" class="mt-5 pt-4 border-t border-slate-800/90">
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-[11px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
-                <span>⚡</span> 1-Click Demo Persona Switcher
-              </span>
-              <span class="text-[10px] text-slate-400 font-mono-code">5 Roles Ready</span>
-            </div>
-            <p class="text-[11px] text-slate-400 mb-2.5">
-              Jump directly into any pre-configured test persona without typing credentials:
-            </p>
-            <div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-              <button type="button" data-testid="btn-demo-persona-aarav" onclick="quickLoginDemo('admin.aarav@vasool.test')" class="px-2.5 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-[11px] font-semibold text-left truncate transition">
-                👑 Aarav (Admin)
-              </button>
-              <button type="button" data-testid="btn-demo-persona-vikram" onclick="quickLoginDemo('vikram.spender@vasool.test')" class="px-2.5 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-[11px] font-semibold text-left truncate transition">
-                💰 Vikram (+₹19.6k)
-              </button>
-              <button type="button" data-testid="btn-demo-persona-rohan" onclick="quickLoginDemo('rohan.debtor@vasool.test')" class="px-2.5 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 text-[11px] font-semibold text-left truncate transition">
-                💳 Rohan (-₹5.4k)
-              </button>
-              <button type="button" data-testid="btn-demo-persona-neha" onclick="quickLoginDemo('neha.couple@vasool.test')" class="px-2.5 py-1.5 rounded-xl bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 text-teal-300 text-[11px] font-semibold text-left truncate transition">
-                ⚖️ Neha (2x Weight)
-              </button>
-              <button type="button" data-testid="btn-demo-persona-priya" onclick="quickLoginDemo('priya.settler@vasool.test')" class="px-2.5 py-1.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 text-[11px] font-semibold text-left truncate transition col-span-2 sm:col-span-1">
-                💵 Priya (Settler)
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </div>
