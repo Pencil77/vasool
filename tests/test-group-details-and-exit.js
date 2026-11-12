@@ -1,5 +1,6 @@
 const assert = require('assert');
 const fs = require('fs');
+const path = require('path');
 const http = require('http');
 const express = require('express');
 const { connectToDatabase } = require('../lib/mongodb');
@@ -53,7 +54,17 @@ async function runTests() {
   // 1. FRONTEND HTML & UI VERIFICATION
   // =========================================================================
   console.log('1. Verifying public/index.html UI Elements & Modals:');
-  const html = fs.readFileSync('/tmp/workspace/vasool/public/index.html', 'utf8');
+  const indexHtmlPath = path.join(__dirname, '../public/index.html');
+  let html = fs.readFileSync(indexHtmlPath, 'utf8');
+  // In v3 modular architecture, include frontend JS modules
+  const jsDir = path.join(__dirname, '../public/js');
+  if (fs.existsSync(jsDir)) {
+    fs.readdirSync(jsDir).forEach((f) => {
+      if (f.endsWith('.js')) {
+        html += '\n' + fs.readFileSync(path.join(jsDir, f), 'utf8');
+      }
+    });
+  }
 
   // Check Group Details Modal
   assert(html.includes('id="groupDetailsModal"'), 'Must have #groupDetailsModal');

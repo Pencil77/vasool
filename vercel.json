@@ -25,8 +25,8 @@
       "destination": "/api/index.js"
     },
     {
-            "source": "/((?!css/|js/|favicon).*)",
-            "destination": "/api/index.js"
+      "source": "/((?!api/|css/|js/|favicon).*)",
+      "destination": "/index.html"
     }
   ]
 }

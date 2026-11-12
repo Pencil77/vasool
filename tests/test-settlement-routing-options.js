@@ -1,5 +1,6 @@
 const assert = require('assert');
 const fs = require('fs');
+const path = require('path');
 const { simplifyDebtsGreedy, simplifyDebtsAdminHub } = require('../routes/splits');
 const Group = require('../models/Group');
 
@@ -56,7 +57,16 @@ async function runTests() {
 
   // 3. Inspect public/index.html UI elements and scripts
   console.log('3. Inspecting public/index.html frontend code:');
-  const html = fs.readFileSync('/tmp/workspace/vasool/public/index.html', 'utf8');
+  const indexHtmlPath = path.join(__dirname, '../public/index.html');
+  let html = fs.readFileSync(indexHtmlPath, 'utf8');
+  const jsDir = path.join(__dirname, '../public/js');
+  if (fs.existsSync(jsDir)) {
+    fs.readdirSync(jsDir).forEach((f) => {
+      if (f.endsWith('.js')) {
+        html += '\n' + fs.readFileSync(path.join(jsDir, f), 'utf8');
+      }
+    });
+  }
 
   // Verify modal elements
   assert(html.includes('id="newGroupAdminHub"'), 'index.html must have #newGroupAdminHub checkbox');
@@ -78,8 +88,8 @@ async function runTests() {
   console.log('   ✅ Settle Up banners for both Admin-Hub and Direct P2P present');
 
   // Verify version bump
-  assert(html.includes('v2.7') || html.includes('v2.6') || html.includes('v2.5'), 'index.html must have v2.5, v2.6 or v2.7 badge');
-  console.log('   ✅ Version badge verified (v2.7)');
+  assert(html.includes('v3.') || html.includes('v2.7') || html.includes('v2.6') || html.includes('v2.5'), 'index.html must have v3.x or v2.x badge');
+  console.log('   ✅ Version badge verified');
 
   console.log('\n🎉 ALL TESTS PASSED SUCCESSFULLY! Settlement routing options fully verified.');
 }

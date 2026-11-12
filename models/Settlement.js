@@ -12,8 +12,8 @@ const SettlementSchema = new mongoose.Schema(
     currency: { type: String, default: 'INR' },
     method: { type: String, enum: ['UPI', 'Amazon Pay', 'Bank Transfer', 'Cash'], default: 'UPI' },
     referenceNote: { type: String, default: '' },
-    adminNote: { type: String, default: '' },
     utrNumber: { type: String, default: '' },
+    adminNote: { type: String, default: '' },
     confirmedRole: { type: String, default: '' },
     status: {
       type: String,

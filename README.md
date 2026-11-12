@@ -1,43 +1,27 @@
-# Vasool v2.9 Aurora UI — Full-Stack Smart Expense Splitting & Debt Simplification Platform
+# Vasool v2.8 — Full-Stack Smart Expense Splitting & Debt Simplification Platform
 
-Full-stack expense splitting and debt simplification web application built with **Node.js, Express, MongoDB (Mongoose), Tailwind CSS**, and **Infisical Agent Vault** secret management.
-## What's New in Vasool v2.9
-- Aurora Obsidian & Emerald Luxe UI (`Plus Jakarta Sans`, Bento KPI cards, unified glass command bar, and header persona switcher)
-- Prominent Sign Out controls in top header & Account Settings with live net balance preview modal
-- In-place Expense Editing (`PUT /api/expenses/:id`) & 1-Click Undo Delete
-- 7-Currency Per-Bill FX Conversion & Linked Refund Accounting (`parentExpenseId`)
-- Partial Settlement Confirmation (`receivedAmount` & `adminNote`), Group Activity & Audit Trail (`auditLog`), Printable PDF Group Statement Summary, and Interactive Chart Drill-Downs.
-## Key Features
-- **Dual Authentication (`/api/auth/*`)**:
-  - **Email & Password Signup/Login**: Bcrypt 12-round salted password hashing + signed 7-day JWT tokens.
-  - **Google Sign-Up & Sign-In**: OAuth 2.0 ID token verification via `google-auth-library` (`OAuth2Client.verifyIdToken`) with automatic account creation and provider linking by email.
-- **MongoDB Atlas Persistence (`models/*`, `lib/mongodb.js`)**:
-  - Global connection pool caching (`global._mongooseConnectionCache`) optimized for both **Vercel Fluid Compute / Serverless Functions** and persistent **Render Web Services**.
-  - Schemas for `User`, `Group`, `Expense` (4 split modes: `equal`, `exact`, `percentage`, `shares`), and `Settlement` (`UPI`, `Amazon Pay`, `Bank Transfer`, `Cash`).
-- **Minimum-Cash-Flow Debt Simplification Engine**:
-  - Automatically computes net balances across group members and minimizes the total number of settlement transfers needed.
-- **Infisical Vault Integration (`infisical-agent.sh`)**:
-  - Pre-configured with your enrollment token to start the Infisical Agent-Vault proxy or inject secrets directly into process memory.
+Full-stack expense splitting, multi-currency bill tracking, and verifiable debt settlement platform built with **Node.js, Express, MongoDB (Mongoose), Tailwind CSS, Chart.js**, **OpenTelemetry RUM / Grafana Loki**, and **Infisical Agent Vault** secret management.
 
-## Quick Start with Infisical Vault
+- **Repository**: [https://github.com/Pencil77/vasool.git](https://github.com/Pencil77/vasool.git)
+- **Live Deployment**: [https://vasool-ecru.vercel.app](https://vasool-ecru.vercel.app)
 
-1. **Start the Infisical Agent-Vault Proxy**:
-   ```bash
-   ./infisical-agent.sh proxy
-   ```
-   Or run directly:
-   ```bash
-   infisical agent-vault proxy \
-     --enrollment-token avp_XMX7kOJX_sGpRChlDz5bHwHjRHsWb0z80tap-ojRGf8 \
-     --domain https://app.infisical.com
-   ```
-
-2. **Install Dependencies & Run with Injected Secrets**:
-   ```bash
-   npm install
-   ./infisical-agent.sh dev
-   ```
-
-3. **Deploy to Vercel (Recommended) or Render**:
-   - **Vercel**: Includes `vercel.json` and `api/index.js`. Sync secrets via the Infisical-Vercel integration or run `./infisical-agent.sh deploy-vercel`.
-   - **Render**: Includes `render.yaml` Blueprint for zero-config deployment.
+## What's New in Vasool v2.8
+1. **In-Place Expense Editing (`PUT /api/expenses/:id`) & 1-Click Undo Delete**:
+   - Edit any existing bill or refund directly from the **Expenses & Splits** view or **Group Details** modal.
+   - Authorized deletion (`DELETE /api/expenses/:id`) returns a snapshot of the removed expense and surfaces a **1-Click Undo Delete** banner so accidental deletions can be restored immediately.
+2. **Per-Bill Multi-Currency FX Conversion**:
+   - Log expenses in `INR (₹)`, `USD ($)`, `EUR (€)`, `GBP (£)`, `AED (د.إ)`, `SGD (S$)`, or `THB (฿)` with live/custom FX exchange rates (`originalAmount`, `originalCurrency`, `exchangeRate`) automatically converted into the group's base currency.
+3. **Linked Refund Accounting (`parentExpenseId`)**:
+   - Link positive inflows (*Income & Refunds*, such as security deposit refunds) directly to their original parent expense so group statements show exact refund lineage.
+4. **Explicit Rounding Remainder (`±₹0.01`) Attribution**:
+   - When odd bill totals or weighted shares (`defaultWeight: 2` for couples) produce a `±₹0.01` rounding remainder, Vasool explicitly tags and displays which participant absorbed the adjustment.
+5. **Partial Settlement Confirmation & Offline-Resilient UPI QR**:
+   - Creditors and Group Admins can confirm **Partial Amounts Received** (`POST /api/settlements/:id/confirm` with `receivedAmount` and `adminNote`), automatically leaving the remaining balance open.
+   - Automatically resolves each payee's configured `upiId` and includes an offline SVG QR matrix fallback alongside `upi://pay` deep links and 12-digit UTR capture.
+6. **Group Activity & Audit Trail (`GET /api/groups/:id/activity`)**:
+   - Dedicated **📜 Activity** tab inside the **Group Details** modal logging bill creations, edits, deletions, settlement handshakes, and group setting changes.
+7. **Printable PDF Group Summary Statement (`🖨️ Export PDF`)**:
+   - Generates a formatted, print-ready Group Statement & Audit Ledger modal (`window.print()` / Save as PDF + downloadable `.html` statement) alongside CSV and plain-text exports.
+8. **Interactive Chart Drill-Downs & 1-Click Demo Persona Switcher**:
+   - Click any category slice in *Spending by Category* or member bar in *Net Member Balances* to filter matching bills in one tap.
+   - 1-Click Demo Persona Switcher pills on the Sign-In view and top header for instant multi-role testing (`Aarav`, `Vikram`, `Rohan`, `Neha & Partner`, `Priya`).

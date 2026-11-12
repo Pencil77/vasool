@@ -6,13 +6,13 @@ import threading
 from playwright.async_api import async_playwright
 
 CHROME_BIN = "/home/mrzoromit3/.agent-reach/cloak-binaries/chromium-146.0.7680.177.5/chrome"
-PUBLIC_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "public")
+PUBLIC_DIR = "/tmp/vasool-v3/public"
 
 class StaticHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=PUBLIC_DIR, **kwargs)
     def log_message(self, format, *args):
-        pass # Silence log noise
+        pass
 
 def start_server():
     server = HTTPServer(('127.0.0.1', 0), StaticHandler)
@@ -23,12 +23,10 @@ def start_server():
 
 async def main():
     print("======================================================")
-    print("🛡️  RUNNING UI INVARIANTS & REGRESSION TEST SUITE")
+    print("🛡️  RUNNING VASOOL V3.0 MODULAR UI INVARIANTS TEST")
     print("======================================================\n")
 
     server, base_url = start_server()
-    print(f"Local test web server listening on {base_url}\n")
-
     async with async_playwright() as p:
         browser = await p.chromium.launch(
             executable_path=CHROME_BIN,
@@ -50,7 +48,7 @@ async def main():
                 await page.goto(base_url, wait_until="domcontentloaded")
                 await page.wait_for_timeout(1000)
 
-                # Simulate active authenticated Super Admin (worst-case header width)
+                # Simulate active authenticated Super Admin
                 await page.evaluate("""() => {
                     showingAuthPortal = false;
                     appState.currentUser = { email: 'mdzubair7592@gmail.com', name: 'Zoro' };
@@ -131,12 +129,11 @@ async def main():
                 await context.close()
 
             print("======================================================")
-            print("🎉 ALL UI INVARIANT & REGRESSION TESTS PASSED (18/18)")
+            print("🎉 ALL 18/18 INVARIANT CHECKS PASSED ON VASOOL V3.0!")
             print("======================================================\n")
 
         finally:
             await browser.close()
             server.shutdown()
 
-if __name__ == "__main__":
-    asyncio.run(main())
+asyncio.run(main())

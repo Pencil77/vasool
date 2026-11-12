@@ -1,6 +1,5 @@
 require('dotenv').config();
 const path = require('path');
-const fs = require('fs');
 const express = require('express');
 const cors = require('cors');
 const logger = require('./lib/logger');
@@ -8,7 +7,6 @@ const otel = require('./lib/otel');
 const { authRouter } = require('./routes/auth');
 const { splitsRouter } = require('./routes/splits');
 const { adminRouter } = require('./routes/admin');
-const { v3EnhancementsRouter } = require('./routes/v3-enhancements');
 const { connectToDatabase } = require('./lib/mongodb');
 
 const app = express();
@@ -18,11 +16,7 @@ app.use(cors());
 app.use(express.json({ limit: '2mb' }));
 app.use(otel.middleware());
 app.use(logger.requestMiddleware());
-
-app.get('/vasool-v3-aurora.js', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'js', 'aurora-v3-upgrade.js'));
-});
-app.use(express.static(path.join(__dirname, 'public'))), { index: false };
+app.use(express.static(path.join(__dirname, 'public')));
 
 // POST /api/logs/client — Receive frontend logs & errors to stream into Grafana Loki
 app.post('/api/logs/client', (req, res) => {
@@ -93,7 +87,7 @@ app.get('/api/health', async (req, res) => {
   res.status(200).json({
     service: 'vasool',
     status: 'ok',
-    version: '2.9.0',
+    version: '3.0.0',
     mongodb: dbStatus,
     googleOAuthConfigured: Boolean(process.env.VASOOL_GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID),
     infisicalConfigured: Boolean(process.env.MONGO_URI || process.env.MONGODB_URI),
@@ -115,17 +109,8 @@ app.use((err, req, res, next) => {
 
 // SPA Fallback
 app.get('*', (req, res) => {
-  const htmlPath = path.join(__dirname, 'public', 'index.html');
-  let html = fs.readFileSync(htmlPath, 'utf8');
-  if (!html.includes('/css/aurora-theme.css')) {
-    html = html.replace('</head>', '<link rel="stylesheet" href="/css/aurora-theme.css" />\n</head>');
-  }
-  if (!html.includes('/js/aurora-v3-upgrade.js')) {
-    html = html.replace('</body>', '<script src="/js/aurora-v3-upgrade.js"></script>\n</body>');
-  }
-  res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.send(html);
-});;
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
 if (require.main === module) {
   connectToDatabase()
