@@ -1,7 +1,12 @@
-# Vasool — Full-Stack Expense Splitting Web App
+# Vasool v2.9 Aurora UI — Full-Stack Smart Expense Splitting & Debt Simplification Platform
 
 Full-stack expense splitting and debt simplification web application built with **Node.js, Express, MongoDB (Mongoose), Tailwind CSS**, and **Infisical Agent Vault** secret management.
-
+## What's New in Vasool v2.9
+- Aurora Obsidian & Emerald Luxe UI (`Plus Jakarta Sans`, Bento KPI cards, unified glass command bar, and header persona switcher)
+- Prominent Sign Out controls in top header & Account Settings with live net balance preview modal
+- In-place Expense Editing (`PUT /api/expenses/:id`) & 1-Click Undo Delete
+- 7-Currency Per-Bill FX Conversion & Linked Refund Accounting (`parentExpenseId`)
+- Partial Settlement Confirmation (`receivedAmount` & `adminNote`), Group Activity & Audit Trail (`auditLog`), Printable PDF Group Statement Summary, and Interactive Chart Drill-Downs.
 ## Key Features
 - **Dual Authentication (`/api/auth/*`)**:
   - **Email & Password Signup/Login**: Bcrypt 12-round salted password hashing + signed 7-day JWT tokens.
