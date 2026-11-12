@@ -1,7 +1,6 @@
 const mongoose = require('mongoose');
 
-const SplitAllocationSchema = new mongoose.Schema(
-  {const mongoose = require('mongoose');
+
 
 const SplitAllocationSchema = new mongoose.Schema(
   {
