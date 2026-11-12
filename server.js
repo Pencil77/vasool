@@ -1,5 +1,6 @@
 require('dotenv').config();
 const path = require('path');
+const fs = require('fs');
 const express = require('express');
 const cors = require('cors');
 const logger = require('./lib/logger');
@@ -7,6 +8,7 @@ const otel = require('./lib/otel');
 const { authRouter } = require('./routes/auth');
 const { splitsRouter } = require('./routes/splits');
 const { adminRouter } = require('./routes/admin');
+const { v3EnhancementsRouter } = require('./routes/v3-enhancements');
 const { connectToDatabase } = require('./lib/mongodb');
 
 const app = express();
@@ -16,7 +18,11 @@ app.use(cors());
 app.use(express.json({ limit: '2mb' }));
 app.use(otel.middleware());
 app.use(logger.requestMiddleware());
-app.use(express.static(path.join(__dirname, 'public')));
+
+app.get('/vasool-v3-aurora.js', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'js', 'aurora-v3-upgrade.js'));
+});
+app.use(express.static(path.join(__dirname, 'public'))), { index: false };
 
 // POST /api/logs/client — Receive frontend logs & errors to stream into Grafana Loki
 app.post('/api/logs/client', (req, res) => {
@@ -108,7 +114,17 @@ app.use((err, req, res, next) => {
 });
 
 // SPA Fallback
-app.get('*', (req, res) => {
+const serveIndexHtml = (req, res) => {
+  const htmlPath = path.join(__dirname, 'public', 'index.html');
+  let html = fs.readFileSync(htmlPath, 'utf8');
+  if (!html.includes('/vasool-v3-aurora.js')) {
+    html = html.replace('</body>', '<script src="/vasool-v3-aurora.js" defer></script>\n</body>');
+  }
+  res.send(html);
+};
+
+app.get('/', serveIndexHtml);
+app.get('*, serveIndexHtml);
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
