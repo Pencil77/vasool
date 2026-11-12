@@ -287,6 +287,7 @@
         }
         showingAuthPortal = false;
         saveState();
+        switchMainTab('dashboard');
         refreshAllViews();
         showToast(res.message || `Welcome back, ${res.user.name}!`);
         await syncWithBackend();
@@ -358,6 +359,7 @@
           }
           showingAuthPortal = false;
           saveState();
+          switchMainTab('dashboard');
           refreshAllViews();
           showToast(`Welcome to Vasool, ${res.user.name}!`);
           await syncWithBackend();
@@ -919,6 +921,14 @@
     let revealedPasswords = {};
 
     function openSuperAdminConsole() {
+      const isSuper = (typeof isSuperAdminUser === 'function')
+        ? isSuperAdminUser(appState.currentUser)
+        : Boolean(appState.currentUser && (appState.currentUser.isSuperAdmin || appState.currentUser.role === 'super_admin' || (appState.currentUser.email && appState.currentUser.email.toLowerCase() === 'mdzubair7592@gmail.com')));
+
+      if (!isSuper) {
+        showToast('Access restricted: Super Admin credentials required.', 'error');
+        return;
+      }
       switchMainTab('admin');
     }
 
@@ -1864,9 +1874,19 @@
     function handleLogout() {
       localStorage.removeItem(AUTH_TOKEN_KEY);
       localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem('vasool_active_tab');
+      if (window.history && window.history.replaceState) {
+        window.history.replaceState(null, '', window.location.pathname);
+      } else {
+        window.location.hash = '';
+      }
+      activeMainTab = 'dashboard';
+      const panelAdmin = document.getElementById('panelAdmin');
+      if (panelAdmin) panelAdmin.classList.add('hidden');
       appState = createDefaultState();
       showingAuthPortal = true;
       renderTopLevelView();
+      switchMainTab('dashboard');
       refreshAllViews();
       showToast('Signed out. Please log in or sign up to continue.');
     }

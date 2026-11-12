@@ -537,8 +537,18 @@ exec node server.js`
     }
 
     let appState = createDefaultState();
+    const SUPER_ADMIN_EMAIL = 'mdzubair7592@gmail.com';
+
+    function isSuperAdminUser(user) {
+      if (!user) return false;
+      const email = (user.email || '').toLowerCase().trim();
+      return Boolean(user.isSuperAdmin) || user.role === 'super_admin' || email === SUPER_ADMIN_EMAIL.toLowerCase();
+    }
+
     if (typeof window !== 'undefined') {
       window.appState = appState;
+      window.isSuperAdminUser = isSuperAdminUser;
+      window.SUPER_ADMIN_EMAIL = SUPER_ADMIN_EMAIL;
     }
 
     function loadState() {

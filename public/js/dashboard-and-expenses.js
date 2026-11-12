@@ -300,17 +300,45 @@
     // UI RENDERING & CHARTS
     // =========================================================================
     function switchMainTab(tab) {
+      const isSuper = (typeof isSuperAdminUser === 'function')
+        ? isSuperAdminUser(appState.currentUser)
+        : Boolean(appState.currentUser && (appState.currentUser.isSuperAdmin || appState.currentUser.role === 'super_admin' || (appState.currentUser.email && appState.currentUser.email.toLowerCase().trim() === 'mdzubair7592@gmail.com')));
+
+      // Strict Security Gate: Non-super-admins cannot navigate to admin tab
+      if (tab === 'admin' && !isSuper) {
+        console.warn('[Security] Super Admin tab access denied for non-admin user. Diverting to dashboard.');
+        tab = 'dashboard';
+        if (window.history && window.history.replaceState) {
+          window.history.replaceState(null, '', window.location.pathname);
+        } else {
+          window.location.hash = '';
+        }
+      }
+
       activeMainTab = tab;
       try {
-        localStorage.setItem('vasool_active_tab', tab);
-        if (window.history && window.history.replaceState) {
+        // Never persist 'admin' or 'tests' in localStorage to prevent sticky admin routing across sessions
+        if (tab !== 'admin' && tab !== 'tests') {
+          localStorage.setItem('vasool_active_tab', tab);
+        } else {
+          localStorage.removeItem('vasool_active_tab');
+        }
+
+        if (tab === 'admin') {
+          if (isSuper) {
+            if (window.history && window.history.replaceState) {
+              window.history.replaceState(null, '', '#admin');
+            } else {
+              window.location.hash = '#admin';
+            }
+          }
+        } else if (window.history && window.history.replaceState) {
           window.history.replaceState(null, '', '#' + tab);
         } else {
           window.location.hash = '#' + tab;
         }
       } catch {}
       const tabs = ['dashboard', 'expenses', 'groups', 'settle', 'tests', 'admin'];
-      const isSuper = appState.currentUser && (appState.currentUser.isSuperAdmin || appState.currentUser.role === 'super_admin' || (appState.currentUser.email && appState.currentUser.email.toLowerCase() === 'mdzubair7592@gmail.com'));
       tabs.forEach((t) => {
         const cap = t.charAt(0).toUpperCase() + t.slice(1);
         const panel = document.getElementById('panel' + cap);
@@ -318,7 +346,13 @@
         const mobileBtn = document.getElementById('mobileNav' + cap);
 
         if (panel) {
-          if (t === tab) {
+          if (t === 'admin') {
+            if (tab === 'admin' && isSuper) {
+              panel.classList.remove('hidden');
+            } else {
+              panel.classList.add('hidden');
+            }
+          } else if (t === tab) {
             panel.classList.remove('hidden');
           } else {
             panel.classList.add('hidden');
@@ -364,7 +398,7 @@
         runAutomatedTestSuite(false);
         switchPipelineViewer(activePipelineTab);
       }
-      if (tab === 'admin') {
+      if (tab === 'admin' && isSuper) {
         fetchAdminUsers();
       }
     }

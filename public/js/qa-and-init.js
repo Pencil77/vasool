@@ -604,10 +604,16 @@
 
       renderTopLevelView();
 
-      // Restore persisted active tab across page refreshes
-      const hashTab = (window.location.hash || '').replace('#', '').trim();
-      const savedTab = hashTab || localStorage.getItem('vasool_active_tab') || 'dashboard';
-      const validTabs = ['dashboard', 'expenses', 'groups', 'settle', 'tests', 'admin'];
+      // Restore persisted active tab across page refreshes (only standard user tabs before auth)
+      const rawHash = (window.location.hash || '').replace('#', '').trim();
+      let savedTab = rawHash || localStorage.getItem('vasool_active_tab') || 'dashboard';
+      if (savedTab === 'admin' || savedTab === 'tests') {
+        savedTab = 'dashboard';
+        if (window.history && window.history.replaceState) {
+          window.history.replaceState(null, '', window.location.pathname);
+        }
+      }
+      const validTabs = ['dashboard', 'expenses', 'groups', 'settle'];
       const initialTab = validTabs.includes(savedTab) ? savedTab : 'dashboard';
       switchMainTab(initialTab);
 
@@ -626,16 +632,33 @@
             showingAuthPortal = false;
             renderTopLevelView();
             await syncWithBackend();
-            switchMainTab(activeMainTab);
+
+            // Only navigate to admin if verified user is Super Admin AND originally requested #admin
+            const isSuper = (typeof isSuperAdminUser === 'function')
+              ? isSuperAdminUser(me.user)
+              : Boolean(me.user.isSuperAdmin || me.user.role === 'super_admin' || (me.user.email && me.user.email.toLowerCase() === 'mdzubair7592@gmail.com'));
+
+            if (rawHash === 'admin' && isSuper) {
+              switchMainTab('admin');
+            } else if (activeMainTab === 'admin' && !isSuper) {
+              switchMainTab('dashboard');
+            } else {
+              switchMainTab(activeMainTab || 'dashboard');
+            }
             await checkAndProcessPendingJoin();
           }
         } catch (err) {
           if (err && err.status === 401) {
             console.warn('[Auth Me] Session expired or invalid (HTTP 401). Clearing token:', err.message);
             localStorage.removeItem(AUTH_TOKEN_KEY);
+            localStorage.removeItem('vasool_active_tab');
+            if (window.history && window.history.replaceState) {
+              window.history.replaceState(null, '', window.location.pathname);
+            }
             appState.currentUser = null;
             showingAuthPortal = true;
             renderTopLevelView();
+            switchMainTab('dashboard');
             refreshAllViews();
           } else {
             console.warn('[Auth Me] Transient network/server error while validating session. Preserving login state:', err.message);
@@ -646,7 +669,25 @@
             }
           }
         }
+      } else {
+        // Unauthenticated session: ensure clean URL with no #admin hash
+        if (window.location.hash === '#admin' || window.location.hash === '#tests') {
+          if (window.history && window.history.replaceState) {
+            window.history.replaceState(null, '', window.location.pathname);
+          } else {
+            window.location.hash = '';
+          }
+        }
       }
+
+      // Hashchange listener to guard manual URL changes
+      window.addEventListener('hashchange', () => {
+        const hash = (window.location.hash || '').replace('#', '').trim();
+        const validHashTabs = ['dashboard', 'expenses', 'groups', 'settle', 'admin'];
+        if (validHashTabs.includes(hash)) {
+          switchMainTab(hash);
+        }
+      });
 
       // Report Navigation Timings & Performance to OpenTelemetry RUM
       setTimeout(() => {
