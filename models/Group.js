@@ -14,6 +14,17 @@ const MemberSubSchema = new mongoose.Schema(
   },
   { _id: false }
 );
+const AuditLogEntrySchema = new mongoose.Schema(
+  {
+        action: { type: String, required: true, trim: true },
+        actorEmail: { type: String, default: '', lowercase: true, trim: true },
+        actorName: { type: String, default: '', trim: true },
+        summary: { type: String, required: true, trim: true },
+        details: { type: String, default: '' },
+        createdAt: { type: Date, default: Date.now }
+        },
+    { _id: false }
+  );
 
 const GroupSchema = new mongoose.Schema(
   {
@@ -29,7 +40,8 @@ const GroupSchema = new mongoose.Schema(
     adminHubSettlement: { type: Boolean, default: false },
     allowMembersToAddOthers: { type: Boolean, default: false },
     isArchived: { type: Boolean, default: false },
-    members: { type: [MemberSubSchema], default: [] }
+    members: { type: [MemberSubSchema], default: [] },
+        auditLog: { type: [AuditLogEntrySchema], default: [] }
   },
   { timestamps: true }
 );
