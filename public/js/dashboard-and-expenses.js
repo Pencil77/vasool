@@ -737,7 +737,7 @@
             splitsPills = visibleSplits
               .map(
                 (s) =>
-                  `<span class="px-2 py-0.5 rounded bg-slate-800 text-[11px] text-slate-300">${escapeHtml(s.memberName.split(' ')[0])}: ${formatINR(s.amount)}${s.roundingAdjustment ? ` <span class="text-[9px] text-amber-300 font-mono-code">(${s.roundingAdjustment > 0 ? '+' : ''}${s.roundingAdjustment} adj)</span>` : ''}</span>`
+                  `<span class="px-2 py-0.5 rounded bg-slate-800 text-[11px] text-slate-300">${escapeHtml(s.memberName.split(' ')[0])}: ${formatINR(s.amount)}</span>`
               )
               .join(' ');
           }
@@ -746,9 +746,6 @@
             : '';
           const parentRefundBadge = e.parentExpenseDesc
             ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-cyan-500/15 text-cyan-200 border border-cyan-500/30">🔗 Refund for: ${escapeHtml(e.parentExpenseDesc)}</span>`
-            : '';
-          const remBadge = e.roundingRemainder
-            ? `<span class="px-1.5 py-0.5 rounded text-[10px] font-mono-code bg-amber-500/10 text-amber-300 border border-amber-500/25">⚖️ ${e.roundingRemainder > 0 ? '+' : ''}₹${e.roundingRemainder} rounding absorbed by ${escapeHtml(e.remainderAbsorbedBy || 'first member')}</span>`
             : '';
           return `
             <div data-testid="expense-card-${escapeHtml(e.id)}" class="glass-panel glass-card-hover rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -768,7 +765,6 @@
                       : escapeHtml(e.paidByName)
                   }</strong> in <span class="text-teal-300">${escapeHtml(grp ? grp.name : 'Group')}</span> · ${escapeHtml(e.date || 'Today')}</span>
                   ${Array.isArray(e.paidByAllocations) && e.paidByAllocations.length > 1 ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/15 text-teal-300 border border-teal-500/30">👥 ${e.paidByAllocations.length} Payers</span>` : ''}
-                  ${remBadge}
                 </div>
                 <div class="flex flex-wrap gap-1.5 pt-1">${splitsPills}</div>
               </div>

@@ -36,7 +36,8 @@ async def main():
         
         # Navigate to homepage
         await page.goto(base_url + '/', wait_until='networkidle')
-        await page.wait_for_timeout(1000)
+        await page.wait_for_function('() => typeof window.openModal !== "undefined"', timeout=10000)
+        await page.wait_for_timeout(500)
         
         # ======================================================================
         # Test 1: System Status is strictly hidden for unauthenticated / non-super-admins
