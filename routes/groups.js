@@ -23,6 +23,42 @@ const {
 
 const router = express.Router();
 
+/**
+ * Hydrates group members with live upiId from User documents so payers know whether a member has configured a real UPI ID
+ */
+async function hydrateGroupMembersUpi(groupsList) {
+  const arr = Array.isArray(groupsList) ? groupsList : [groupsList];
+  const emailSet = new Set();
+  arr.forEach((g) => {
+    if (g && Array.isArray(g.members)) {
+      g.members.forEach((m) => {
+        if (m && m.email) emailSet.add(String(m.email).toLowerCase().trim());
+      });
+    }
+  });
+  if (emailSet.size === 0) return;
+  const users = await User.find({ email: { $in: Array.from(emailSet) } }, 'email upiId name').lean();
+  const upiMap = {};
+  users.forEach((u) => {
+    if (u && u.email) {
+      upiMap[u.email.toLowerCase().trim()] = u.upiId || '';
+    }
+  });
+  arr.forEach((g) => {
+    if (g && Array.isArray(g.members)) {
+      g.members.forEach((m) => {
+        const em = String(m.email || '').toLowerCase().trim();
+        if (em in upiMap) {
+          m.upiId = upiMap[em];
+        } else {
+          m.upiId = m.upiId || '';
+        }
+      });
+    }
+  });
+}
+
+
 // GET /api/groups - List groups where user is a member
 router.get('/groups', requireAuth, async (req, res) => {
   try {
@@ -31,6 +67,7 @@ router.get('/groups', requireAuth, async (req, res) => {
     const groups = await Group.find({
       'members.email': { $regex: new RegExp('^' + userEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') }
     }).sort({ updatedAt: -1 });
+    await hydrateGroupMembersUpi(groups);
 
     const activeGroups = [];
     const pendingInvites = [];
@@ -208,6 +245,8 @@ router.get('/groups/:id', requireAuth, async (req, res) => {
     if (!isMember && !isSuperAdmin) {
       return res.status(403).json({ error: 'Access denied. You are not a member of this group.' });
     }
+
+    await hydrateGroupMembersUpi(group);
 
     const [expenses, settlements] = await Promise.all([
       Expense.find({ groupId: group._id }).sort({ expenseDate: -1, createdAt: -1 }),
@@ -628,14 +667,11 @@ router.patch('/groups/:id/archive', requireAuth, async (req, res) => {
   }
 });
 
-// POST /api/groups/:id/members - Add a member to a group
+// POST /api/groups/:id/members - Add one or multiple comma-separated members to a group
 router.post('/groups/:id/members', requireAuth, async (req, res) => {
   try {
     await connectToDatabase();
-    const { name, email, defaultWeight = 1 } = req.body;
-    if (!name || !email) {
-      return res.status(400).json({ error: 'Member name and email are required.' });
-    }
+    const { name, email, emails, members: batchMembers, defaultWeight = 1 } = req.body;
     const group = await Group.findById(req.params.id);
     if (!group) {
       return res.status(404).json({ error: 'Group not found.' });
@@ -646,47 +682,145 @@ router.post('/groups/:id/members', requireAuth, async (req, res) => {
       (group.adminEmail ? group.members.find((m) => m.email.toLowerCase() === group.adminEmail.toLowerCase()) : null) ||
       group.members[0];
 
-    const isCurrentAdmin = isSuperAdminUser(req.user) || (currentAdmin && currentAdmin.email.toLowerCase().trim() === requesterEmail);
+    const isCurrentAdmin =
+      isSuperAdminUser(req.user) ||
+      (group.adminEmail && group.adminEmail.toLowerCase().trim() === requesterEmail) ||
+      (group.createdByEmail && group.createdByEmail.toLowerCase().trim() === requesterEmail) ||
+      (currentAdmin && currentAdmin.email.toLowerCase().trim() === requesterEmail) ||
+      group.members.some((m) => m.email.toLowerCase().trim() === requesterEmail && (m.role === 'admin' || m.role === 'owner'));
+
     if (!isCurrentAdmin && !group.allowMembersToAddOthers) {
       return res.status(403).json({
         error: 'Only the group admin can add members to this group. Non-admin member invitations are disabled by default in group settings.'
       });
     }
 
-    const cleanEmail = String(email).toLowerCase().trim();
-    const cleanName = String(name).trim();
-    if (group.members.some((m) => m.email.toLowerCase().trim() === cleanEmail)) {
-      return res.status(409).json({ error: 'Member is already in this group.' });
+    // Parse candidate list from either batchMembers array or comma-separated email/name string
+    const candidates = [];
+    if (Array.isArray(batchMembers) && batchMembers.length > 0) {
+      batchMembers.forEach((bm) => {
+        if (bm && bm.email) {
+          const em = String(bm.email).toLowerCase().trim();
+          const nm = String(bm.name || em.split('@')[0]).trim();
+          candidates.push({ name: nm, email: em, defaultWeight: Number(bm.defaultWeight || defaultWeight) || 1 });
+        }
+      });
+    } else {
+      const rawInput = String(emails || email || '').trim();
+      if (!rawInput) {
+        return res.status(400).json({ error: 'At least one member email is required.' });
+      }
+      const tokens = rawInput.split(',').map((t) => t.trim()).filter(Boolean);
+      tokens.forEach((token, idx) => {
+        const angleMatch = token.match(/^([^<]+)<([^>]+)>$/);
+        let mEmail = '';
+        let mName = '';
+        if (angleMatch) {
+          mName = angleMatch[1].trim();
+          mEmail = angleMatch[2].trim().toLowerCase();
+        } else if (token.includes('@')) {
+          mEmail = token.toLowerCase().trim();
+          if (tokens.length === 1 && name && String(name).trim()) {
+            mName = String(name).trim();
+          } else {
+            const prefix = mEmail.split('@')[0].replace(/[._-]+/g, ' ');
+            mName = prefix.replace(/\b\w/g, (c) => c.toUpperCase());
+          }
+        } else {
+          mName = token.trim();
+          mEmail = mName.toLowerCase().replace(/[^a-z0-9]/g, '.') + '@gmail.com';
+        }
+        if (mEmail) {
+          candidates.push({ name: mName || mEmail.split('@')[0], email: mEmail, defaultWeight: Number(defaultWeight) || 1 });
+        }
+      });
     }
 
-    group.members.push({
-      name: cleanName,
-      email: cleanEmail,
-      role: 'member',
-      status: 'pending_acceptance',
-      invitedAt: new Date(),
-      defaultWeight: Number(defaultWeight) || 1
-    });
-    await group.save();
+    if (candidates.length === 0) {
+      return res.status(400).json({ error: 'Valid member email is required.' });
+    }
 
-    // Dispatch invitation email asynchronously
+    // Lookup registered users to enrich names and upiIds
+    const candidateEmails = candidates.map((c) => c.email);
+    const registeredUsers = await User.find({ email: { $in: candidateEmails } }, 'name email upiId _id').lean();
+    const regMap = {};
+    registeredUsers.forEach((u) => {
+      regMap[u.email.toLowerCase().trim()] = u;
+    });
+
+    const existingEmails = new Set(group.members.map((m) => m.email.toLowerCase().trim()));
+    const addedMembers = [];
+    const skippedEmails = [];
+
+    candidates.forEach((c) => {
+      if (existingEmails.has(c.email)) {
+        skippedEmails.push(c.email);
+        return;
+      }
+      existingEmails.add(c.email);
+      const reg = regMap[c.email];
+      const finalName = (reg && reg.name && (!c.name || c.name.toLowerCase() === c.email.split('@')[0].toLowerCase()))
+        ? reg.name
+        : c.name;
+      const newMemberObj = {
+        userId: reg ? reg._id : null,
+        name: finalName,
+        email: c.email,
+        upiId: reg ? (reg.upiId || '') : '',
+        role: 'member',
+        status: 'pending_acceptance',
+        invitedAt: new Date(),
+        defaultWeight: c.defaultWeight
+      };
+      group.members.push(newMemberObj);
+      addedMembers.push(newMemberObj);
+    });
+
+    if (addedMembers.length === 0) {
+      return res.status(409).json({ error: 'All specified member(s) are already in this group.' });
+    }
+
+    appendGroupAuditLog(group, {
+      action: 'members_invited',
+      actorEmail: requesterEmail,
+      actorName: req.user.name || requesterEmail,
+      summary: `${req.user.name || requesterEmail} invited ${addedMembers.map((m) => m.name).join(', ')} to the group`,
+      details: `${addedMembers.length} member(s) added as Pending Acceptance`
+    });
+
+    await group.save();
+    await hydrateGroupMembersUpi(group);
+
+    // Dispatch invitation emails asynchronously
     const inviterName = req.user.name || (currentAdmin ? currentAdmin.name : 'Group Admin');
     const inviterEmail = req.user.email || (currentAdmin ? currentAdmin.email : group.createdByEmail);
 
-    sendGroupInviteEmail({
-      toEmail: cleanEmail,
-      toName: cleanName,
-      groupName: group.name,
-      inviteCode: group.inviteCode,
-      adminName: inviterName,
-      adminEmail: inviterEmail
-    }).catch((err) => {
-      logger.error(`[splits:invite] Background member invite dispatch failed for ${cleanEmail}:`, err);
+    addedMembers.forEach((am) => {
+      sendGroupInviteEmail({
+        toEmail: am.email,
+        toName: am.name,
+        groupName: group.name,
+        inviteCode: group.inviteCode,
+        adminName: inviterName,
+        adminEmail: inviterEmail
+      }).catch((err) => {
+        logger.error(`[splits:invite] Background member invite dispatch failed for ${am.email}:`, err);
+      });
     });
 
-    logger.info(`[splits:members] Added member ${cleanName} (${cleanEmail}) to group "${group.name}" with status: pending_acceptance`);
-    otel.metrics.counter('vasool_members_added_total', 1, { status: 'pending_acceptance' });
-    return res.status(200).json({ group, message: `Invitation sent to ${cleanName} (${cleanEmail}). Status: Pending Acceptance.` });
+    logger.info(`[splits:members] Added ${addedMembers.length} member(s) to group "${group.name}"`);
+    otel.metrics.counter('vasool_members_added_total', addedMembers.length, { status: 'pending_acceptance' });
+
+    const msg = addedMembers.length === 1
+      ? `Invitation sent to ${addedMembers[0].name} (${addedMembers[0].email}). Status: Pending Acceptance.`
+      : `Invited ${addedMembers.length} members (${addedMembers.map((m) => m.name).join(', ')}) to "${group.name}"!`;
+
+    return res.status(200).json({
+      group,
+      addedMembers,
+      skippedEmails,
+      message: msg
+    });
   } catch (err) {
     logger.error('[splits:members] Error adding member to group:', err);
     return res.status(500).json({ error: err.message });

@@ -1,5 +1,14 @@
 const mongoose = require('mongoose');
 
+const PayerAllocationSchema = new mongoose.Schema(
+  {
+    memberEmail: { type: String, required: true, lowercase: true, trim: true },
+    memberName: { type: String, required: true, trim: true },
+    amount: { type: Number, required: true, min: 0 }
+  },
+  { _id: false }
+);
+
 const SplitAllocationSchema = new mongoose.Schema(
   {
     memberEmail: { type: String, required: true, lowercase: true, trim: true },
@@ -30,6 +39,7 @@ const ExpenseSchema = new mongoose.Schema(
     parentExpenseDesc: { type: String, default: '' },
     paidByEmail: { type: String, required: true, lowercase: true, trim: true },
     paidByName: { type: String, required: true, trim: true },
+    paidByAllocations: { type: [PayerAllocationSchema], default: [] },
     splitType: { type: String, enum: ['equal', 'exact', 'percentage', 'shares'], default: 'equal' },
     splits: { type: [SplitAllocationSchema], required: true },
     roundingRemainder: { type: Number, default: 0 },

@@ -1,6 +1,26 @@
 // =========================================================================
     // MINIMUM-CASH-FLOW DEBT SIMPLIFICATION ENGINE
     // =========================================================================
+    function getClientExpensePayerAllocations(exp) {
+      if (Array.isArray(exp.paidByAllocations) && exp.paidByAllocations.length > 0) {
+        const valid = exp.paidByAllocations
+          .map((p) => ({
+            memberEmail: String(p.memberEmail || p.email || '').toLowerCase().trim(),
+            memberName: String(p.memberName || p.name || p.memberEmail || 'Member').trim(),
+            amount: Math.round((Number(p.amount) || 0) * 100) / 100
+          }))
+          .filter((p) => p.memberEmail && p.amount > 0);
+        if (valid.length > 0) return valid;
+      }
+      return [
+        {
+          memberEmail: String(exp.paidByEmail || '').toLowerCase().trim(),
+          memberName: String(exp.paidByName || exp.paidByEmail || 'Member').trim(),
+          amount: Math.round((Number(exp.amount) || 0) * 100) / 100
+        }
+      ];
+    }
+
     function computeBalancesAndSimplifications(groupFilterId = 'ALL', customState = null) {
       const stateRef = customState || appState;
       const activeGroups =
@@ -29,12 +49,15 @@
       filteredExpenses.forEach((exp) => {
         const isIncome = exp.type === 'income';
         const amt = Number(exp.amount) || 0;
-        const payer = ensurePerson(exp.paidByEmail, exp.paidByName);
+        const payers = getClientExpensePayerAllocations(exp);
 
         if (isIncome) {
           totalSpend -= amt;
-          payer.paid -= amt;
-          payer.net -= amt;
+          payers.forEach((p) => {
+            const payer = ensurePerson(p.memberEmail, p.memberName);
+            payer.paid -= p.amount;
+            payer.net -= p.amount;
+          });
           (exp.splits || []).forEach((s) => {
             const part = ensurePerson(s.memberEmail, s.memberName);
             part.owed -= Number(s.amount);
@@ -42,8 +65,11 @@
           });
         } else {
           totalSpend += amt;
-          payer.paid += amt;
-          payer.net += amt;
+          payers.forEach((p) => {
+            const payer = ensurePerson(p.memberEmail, p.memberName);
+            payer.paid += p.amount;
+            payer.net += p.amount;
+          });
           (exp.splits || []).forEach((s) => {
             const part = ensurePerson(s.memberEmail, s.memberName);
             part.owed += Number(s.amount);
@@ -69,28 +95,35 @@
         // Direct pair-wise debts mode: members only settle with the exact person who paid
         const netPairMap = {};
         filteredExpenses.forEach((exp) => {
-          const payerEmail = String(exp.paidByEmail).toLowerCase().trim();
-          const payerName = exp.paidByName;
+          const payers = getClientExpensePayerAllocations(exp);
+          const totalExpAmt = payers.reduce((acc, p) => acc + p.amount, 0) || Number(exp.amount) || 1;
           const isIncome = exp.type === 'income';
 
           (exp.splits || []).forEach((s) => {
             const debtorEmail = String(s.memberEmail).toLowerCase().trim();
             const debtorName = s.memberName;
-            if (debtorEmail === payerEmail) return;
 
-            const key = isIncome ? `${payerEmail}->${debtorEmail}` : `${debtorEmail}->${payerEmail}`;
-            if (!netPairMap[key]) {
-              netPairMap[key] = {
-                fromEmail: isIncome ? payerEmail : debtorEmail,
-                fromName: isIncome ? payerName : debtorName,
-                toEmail: isIncome ? debtorEmail : payerEmail,
-                toName: isIncome ? debtorName : payerName,
-                amount: 0,
-                isAdminTransfer: false,
-                type: 'direct_pairwise'
-              };
-            }
-            netPairMap[key].amount += Number(s.amount);
+            payers.forEach((p) => {
+              const payerEmail = p.memberEmail;
+              const payerName = p.memberName;
+              if (debtorEmail === payerEmail) return;
+              const sharePortion = Number(s.amount) * (p.amount / totalExpAmt);
+              if (sharePortion <= 0) return;
+
+              const key = isIncome ? `${payerEmail}->${debtorEmail}` : `${debtorEmail}->${payerEmail}`;
+              if (!netPairMap[key]) {
+                netPairMap[key] = {
+                  fromEmail: isIncome ? payerEmail : debtorEmail,
+                  fromName: isIncome ? payerName : debtorName,
+                  toEmail: isIncome ? debtorEmail : payerEmail,
+                  toName: isIncome ? debtorName : payerName,
+                  amount: 0,
+                  isAdminTransfer: false,
+                  type: 'direct_pairwise'
+                };
+              }
+              netPairMap[key].amount += sharePortion;
+            });
           });
         });
 
@@ -394,12 +427,33 @@
         }
       });
       refreshAllViews();
+      // Show Top Welcome Hero & 4 KPI tiles ONLY on the Home (dashboard) tab
+      const homeTopSection = document.getElementById('homeDashboardTopSection');
+      if (homeTopSection) {
+        if (tab === 'dashboard') {
+          homeTopSection.classList.remove('hidden');
+        } else {
+          homeTopSection.classList.add('hidden');
+        }
+      }
+
+      // Hide Group Filter Bar when on Admin or QA tabs to reduce visual redundancy
+      const cmdBar = document.getElementById('workspaceCommandBar');
+      if (cmdBar) {
+        if (tab === 'admin' || tab === 'tests') {
+          cmdBar.classList.add('hidden');
+        } else {
+          cmdBar.classList.remove('hidden');
+        }
+      }
+
       if (tab === 'tests') {
         runAutomatedTestSuite(false);
         switchPipelineViewer(activePipelineTab);
       }
       if (tab === 'admin' && isSuper) {
         fetchAdminUsers();
+        if (typeof fetchAdminGroups === 'function') fetchAdminGroups(true);
       }
     }
 
@@ -486,7 +540,9 @@
       renderExpensesList();
       renderGroupsGrid();
       renderSettleView(simplified, filteredSettlements);
-      updateCloudInspector();
+      if (typeof updateCloudInspector === 'function') {
+        updateCloudInspector();
+      }
     }
 
     function renderDashboardWidgets(filteredExpenses, simplified, balanceList) {
@@ -706,7 +762,12 @@
                   ${parentRefundBadge}
                 </div>
                 <div class="text-xs text-slate-400 flex items-center gap-2 flex-wrap">
-                  <span>${e.type === 'income' ? 'Received by' : 'Paid by'} <strong class="text-slate-200">${escapeHtml(e.paidByName)}</strong> in <span class="text-teal-300">${escapeHtml(grp ? grp.name : 'Group')}</span> · ${escapeHtml(e.date || 'Today')}</span>
+                  <span>${e.type === 'income' ? 'Received by' : 'Paid by'} <strong class="text-emerald-300">${
+                    Array.isArray(e.paidByAllocations) && e.paidByAllocations.length > 1
+                      ? e.paidByAllocations.map((p) => `${escapeHtml(p.memberName.split(' ')[0])} (${formatINR(p.amount)})`).join(' + ')
+                      : escapeHtml(e.paidByName)
+                  }</strong> in <span class="text-teal-300">${escapeHtml(grp ? grp.name : 'Group')}</span> · ${escapeHtml(e.date || 'Today')}</span>
+                  ${Array.isArray(e.paidByAllocations) && e.paidByAllocations.length > 1 ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/15 text-teal-300 border border-teal-500/30">👥 ${e.paidByAllocations.length} Payers</span>` : ''}
                   ${remBadge}
                 </div>
                 <div class="flex flex-wrap gap-1.5 pt-1">${splitsPills}</div>
@@ -1113,7 +1174,9 @@
       const container = document.getElementById('groupsGridContainer');
       if (!container) return;
 
-      renderPendingInvitesBanner();
+      if (typeof renderPendingInvitesBanner === 'function') {
+        renderPendingInvitesBanner();
+      }
 
       if (!appState.groups || !appState.groups.length) {
         container.innerHTML = '<div class="col-span-full glass-panel rounded-2xl p-8 text-center text-xs text-slate-400">No groups created yet. Click "+ New Group" above to start.</div>';

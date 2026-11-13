@@ -60,7 +60,8 @@
 
       // Add Member button inside modal
       const btnAddMem = document.getElementById('btnGroupDetailsAddMember');
-      const canAddMember = isCurrentUserAdmin || Boolean(grp.allowMembersToAddOthers);
+      const isSuper = Boolean(appState.currentUser && (appState.currentUser.isSuperAdmin || appState.currentUser.role === 'super_admin' || (appState.currentUser.email && appState.currentUser.email.toLowerCase() === 'mdzubair7592@gmail.com')));
+      const canAddMember = isCurrentUserAdmin || isSuper || Boolean(grp.allowMembersToAddOthers);
       if (btnAddMem) {
         if (canAddMember) {
           btnAddMem.classList.remove('hidden');
@@ -966,7 +967,11 @@
         }
       }
 
-      populateExpenseModalMembers();
+      const existingPayers = Array.isArray(exp.paidByAllocations) && exp.paidByAllocations.length > 0
+        ? exp.paidByAllocations
+        : [{ memberEmail: exp.paidByEmail, memberName: exp.paidByName, amount: Number(exp.amount) || 0 }];
+
+      populateExpenseModalMembers(existingPayers);
       populateParentExpenseDropdown(exp.groupId, exp.parentExpenseId || '');
       if (document.getElementById('expPaidBySelect') && exp.paidByEmail) {
         document.getElementById('expPaidBySelect').value = exp.paidByEmail;
@@ -996,14 +1001,23 @@
     function openExpenseWithSuggestedPayer() {
       openAddExpenseModal();
       if (appState.suggestedPayer && appState.suggestedPayer.email) {
+        const sugEmail = appState.suggestedPayer.email.toLowerCase().trim();
         const paidBySel = document.getElementById('expPaidBySelect');
         if (paidBySel) {
           const options = Array.from(paidBySel.options);
-          const match = options.find((opt) => opt.value.toLowerCase() === appState.suggestedPayer.email.toLowerCase());
-          if (match) {
-            paidBySel.value = match.value;
-          }
+          const match = options.find((opt) => opt.value.toLowerCase() === sugEmail);
+          if (match) paidBySel.value = match.value;
         }
+        const payerRows = Array.from(document.querySelectorAll('#expPaidByMultiContainer > div'));
+        const total = Number(document.getElementById('expAmountInput')?.value) || 0;
+        payerRows.forEach((row) => {
+          const em = (row.dataset.memberEmail || '').toLowerCase().trim();
+          const chk = row.querySelector('.exp-payer-check');
+          const amtInp = row.querySelector('.exp-payer-amount');
+          if (chk) chk.checked = (em === sugEmail);
+          if (amtInp) amtInp.value = (em === sugEmail) ? String(total) : '0';
+        });
+        handlePayerSelectionChange(false);
       }
     }
 
@@ -1039,18 +1053,72 @@
       }
     }
 
-    function populateExpenseModalMembers() {
+    function populateExpenseModalMembers(preselectedPayers = null) {
       const groupId = document.getElementById('expGroupSelect').value;
       const group = appState.groups.find((g) => g.id === groupId) || appState.groups[0];
       if (!group) return;
 
       const paidBySel = document.getElementById('expPaidBySelect');
-      paidBySel.innerHTML = group.members
-        .map((m) => `<option value="${escapeHtml(m.email)}">${escapeHtml(m.name)} (${escapeHtml(m.email)})</option>`)
-        .join('');
+      if (paidBySel) {
+        paidBySel.innerHTML = group.members
+          .map((m) => `<option value="${escapeHtml(m.email)}">${escapeHtml(m.name)} (${escapeHtml(m.email)})</option>`)
+          .join('');
+      }
 
-      if (appState.currentUser && group.members.some((m) => m.email === appState.currentUser.email)) {
-        paidBySel.value = appState.currentUser.email;
+      const currentEmail = (appState.currentUser?.email || '').toLowerCase().trim();
+      const defaultPayerEmail = group.members.some((m) => (m.email || '').toLowerCase().trim() === currentEmail)
+        ? currentEmail
+        : (group.members[0]?.email || '').toLowerCase().trim();
+
+      if (paidBySel && defaultPayerEmail) {
+        const matchOpt = Array.from(paidBySel.options).find((o) => o.value.toLowerCase().trim() === defaultPayerEmail);
+        if (matchOpt) paidBySel.value = matchOpt.value;
+      }
+
+      const totalBill = Number(document.getElementById('expAmountInput')?.value) || 0;
+      const payerMap = {};
+      if (Array.isArray(preselectedPayers) && preselectedPayers.length > 0) {
+        preselectedPayers.forEach((p) => {
+          const em = String(p.memberEmail || p.email || '').toLowerCase().trim();
+          if (em) payerMap[em] = Number(p.amount) || 0;
+        });
+      } else if (defaultPayerEmail) {
+        payerMap[defaultPayerEmail] = totalBill;
+      }
+
+      const multiContainer = document.getElementById('expPaidByMultiContainer');
+      if (multiContainer) {
+        const checkedCount = Object.keys(payerMap).length || 1;
+        multiContainer.innerHTML = group.members
+          .map((m) => {
+            const mEmail = (m.email || '').toLowerCase().trim();
+            const isChecked = Object.prototype.hasOwnProperty.call(payerMap, mEmail);
+            const isMe = mEmail === currentEmail;
+            const paidVal = isChecked ? payerMap[mEmail] : 0;
+            return `
+              <div class="flex items-center justify-between gap-2 py-1.5 px-2 rounded-lg border ${isChecked ? 'bg-emerald-950/25 border-emerald-500/35' : 'bg-slate-950/60 border-slate-800/80'} transition" data-member-email="${escapeHtml(m.email)}" data-member-name="${escapeHtml(m.name)}">
+                <label class="flex items-center gap-2 text-xs text-slate-200 cursor-pointer flex-1 min-w-0">
+                  <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="handlePayerSelectionChange(true)" class="exp-payer-check rounded text-emerald-500 focus:ring-0" />
+                  <span class="truncate font-medium">${escapeHtml(m.name)}</span>
+                  ${isMe ? '<span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-teal-500/20 text-teal-300 border border-teal-500/30">You</span>' : ''}
+                </label>
+                <div class="flex items-center gap-1">
+                  <span class="text-[10px] text-slate-400">₹</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value="${isChecked ? paidVal : 0}"
+                    oninput="handlePayerAmountInput()"
+                    ${!isChecked ? 'disabled' : ''}
+                    class="exp-payer-amount w-24 px-2 py-1 rounded-lg bg-slate-950 border ${isChecked ? 'border-emerald-500/50 text-emerald-300' : 'border-slate-800 text-slate-500'} text-xs text-right font-mono-code focus:outline-none focus:border-emerald-400"
+                  />
+                </div>
+              </div>
+            `;
+          })
+          .join('');
+        updatePayerSummaryUI();
       }
 
       const container = document.getElementById('expMemberSplitsContainer');
@@ -1138,8 +1206,130 @@
       recalculateSplitPreview();
     }
 
-    function recalculateSplitPreview() {
+    function handlePayerSelectionChange(redistribute = true) {
+      const rows = Array.from(document.querySelectorAll('#expPaidByMultiContainer > div'));
+      if (!rows.length) return;
+      const total = Number(document.getElementById('expAmountInput')?.value) || 0;
+      const checkedRows = rows.filter((r) => r.querySelector('.exp-payer-check')?.checked);
+
+      rows.forEach((r) => {
+        const chk = r.querySelector('.exp-payer-check');
+        const inp = r.querySelector('.exp-payer-amount');
+        const isChecked = Boolean(chk && chk.checked);
+        r.className = `flex items-center justify-between gap-2 py-1.5 px-2 rounded-lg border ${isChecked ? 'bg-emerald-950/25 border-emerald-500/35' : 'bg-slate-950/60 border-slate-800/80'} transition`;
+        if (inp) {
+          inp.disabled = !isChecked;
+          inp.className = `exp-payer-amount w-24 px-2 py-1 rounded-lg bg-slate-950 border ${isChecked ? 'border-emerald-500/50 text-emerald-300' : 'border-slate-800 text-slate-500'} text-xs text-right font-mono-code focus:outline-none focus:border-emerald-400`;
+          if (!isChecked) inp.value = '0';
+        }
+      });
+
+      if (redistribute && checkedRows.length > 0) {
+        if (checkedRows.length === 1) {
+          const inp = checkedRows[0].querySelector('.exp-payer-amount');
+          if (inp) inp.value = String(Math.round(total * 100) / 100);
+        } else {
+          const each = Math.floor((total / checkedRows.length) * 100) / 100;
+          let sumSoFar = 0;
+          checkedRows.forEach((r, idx) => {
+            const inp = r.querySelector('.exp-payer-amount');
+            if (!inp) return;
+            if (idx === checkedRows.length - 1) {
+              inp.value = String(Math.max(0, Math.round((total - sumSoFar) * 100) / 100));
+            } else {
+              inp.value = String(each);
+              sumSoFar += each;
+            }
+          });
+        }
+      }
+
+      // Sync hidden #expPaidBySelect to first checked payer
+      const paidBySel = document.getElementById('expPaidBySelect');
+      if (paidBySel && checkedRows.length > 0) {
+        paidBySel.value = checkedRows[0].dataset.memberEmail || paidBySel.value;
+      }
+
+      updatePayerSummaryUI();
+    }
+
+    function handlePayerAmountInput() {
+      const rows = Array.from(document.querySelectorAll('#expPaidByMultiContainer > div'));
+      const checkedRows = rows.filter((r) => r.querySelector('.exp-payer-check')?.checked);
+      if (checkedRows.length >= 1) {
+        let sum = 0;
+        checkedRows.forEach((r) => {
+          const v = Number(r.querySelector('.exp-payer-amount')?.value) || 0;
+          sum += Math.max(0, v);
+        });
+        sum = Math.round(sum * 100) / 100;
+        if (checkedRows.length > 1 && sum > 0) {
+          const totalInp = document.getElementById('expAmountInput');
+          if (totalInp) {
+            totalInp.value = String(sum);
+            recalculateSplitPreview(true);
+          }
+        }
+      }
+      updatePayerSummaryUI();
+    }
+
+    function updatePayerSummaryUI() {
+      const rows = Array.from(document.querySelectorAll('#expPaidByMultiContainer > div'));
+      if (!rows.length) return;
+      const total = Number(document.getElementById('expAmountInput')?.value) || 0;
+      const checkedRows = rows.filter((r) => r.querySelector('.exp-payer-check')?.checked);
+      const badge = document.getElementById('expPaidBySummaryBadge');
+      const valBanner = document.getElementById('expPayerValidationBanner');
+
+      let paidSum = 0;
+      checkedRows.forEach((r) => {
+        paidSum += Math.max(0, Number(r.querySelector('.exp-payer-amount')?.value) || 0);
+      });
+      paidSum = Math.round(paidSum * 100) / 100;
+
+      if (badge) {
+        if (checkedRows.length === 0) {
+          badge.className = 'text-[11px] font-semibold text-rose-400';
+          badge.textContent = 'Select at least 1 payer';
+        } else if (checkedRows.length === 1) {
+          const nm = (checkedRows[0].dataset.memberName || 'Member').split(' ')[0];
+          badge.className = 'text-[11px] font-semibold text-emerald-400';
+          badge.textContent = `Paid by ${nm} (${formatINR(paidSum)})`;
+        } else {
+          badge.className = 'text-[11px] font-semibold text-teal-300';
+          badge.textContent = `${checkedRows.length} payers · Total ${formatINR(paidSum)}`;
+        }
+      }
+
+      if (valBanner) {
+        if (checkedRows.length > 1) {
+          valBanner.classList.remove('hidden');
+          const diff = Math.abs(total - paidSum);
+          if (diff <= 0.05) {
+            valBanner.className = 'text-[11px] font-medium text-emerald-400 px-1 flex items-center justify-between';
+            valBanner.innerHTML = `<span>✓ Multi-payer spend matches total bill</span><span>${formatINR(paidSum)} / ${formatINR(total)}</span>`;
+          } else {
+            valBanner.className = 'text-[11px] font-medium text-amber-400 px-1 flex items-center justify-between';
+            valBanner.innerHTML = `<span>⚠️ Payers sum (${formatINR(paidSum)}) ≠ Bill (${formatINR(total)})</span><span>Diff: ${formatINR(diff)}</span>`;
+          }
+        } else {
+          valBanner.classList.add('hidden');
+        }
+      }
+    }
+
+    function recalculateSplitPreview(skipPayerSync = false) {
       const total = Number(document.getElementById('expAmountInput').value) || 0;
+      if (!skipPayerSync) {
+        const payerRows = Array.from(document.querySelectorAll('#expPaidByMultiContainer > div'));
+        const checkedPayers = payerRows.filter((r) => r.querySelector('.exp-payer-check')?.checked);
+        if (checkedPayers.length === 1) {
+          const pInp = checkedPayers[0].querySelector('.exp-payer-amount');
+          if (pInp) pInp.value = String(Math.round(total * 100) / 100);
+        }
+        updatePayerSummaryUI();
+      }
       const rows = Array.from(document.querySelectorAll('#expMemberSplitsContainer > div'));
       const activeRows = rows.filter((r) => r.querySelector('.exp-member-check').checked);
 
@@ -1208,12 +1398,56 @@
       const groupId = document.getElementById('expGroupSelect').value;
       const category = document.getElementById('expCategorySelect').value;
       const description = document.getElementById('expDescInput').value.trim();
-      const amount = Number(document.getElementById('expAmountInput').value) || 0;
-      const paidByEmail = document.getElementById('expPaidBySelect').value;
-
+      let amount = Number(document.getElementById('expAmountInput').value) || 0;
       const group = appState.groups.find((g) => g.id === groupId);
-      const payerObj = group?.members.find((m) => m.email === paidByEmail);
-      const paidByName = payerObj ? payerObj.name : paidByEmail;
+
+      // Extract multi-payer allocations from #expPaidByMultiContainer
+      const payerRows = Array.from(document.querySelectorAll('#expPaidByMultiContainer > div'));
+      const paidByAllocations = [];
+      payerRows.forEach((r) => {
+        const chk = r.querySelector('.exp-payer-check');
+        const amtInp = r.querySelector('.exp-payer-amount');
+        if (chk && chk.checked) {
+          const pAmt = Math.round((Number(amtInp?.value) || 0) * 100) / 100;
+          paidByAllocations.push({
+            memberEmail: r.dataset.memberEmail,
+            memberName: r.dataset.memberName,
+            amount: pAmt
+          });
+        }
+      });
+
+      if (payerRows.length > 0 && paidByAllocations.length === 0) {
+        showToast('Please select at least one person who paid for this expense.', 'error');
+        return;
+      }
+
+      if (paidByAllocations.length === 1 && Math.abs(paidByAllocations[0].amount - amount) > 0.01) {
+        paidByAllocations[0].amount = amount;
+      } else if (paidByAllocations.length > 1) {
+        const payerSum = Math.round(paidByAllocations.reduce((s, p) => s + p.amount, 0) * 100) / 100;
+        if (payerSum <= 0) {
+          showToast('Please enter the amount paid by each selected person.', 'error');
+          return;
+        }
+        if (Math.abs(payerSum - amount) > 0.1) {
+          showToast(`Total paid by selected payers (${formatINR(payerSum)}) must match the bill total (${formatINR(amount)}).`, 'error');
+          return;
+        }
+      }
+
+      let paidByEmail = document.getElementById('expPaidBySelect')?.value || (appState.currentUser?.email || '');
+      let paidByName = paidByEmail;
+      if (paidByAllocations.length > 0) {
+        paidByEmail = paidByAllocations[0].memberEmail;
+        paidByName = paidByAllocations.length > 1
+          ? paidByAllocations.map((p) => `${p.memberName.split(' ')[0]} (₹${p.amount})`).join(' + ')
+          : paidByAllocations[0].memberName;
+      } else {
+        const payerObj = group?.members.find((m) => m.email === paidByEmail);
+        paidByName = payerObj ? payerObj.name : paidByEmail;
+        paidByAllocations.push({ memberEmail: paidByEmail, memberName: paidByName, amount });
+      }
 
       const rows = Array.from(document.querySelectorAll('#expMemberSplitsContainer > div'));
       const splits = [];
@@ -1277,6 +1511,7 @@
         parentExpenseDesc,
         paidByEmail,
         paidByName,
+        paidByAllocations,
         type: currentExpenseType,
         splitType: currentSplitMode,
         splits,
@@ -1434,6 +1669,114 @@
 
     let pendingUnregisteredMemberData = null;
     let autocompleteDebounceTimer = null;
+    let newGroupAutocompleteTimer = null;
+
+    async function queryUserSuggestions(token) {
+      const q = String(token || '').trim().toLowerCase();
+      if (!q) return [];
+      const seen = new Set();
+      const results = [];
+
+      const pushCandidate = (u) => {
+        if (!u || !u.email) return;
+        const em = String(u.email).toLowerCase().trim();
+        if (seen.has(em)) return;
+        seen.add(em);
+        results.push({
+          name: u.name || em.split('@')[0],
+          email: em,
+          upiId: u.upiId || ''
+        });
+      };
+
+      // 1. Search local known users & group members first for instant response
+      (appState.users || []).forEach((u) => {
+        if ((u.name && u.name.toLowerCase().includes(q)) || (u.email && u.email.toLowerCase().includes(q))) {
+          pushCandidate(u);
+        }
+      });
+      (appState.groups || []).forEach((g) => {
+        (g.members || []).forEach((m) => {
+          if ((m.name && m.name.toLowerCase().includes(q)) || (m.email && m.email.toLowerCase().includes(q))) {
+            pushCandidate(m);
+          }
+        });
+      });
+
+      // 2. Also query backend /api/users/search when authenticated
+      if (localStorage.getItem(AUTH_TOKEN_KEY)) {
+        try {
+          const res = await apiFetch(`/api/users/search?q=${encodeURIComponent(token.trim())}`);
+          if (res && Array.isArray(res.users)) {
+            res.users.forEach((u) => pushCandidate(u));
+          }
+        } catch (err) {
+          console.warn('[Autocomplete search notice]', err.message);
+        }
+      }
+
+      return results.slice(0, 8);
+    }
+
+    function handleNewGroupMembersInput(rawVal) {
+      clearTimeout(newGroupAutocompleteTimer);
+      const container = document.getElementById('newGroupMembersAutocomplete');
+      if (!container) return;
+
+      const parts = String(rawVal || '').split(',');
+      const lastToken = (parts[parts.length - 1] || '').trim();
+      if (lastToken.length < 1 || lastToken.includes('>')) {
+        container.classList.add('hidden');
+        container.innerHTML = '';
+        return;
+      }
+
+      newGroupAutocompleteTimer = setTimeout(async () => {
+        const users = await queryUserSuggestions(lastToken);
+        if (!users.length) {
+          container.classList.add('hidden');
+          container.innerHTML = '';
+          return;
+        }
+        container.classList.remove('hidden');
+        container.innerHTML = users
+          .map((u) => {
+            const ini = (u.name || u.email).slice(0, 2).toUpperCase();
+            return `
+              <div onclick="selectNewGroupMemberAutocomplete('${escapeHtml(u.name)}', '${escapeHtml(u.email)}')" class="p-2.5 hover:bg-slate-800/80 cursor-pointer flex items-center justify-between gap-2 transition">
+                <div class="flex items-center gap-2 min-w-0">
+                  <span class="w-7 h-7 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-xs flex items-center justify-center flex-shrink-0">
+                    ${escapeHtml(ini)}
+                  </span>
+                  <div class="min-w-0">
+                    <div class="text-xs font-bold text-white truncate">${escapeHtml(u.name)}</div>
+                    <div class="text-[11px] text-slate-400 font-mono truncate">${escapeHtml(u.email)}</div>
+                  </div>
+                </div>
+                <span class="text-[9px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex-shrink-0">+ Add</span>
+              </div>
+            `;
+          })
+          .join('');
+      }, 150);
+    }
+
+    function selectNewGroupMemberAutocomplete(name, email) {
+      const inputEl = document.getElementById('newGroupMembersInput');
+      const ac = document.getElementById('newGroupMembersAutocomplete');
+      if (inputEl) {
+        const parts = String(inputEl.value || '').split(',');
+        parts.pop();
+        const prefix = parts.map((p) => p.trim()).filter(Boolean);
+        prefix.push(`${name} <${email}>`);
+        inputEl.value = prefix.join(', ') + ', ';
+        inputEl.focus();
+      }
+      if (ac) {
+        ac.classList.add('hidden');
+        ac.innerHTML = '';
+      }
+    }
 
     function openAddMemberModal(groupId) {
       document.getElementById('addMemberGroupId').value = groupId;
@@ -1446,7 +1789,13 @@
         ac.classList.add('hidden');
         ac.innerHTML = '';
       }
+      const modalEl = document.getElementById('addMemberModal');
+      if (modalEl) modalEl.style.zIndex = '65';
       openModal('addMemberModal');
+      setTimeout(() => {
+        const emInp = document.getElementById('addMemberEmail');
+        if (emInp) emInp.focus();
+      }, 50);
     }
 
     async function handleMemberEmailInput(query) {
@@ -1454,8 +1803,9 @@
       const container = document.getElementById('addMemberAutocomplete');
       if (!container) return;
 
-      const q = String(query || '').trim();
-      if (q.length < 1) {
+      const parts = String(query || '').split(',');
+      const lastToken = (parts[parts.length - 1] || '').trim();
+      if (lastToken.length < 1 || lastToken.includes('>')) {
         container.classList.add('hidden');
         container.innerHTML = '';
         return;
@@ -1463,14 +1813,12 @@
 
       autocompleteDebounceTimer = setTimeout(async () => {
         try {
-          if (!localStorage.getItem(AUTH_TOKEN_KEY)) return;
-          const res = await apiFetch(`/api/users/search?q=${encodeURIComponent(q)}`);
-          const users = (res && res.users) || [];
+          const users = await queryUserSuggestions(lastToken);
           if (!users.length) {
             container.classList.remove('hidden');
             container.innerHTML = `
               <div class="p-3 text-xs text-slate-400 text-center">
-                No registered user found. (Will prompt multi-channel invite on submit)
+                No registered user match for "${escapeHtml(lastToken)}". You can still invite via email or comma-separated list!
               </div>
             `;
             return;
@@ -1482,16 +1830,16 @@
               const ini = (u.name || u.email).slice(0, 2).toUpperCase();
               return `
                 <div onclick="selectAutocompleteUser('${escapeHtml(u.name)}', '${escapeHtml(u.email)}')" class="p-2.5 hover:bg-slate-800/80 cursor-pointer flex items-center justify-between gap-2 transition">
-                  <div class="flex items-center gap-2">
-                    <span class="w-7 h-7 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-xs flex items-center justify-center">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <span class="w-7 h-7 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-xs flex items-center justify-center flex-shrink-0">
                       ${escapeHtml(ini)}
                     </span>
-                    <div>
-                      <div class="text-xs font-bold text-white">${escapeHtml(u.name)}</div>
-                      <div class="text-[11px] text-slate-400 font-mono">${escapeHtml(u.email)}</div>
+                    <div class="min-w-0">
+                      <div class="text-xs font-bold text-white truncate">${escapeHtml(u.name)}</div>
+                      <div class="text-[11px] text-slate-400 font-mono truncate">${escapeHtml(u.email)}</div>
                     </div>
                   </div>
-                  <span class="text-[9px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Registered</span>
+                  <span class="text-[9px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex-shrink-0">Select</span>
                 </div>
               `;
             })
@@ -1499,14 +1847,26 @@
         } catch (err) {
           console.warn('[Autocomplete error]', err);
         }
-      }, 200);
+      }, 150);
     }
 
     function selectAutocompleteUser(name, email) {
       const nameInput = document.getElementById('addMemberName');
       const emailInput = document.getElementById('addMemberEmail');
-      if (nameInput) nameInput.value = name;
-      if (emailInput) emailInput.value = email;
+      if (emailInput) {
+        const currentRaw = String(emailInput.value || '');
+        if (currentRaw.includes(',')) {
+          const parts = currentRaw.split(',');
+          parts.pop();
+          const prefix = parts.map((p) => p.trim()).filter(Boolean);
+          prefix.push(`${name} <${email}>`);
+          emailInput.value = prefix.join(', ') + ', ';
+        } else {
+          emailInput.value = email;
+          if (nameInput) nameInput.value = name;
+        }
+        emailInput.focus();
+      }
       const ac = document.getElementById('addMemberAutocomplete');
       if (ac) {
         ac.classList.add('hidden');
@@ -1514,87 +1874,192 @@
       }
     }
 
+    function parseMemberTokensList(rawEmailStr, fallbackSingleName = '', defaultWeight = 1) {
+      const tokens = String(rawEmailStr || '')
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean);
+      const parsed = [];
+      const seen = new Set();
+
+      tokens.forEach((token) => {
+        const angleMatch = token.match(/^([^<]+)<([^>]+)>$/);
+        let mEmail = '';
+        let mName = '';
+        if (angleMatch) {
+          mName = angleMatch[1].trim();
+          mEmail = angleMatch[2].trim().toLowerCase();
+        } else if (token.includes('@')) {
+          mEmail = token.toLowerCase().trim();
+          if (tokens.length === 1 && fallbackSingleName && String(fallbackSingleName).trim()) {
+            mName = String(fallbackSingleName).trim();
+          } else {
+            const known = (appState.users || []).find((u) => (u.email || '').toLowerCase().trim() === mEmail);
+            if (known && known.name) {
+              mName = known.name;
+            } else {
+              const prefix = mEmail.split('@')[0].replace(/[._-]+/g, ' ');
+              mName = prefix.replace(/\b\w/g, (c) => c.toUpperCase());
+            }
+          }
+        } else {
+          mName = token.trim();
+          mEmail = mName.toLowerCase().replace(/[^a-z0-9]/g, '.') + '@gmail.com';
+        }
+        if (mEmail && !seen.has(mEmail)) {
+          seen.add(mEmail);
+          parsed.push({
+            name: mName || mEmail.split('@')[0],
+            email: mEmail,
+            defaultWeight: Number(defaultWeight) || 1
+          });
+        }
+      });
+
+      return parsed;
+    }
+
     async function handleAddMemberSubmit(e) {
       e.preventDefault();
       const groupId = document.getElementById('addMemberGroupId').value;
       const name = document.getElementById('addMemberName').value.trim();
-      const email = document.getElementById('addMemberEmail').value.trim().toLowerCase();
+      const rawEmails = document.getElementById('addMemberEmail').value.trim();
       const weight = parseFloat(document.getElementById('addMemberWeight')?.value) || 1;
 
       const grp = appState.groups.find((g) => g.id === groupId);
       if (!grp) return;
-      if (grp.members.some((m) => m.email.toLowerCase() === email)) {
-        showToast('Member is already in this group.', 'error');
+
+      const candidates = parseMemberTokensList(rawEmails, name, weight);
+      if (!candidates.length) {
+        showToast('Please enter at least one valid member email.', 'error');
         return;
       }
 
-      // Check permission: only admin or if allowMembersToAddOthers is enabled
+      // Check permission: admin, super admin, or if allowMembersToAddOthers is enabled
       const currentEmail = (appState.currentUser?.email || '').toLowerCase().trim();
+      const isSuper = Boolean(appState.currentUser && (appState.currentUser.isSuperAdmin || appState.currentUser.role === 'super_admin' || currentEmail === 'mdzubair7592@gmail.com'));
       const currentAdmin = grp.members.find((m) => m.role === 'admin' || (grp.adminEmail && grp.adminEmail.toLowerCase() === m.email.toLowerCase())) || grp.members[0];
-      const isCurrentUserAdmin = currentAdmin && currentAdmin.email.toLowerCase().trim() === currentEmail;
+      const isCurrentUserAdmin = isSuper || (currentAdmin && currentAdmin.email.toLowerCase().trim() === currentEmail);
       if (!isCurrentUserAdmin && !grp.allowMembersToAddOthers) {
         showToast('Only the group admin can add members to this group.', 'error');
         return;
       }
 
-      // Check if user is registered
-      let isRegistered = false;
-      try {
-        if (localStorage.getItem(AUTH_TOKEN_KEY)) {
-          const checkRes = await apiFetch(`/api/users/check-email?email=${encodeURIComponent(email)}`);
-          isRegistered = Boolean(checkRes && checkRes.exists);
-        }
-      } catch {}
-
-      if (!isRegistered) {
-        // Open multi-channel invite modal
-        pendingUnregisteredMemberData = { groupId, name, email, weight };
-        const h = document.getElementById('unregInviteTargetHeading');
-        const s = document.getElementById('unregInviteTargetSub');
-        if (h) h.textContent = `${email} is not on Vasool yet!`;
-        if (s) {
-          s.innerHTML = `<strong>${escapeHtml(name)}</strong> (${escapeHtml(email)}) doesn't have an active Vasool account yet. They will be added to <strong>${escapeHtml(grp.name)}</strong> as <span class="text-amber-300 font-semibold">⏳ Pending Acceptance</span>. Choose how you'd like to share the invite:`;
-        }
-        closeModal('addMemberModal');
-        openModal('unregisteredInviteModal');
+      const existingSet = new Set((grp.members || []).map((m) => (m.email || '').toLowerCase().trim()));
+      const newCandidates = candidates.filter((c) => !existingSet.has(c.email));
+      if (!newCandidates.length) {
+        showToast('All specified member(s) are already in this group.', 'error');
         return;
       }
 
-      await executeAddMember(groupId, name, email, weight);
+      // If adding a single member, check if registered so we can offer multi-channel invite
+      if (newCandidates.length === 1) {
+        const single = newCandidates[0];
+        let isRegistered = false;
+        try {
+          if (localStorage.getItem(AUTH_TOKEN_KEY)) {
+            const checkRes = await apiFetch(`/api/users/check-email?email=${encodeURIComponent(single.email)}`);
+            isRegistered = Boolean(checkRes && checkRes.exists);
+            if (checkRes && checkRes.user && checkRes.user.name && (!name || name === single.email.split('@')[0])) {
+              single.name = checkRes.user.name;
+            }
+          }
+        } catch {}
+
+        if (!isRegistered && localStorage.getItem(AUTH_TOKEN_KEY)) {
+          pendingUnregisteredMemberData = { groupId, name: single.name, email: single.email, weight: single.defaultWeight, members: newCandidates };
+          const h = document.getElementById('unregInviteTargetHeading');
+          const s = document.getElementById('unregInviteTargetSub');
+          if (h) h.textContent = `${single.email} is not on Vasool yet!`;
+          if (s) {
+            s.innerHTML = `<strong>${escapeHtml(single.name)}</strong> (${escapeHtml(single.email)}) doesn't have an active Vasool account yet. They will be added to <strong>${escapeHtml(grp.name)}</strong> as <span class="text-amber-300 font-semibold">⏳ Pending Acceptance</span>. Choose how you'd like to share the invite:`;
+          }
+          closeModal('addMemberModal');
+          openModal('unregisteredInviteModal');
+          return;
+        }
+      }
+
+      await executeAddMember(groupId, newCandidates[0].name, rawEmails, weight, newCandidates);
       closeModal('addMemberModal');
     }
 
-    async function executeAddMember(groupId, name, email, weight) {
+    async function executeAddMember(groupId, name, email, weight, parsedMembersArray = null) {
       const grp = appState.groups.find((g) => g.id === groupId);
       if (!grp) return;
+
+      const membersToAdd = Array.isArray(parsedMembersArray) && parsedMembersArray.length > 0
+        ? parsedMembersArray
+        : parseMemberTokensList(email, name, weight);
+
+      if (!membersToAdd.length) return;
 
       if (localStorage.getItem(AUTH_TOKEN_KEY)) {
         try {
           const res = await apiFetch(`/api/groups/${groupId}/members`, {
             method: 'POST',
-            body: JSON.stringify({ name, email, defaultWeight: weight })
+            body: JSON.stringify({
+              name: membersToAdd[0].name,
+              email: membersToAdd.map((m) => `${m.name} <${m.email}>`).join(', '),
+              members: membersToAdd,
+              defaultWeight: weight
+            })
           });
           if (res && res.error) {
             showToast(res.error, 'error');
             return;
           }
+          if (res && res.group && Array.isArray(res.group.members)) {
+            grp.members = res.group.members;
+          } else {
+            const existingSet = new Set(grp.members.map((m) => (m.email || '').toLowerCase().trim()));
+            membersToAdd.forEach((m) => {
+              if (!existingSet.has(m.email)) {
+                grp.members.push({
+                  name: m.name,
+                  email: m.email,
+                  role: 'member',
+                  status: 'pending_acceptance',
+                  invitedAt: new Date().toISOString(),
+                  defaultWeight: m.defaultWeight || weight || 1
+                });
+              }
+            });
+          }
         } catch (err) {
           showToast(err.message, 'error');
           return;
         }
+      } else {
+        const existingSet = new Set(grp.members.map((m) => (m.email || '').toLowerCase().trim()));
+        membersToAdd.forEach((m) => {
+          if (!existingSet.has(m.email)) {
+            grp.members.push({
+              name: m.name,
+              email: m.email,
+              role: 'member',
+              status: 'pending_acceptance',
+              invitedAt: new Date().toISOString(),
+              defaultWeight: m.defaultWeight || weight || 1
+            });
+          }
+        });
       }
 
-      grp.members.push({
-        name,
-        email,
-        role: 'member',
-        status: 'pending_acceptance',
-        invitedAt: new Date().toISOString(),
-        defaultWeight: weight
-      });
       saveState();
       refreshAllViews();
-      showToast(`Invited ${name} to ${grp.name}! Status: ⏳ Pending Acceptance.`);
+
+      // Immediately refresh Group Details Modal if it is currently open for this group
+      const detailsModal = document.getElementById('groupDetailsModal');
+      if (activeDetailsGroupId === groupId && detailsModal && !detailsModal.classList.contains('hidden')) {
+        renderGroupDetailsData(grp);
+      }
+
+      if (membersToAdd.length === 1) {
+        showToast(`Invited ${membersToAdd[0].name} to ${grp.name}! Status: ⏳ Pending Acceptance.`);
+      } else {
+        showToast(`Invited ${membersToAdd.length} members (${membersToAdd.map((m) => m.name).join(', ')}) to ${grp.name}!`);
+      }
     }
 
     async function confirmInviteViaChannel(channel) {
@@ -1806,6 +2271,10 @@
       });
     }
 
+    if (typeof window !== 'undefined') {
+      window.renderPendingInvitesBanner = renderPendingInvitesBanner;
+    }
+
     function copyInviteLink(inviteCode, groupName) {
       const baseUrl = window.location.origin;
       const link = `${baseUrl}/?join=${encodeURIComponent(inviteCode)}`;
@@ -1907,14 +2376,31 @@
       const upiInput = document.getElementById('settleUpiIdInput');
       const toName = document.getElementById('settleToName')?.value || 'Vasool Member';
       const amount = Number(document.getElementById('settleAmountInput')?.value) || 0;
-      const upiId = (upiInput ? upiInput.value.trim() : '') || 'vasool.settle@upi';
+      const upiId = upiInput ? upiInput.value.trim() : '';
+
+      const upiSection = document.getElementById('settleUpiSection');
+      const noUpiNotice = document.getElementById('settleNoUpiNotice');
+      const noUpiNameEl = document.getElementById('settleNoUpiRecipientName');
+      const linkEl = document.getElementById('settleUpiDeepLink');
+      const qrImg = document.getElementById('settleQrImage');
+
+      if (noUpiNameEl) noUpiNameEl.textContent = toName;
+
+      // STRICT UPI RULE: If the recipient has not set a UPI ID, never fabricate one and hide the UPI app redirect section
+      if (!upiId || !upiId.includes('@')) {
+        if (upiSection) upiSection.classList.add('hidden');
+        if (noUpiNotice) noUpiNotice.classList.remove('hidden');
+        if (linkEl) linkEl.href = '#';
+        if (qrImg) qrImg.src = '';
+        return;
+      }
+
+      if (upiSection) upiSection.classList.remove('hidden');
+      if (noUpiNotice) noUpiNotice.classList.add('hidden');
 
       const upiUri = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(toName)}&am=${amount.toFixed(2)}&cu=INR&tn=${encodeURIComponent('Vasool Settlement')}`;
-
-      const linkEl = document.getElementById('settleUpiDeepLink');
       if (linkEl) linkEl.href = upiUri;
 
-      const qrImg = document.getElementById('settleQrImage');
       if (qrImg) {
         const fallbackSvg = generateOfflineUpiSvgDataUri(upiId, amount);
         qrImg.onerror = () => {
@@ -1927,16 +2413,37 @@
 
     function resolveRecipientUpiId(toEmail, groupId) {
       const targetEmail = String(toEmail || '').toLowerCase().trim();
+      if (!targetEmail) return '';
+
+      // 1. Check if recipient is currentUser
+      if (appState.currentUser && (appState.currentUser.email || '').toLowerCase().trim() === targetEmail) {
+        return String(appState.currentUser.upiId || '').trim();
+      }
+
+      // 2. Check target group member record
       const grp = appState.groups.find((g) => g.id === groupId);
       const grpMember = grp?.members?.find((m) => (m.email || '').toLowerCase().trim() === targetEmail);
-      if (grpMember && grpMember.upiId) return grpMember.upiId;
-      const usr = appState.users?.find((u) => (u.email || '').toLowerCase().trim() === targetEmail);
-      if (usr && usr.upiId) return usr.upiId;
-      const handle = targetEmail.split('@')[0].replace(/[^a-zA-Z0-9]/g, '');
-      return `${handle}@okhdfcbank`;
+      if (grpMember && grpMember.upiId && String(grpMember.upiId).trim()) {
+        return String(grpMember.upiId).trim();
+      }
+
+      // 3. Check across any other group member record
+      for (const g of (appState.groups || [])) {
+        const m = (g.members || []).find((mem) => (mem.email || '').toLowerCase().trim() === targetEmail && mem.upiId);
+        if (m && String(m.upiId).trim()) return String(m.upiId).trim();
+      }
+
+      // 4. Check in appState.users
+      const usr = (appState.users || []).find((u) => (u.email || '').toLowerCase().trim() === targetEmail);
+      if (usr && usr.upiId && String(usr.upiId).trim()) {
+        return String(usr.upiId).trim();
+      }
+
+      // Never auto-generate or guess a fake UPI ID if the user hasn't set one
+      return '';
     }
 
-    function openSettleConfirm(fromEmail, fromName, toEmail, toName, amount) {
+    async function openSettleConfirm(fromEmail, fromName, toEmail, toName, amount) {
       const targetGroupId = selectedGroupId === 'ALL' ? appState.groups[0]?.id || '' : selectedGroupId;
       document.getElementById('settleFromEmail').value = fromEmail;
       document.getElementById('settleFromName').value = fromName;
@@ -1947,9 +2454,14 @@
       document.getElementById('settleNoteInput').value = '';
       if (document.getElementById('settleUtrInput')) document.getElementById('settleUtrInput').value = '';
 
-      const defaultUpi = resolveRecipientUpiId(toEmail, targetGroupId);
+      let verifiedUpi = resolveRecipientUpiId(toEmail, targetGroupId);
       const upiInput = document.getElementById('settleUpiIdInput');
-      if (upiInput) upiInput.value = defaultUpi;
+      if (upiInput) upiInput.value = verifiedUpi;
+
+      const methodSel = document.getElementById('settleMethodSelect');
+      if (methodSel) {
+        methodSel.value = verifiedUpi ? 'UPI' : 'Cash';
+      }
 
       document.getElementById('settleModalSummaryBox').innerHTML = `
         Recording payment from <strong class="text-rose-300">${escapeHtml(fromName)}</strong> to <strong class="text-emerald-300">${escapeHtml(toName)}</strong>
@@ -1957,6 +2469,29 @@
 
       updateSettlementUpiData();
       openModal('settleConfirmModal');
+
+      // Live check against backend User record to ensure we have the recipient's latest UPI ID
+      if (localStorage.getItem(AUTH_TOKEN_KEY) && toEmail) {
+        try {
+          const checkRes = await apiFetch(`/api/users/check-email?email=${encodeURIComponent(toEmail)}`);
+          if (checkRes && checkRes.exists && checkRes.user) {
+            const liveUpi = String(checkRes.user.upiId || '').trim();
+            // Cache on group member & user
+            (appState.groups || []).forEach((g) => {
+              (g.members || []).forEach((m) => {
+                if ((m.email || '').toLowerCase().trim() === toEmail.toLowerCase().trim()) {
+                  m.upiId = liveUpi;
+                }
+              });
+            });
+            if (upiInput) upiInput.value = liveUpi;
+            if (methodSel) methodSel.value = liveUpi ? 'UPI' : 'Cash';
+            updateSettlementUpiData();
+          }
+        } catch (err) {
+          console.warn('[Settle UPI check notice]', err.message);
+        }
+      }
     }
 
     async function confirmSettlementSubmit(e) {

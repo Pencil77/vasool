@@ -356,10 +356,10 @@
         return `First share ₹${res[0].amount} (roundingAdjustment: +₹${res[0].roundingAdjustment})`;
       });
 
-      runCase('Unit', 'UT-12: Recipient UPI Handle Resolution from Group Member Profile', () => {
-        const resolved = resolveRecipientUpiId('vikram.spender@vasool.test', appState.groups[0]?.id);
-        if (!resolved || !resolved.includes('@')) throw new Error('Invalid UPI VPA resolved');
-        return `Resolved VPA: ${resolved}`;
+      runCase('Unit', 'UT-12: Strict Recipient UPI Handle Resolution (No Fabricated Fallback)', () => {
+        const emptyRes = resolveRecipientUpiId('unconfigured.user@example.com', appState.groups[0]?.id);
+        if (emptyRes !== '') throw new Error('Expected empty string when user has no UPI ID configured');
+        return 'Verified: Empty UPI returns "" (UPI redirect hidden when unset)';
       });
 
       runCase('Integration', 'IT-08: Per-Bill Multi-Currency FX Rate Conversion to Base INR', () => {
@@ -476,17 +476,15 @@
         updateCloudInspector();
       }
       if (id === 'systemStatusModal') {
-        const superNotice = document.getElementById('superAdminDiagnosticNotice');
-        if (superNotice) {
-          const isSuper = (typeof isSuperAdminUser === 'function')
-            ? isSuperAdminUser(appState && appState.currentUser)
-            : false;
-          if (isSuper) {
-            superNotice.classList.remove('hidden');
-          } else {
-            superNotice.classList.add('hidden');
-          }
+        const isSuper = (typeof isSuperAdminUser === 'function')
+          ? isSuperAdminUser(appState && appState.currentUser)
+          : Boolean(appState && appState.currentUser && (appState.currentUser.isSuperAdmin || appState.currentUser.role === 'super_admin' || (appState.currentUser.email && appState.currentUser.email.toLowerCase().trim() === 'mdzubair7592@gmail.com')));
+        if (!isSuper) {
+          showToast('System Status is restricted to Super Admin only.', 'warning');
+          return;
         }
+        const superNotice = document.getElementById('superAdminDiagnosticNotice');
+        if (superNotice) superNotice.classList.remove('hidden');
       }
       const el = document.getElementById(id);
       if (el) el.classList.remove('hidden');
@@ -549,6 +547,9 @@
         2
       );
     }
+    if (typeof window !== 'undefined') {
+      window.updateCloudInspector = updateCloudInspector;
+    }
 
     function exportDatabaseJson() {
       const isSuper = (typeof isSuperAdminUser === 'function')
@@ -586,6 +587,154 @@
 
     function openNewGroupModal() {
       openModal('newGroupModal');
+    }
+
+    // =========================================================================
+    // NEW USER ONBOARDING WIZARD (INTERACTIVE TOUR & GUIDE)
+    // =========================================================================
+    let currentOnboardingStep = 0;
+    const ONBOARDING_STEPS = [
+      {
+        icon: '👥',
+        badge: 'Step 1 of 4 • Groups & Invites',
+        title: 'Create Groups & Invite Friends',
+        tagline: 'Effortless collaboration for roommates, trips, and dinners',
+        description: 'Create shared groups in seconds. Add multiple members at once using comma-separated emails or instant email autocomplete. Group admins can also configure Split Visibility for enhanced member privacy.',
+        highlights: [
+          'Comma-separated multi-email invites with live search suggestions',
+          'Configurable Split Privacy: toggle whether members see full breakdown or their share only',
+          'Instant shareable join links and invitation management'
+        ]
+      },
+      {
+        icon: '🧾',
+        badge: 'Step 2 of 4 • Expense Logging',
+        title: 'Flexible Multi-Payer Expenses',
+        tagline: 'Log single or multi-payer bills with 4 split algorithms',
+        description: 'Anyone can pay, or multiple members can split the payment! Vasool supports multi-payer expenses (SettleUp style) and 4 split modes: Equal, Exact Amount, Percentage, and Shares.',
+        highlights: [
+          'Multi-payer support: multiple friends can contribute to one bill',
+          '4 split modes: Equal, Exact Amount, Percentage (%), and Custom Shares',
+          'Real-time allocation validation preventing math errors'
+        ]
+      },
+      {
+        icon: '⚡',
+        badge: 'Step 3 of 4 • Debt Engine',
+        title: 'Minimum-Cash-Flow Settlements',
+        tagline: 'Greedy graph optimization eliminates round-trips',
+        description: 'No more circular debts or messy back-and-forth transfers. Vasool automatically simplifies debts using a greedy minimum-cash-flow graph engine so everyone makes the minimum number of payments.',
+        highlights: [
+          'Direct Peer-to-Peer settlement routing with fewest total transactions',
+          'Admin-Hub routing option for centralized event reconciliations',
+          'Settlement verification workflow with Confirm and Dispute protection'
+        ]
+      },
+      {
+        icon: '💸',
+        badge: 'Step 4 of 4 • UPI & Payments',
+        title: 'Instant 1-Tap UPI Settlements',
+        tagline: 'Direct mobile deep-links and dynamic QR codes',
+        description: 'Settle balances in seconds! Directly open GPay, PhonePe, or Paytm with pre-filled amounts, or scan dynamic UPI QR codes. Recipient UPI IDs are managed directly from user profiles—no fallback guesses!',
+        highlights: [
+          '1-tap deep-links to all popular Indian UPI apps',
+          'Dynamic UPI QR code generation with amount and note',
+          'Secure profile controls: add, edit, or remove your UPI ID anytime'
+        ]
+      }
+    ];
+
+    function openOnboardingWizard(step = 0) {
+      currentOnboardingStep = Math.max(0, Math.min(step, ONBOARDING_STEPS.length - 1));
+      renderOnboardingWizardStep(currentOnboardingStep);
+      const modal = document.getElementById('onboardingWizardModal');
+      if (modal) modal.classList.remove('hidden');
+    }
+
+    function renderOnboardingWizardStep(step) {
+      currentOnboardingStep = step;
+      const s = ONBOARDING_STEPS[step];
+      if (!s) return;
+
+      const counter = document.getElementById('onboardingStepCounter');
+      if (counter) counter.textContent = `Step ${step + 1} of ${ONBOARDING_STEPS.length}`;
+
+      const progress = document.getElementById('onboardingProgressBar');
+      if (progress) {
+        const pct = Math.round(((step + 1) / ONBOARDING_STEPS.length) * 100);
+        progress.style.width = `${pct}%`;
+      }
+
+      const prevBtn = document.getElementById('btnOnboardingPrev');
+      if (prevBtn) {
+        if (step === 0) {
+          prevBtn.classList.add('opacity-40', 'cursor-not-allowed');
+          prevBtn.disabled = true;
+        } else {
+          prevBtn.classList.remove('opacity-40', 'cursor-not-allowed');
+          prevBtn.disabled = false;
+        }
+      }
+
+      const nextBtn = document.getElementById('btnOnboardingNext');
+      if (nextBtn) {
+        if (step === ONBOARDING_STEPS.length - 1) {
+          nextBtn.innerHTML = 'Get Started 🚀';
+        } else {
+          nextBtn.innerHTML = 'Next &rarr;';
+        }
+      }
+
+      const container = document.getElementById('onboardingStepContent');
+      if (container) {
+        container.innerHTML = `
+          <div class="space-y-4">
+            <div class="p-4 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-800/90 border border-slate-700/70 shadow-inner">
+              <div class="flex items-center gap-3 mb-2">
+                <span class="text-3xl">${s.icon}</span>
+                <div>
+                  <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">${s.badge}</span>
+                  <h4 id="wizardCardTitle" class="text-base sm:text-lg font-bold text-white mt-1">${s.title}</h4>
+                </div>
+              </div>
+              <p class="text-xs text-slate-300 font-medium leading-relaxed">${s.description}</p>
+            </div>
+
+            <div class="space-y-2">
+              <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Key Features</p>
+              <div class="space-y-1.5">
+                ${s.highlights.map(h => `
+                  <div class="flex items-start gap-2 p-2 rounded-xl bg-slate-900/60 border border-slate-800/80 text-xs text-slate-300">
+                    <span class="text-emerald-400 font-bold mt-0.5">✓</span>
+                    <span>${h}</span>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    function nextOnboardingStep() {
+      if (currentOnboardingStep < ONBOARDING_STEPS.length - 1) {
+        renderOnboardingWizardStep(currentOnboardingStep + 1);
+      } else {
+        skipOnboardingWizard();
+      }
+    }
+
+    function prevOnboardingStep() {
+      if (currentOnboardingStep > 0) {
+        renderOnboardingWizardStep(currentOnboardingStep - 1);
+      }
+    }
+
+    function skipOnboardingWizard() {
+      try {
+        localStorage.setItem('vasool_onboarding_completed', 'true');
+      } catch {}
+      closeModal('onboardingWizardModal');
     }
 
     if (typeof window !== 'undefined') {
@@ -630,6 +779,11 @@
       window.handleJoinGroupSubmit = handleJoinGroupSubmit;
       window.copyInviteLink = copyInviteLink;
       window.checkAndProcessPendingJoin = checkAndProcessPendingJoin;
+      window.openOnboardingWizard = openOnboardingWizard;
+      window.renderOnboardingWizardStep = renderOnboardingWizardStep;
+      window.nextOnboardingStep = nextOnboardingStep;
+      window.prevOnboardingStep = prevOnboardingStep;
+      window.skipOnboardingWizard = skipOnboardingWizard;
     }
 
     window.onload = async function () {

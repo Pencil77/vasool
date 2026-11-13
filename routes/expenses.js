@@ -112,6 +112,7 @@ router.post('/expenses', requireAuth, async (req, res) => {
       parentExpenseDesc = '',
       paidByEmail,
       paidByName,
+      paidByAllocations = [],
       splitType = 'equal',
       splits = [],
       roundingRemainder = 0,
@@ -123,6 +124,32 @@ router.post('/expenses', requireAuth, async (req, res) => {
     const totalAmount = Number(amount);
     if (!groupId || !description || !totalAmount || totalAmount <= 0 || !splits.length) {
       return res.status(400).json({ error: 'Group, description, positive amount, and participants are required.' });
+    }
+
+    let normalizedPayers = [];
+    if (Array.isArray(paidByAllocations) && paidByAllocations.length > 0) {
+      normalizedPayers = paidByAllocations
+        .map((p) => ({
+          memberEmail: String(p.memberEmail || p.email || '').toLowerCase().trim(),
+          memberName: String(p.memberName || p.name || p.memberEmail || 'Member').trim(),
+          amount: Math.round((Number(p.amount) || 0) * 100) / 100
+        }))
+        .filter((p) => p.memberEmail && p.amount > 0);
+    }
+    const resolvedPaidByEmail = normalizedPayers.length > 0
+      ? normalizedPayers[0].memberEmail
+      : String(paidByEmail || req.user.email).toLowerCase().trim();
+    const resolvedPaidByName = normalizedPayers.length > 1
+      ? normalizedPayers.map((p) => `${p.memberName.split(' ')[0]} (₹${p.amount})`).join(' + ')
+      : normalizedPayers.length === 1
+        ? normalizedPayers[0].memberName
+        : String(paidByName || req.user.name).trim();
+    if (normalizedPayers.length === 0) {
+      normalizedPayers = [{
+        memberEmail: resolvedPaidByEmail,
+        memberName: resolvedPaidByName,
+        amount: Math.round(totalAmount * 100) / 100
+      }];
     }
 
     const expense = await Expense.create({
@@ -137,8 +164,9 @@ router.post('/expenses', requireAuth, async (req, res) => {
       category: category || (type === 'income' ? '💵 Income & Refunds' : '🍔 Food & Dining'),
       parentExpenseId: parentExpenseId ? String(parentExpenseId) : null,
       parentExpenseDesc: parentExpenseDesc ? String(parentExpenseDesc).trim() : '',
-      paidByEmail: String(paidByEmail || req.user.email).toLowerCase().trim(),
-      paidByName: String(paidByName || req.user.name).trim(),
+      paidByEmail: resolvedPaidByEmail,
+      paidByName: resolvedPaidByName,
+      paidByAllocations: normalizedPayers,
       splitType,
       splits,
       roundingRemainder: Number(roundingRemainder) || 0,
@@ -211,6 +239,7 @@ router.put('/expenses/:id', requireAuth, async (req, res) => {
       parentExpenseDesc,
       paidByEmail,
       paidByName,
+      paidByAllocations,
       splitType,
       splits,
       roundingRemainder,
@@ -238,6 +267,22 @@ router.put('/expenses/:id', requireAuth, async (req, res) => {
     if (parentExpenseDesc !== undefined) existing.parentExpenseDesc = String(parentExpenseDesc || '').trim();
     if (paidByEmail !== undefined) existing.paidByEmail = String(paidByEmail).toLowerCase().trim();
     if (paidByName !== undefined) existing.paidByName = String(paidByName).trim();
+    if (Array.isArray(paidByAllocations) && paidByAllocations.length > 0) {
+      const cleanAlloc = paidByAllocations
+        .map((p) => ({
+          memberEmail: String(p.memberEmail || p.email || '').toLowerCase().trim(),
+          memberName: String(p.memberName || p.name || p.memberEmail || 'Member').trim(),
+          amount: Math.round((Number(p.amount) || 0) * 100) / 100
+        }))
+        .filter((p) => p.memberEmail && p.amount > 0);
+      if (cleanAlloc.length > 0) {
+        existing.paidByAllocations = cleanAlloc;
+        existing.paidByEmail = cleanAlloc[0].memberEmail;
+        existing.paidByName = cleanAlloc.length > 1
+          ? cleanAlloc.map((p) => `${p.memberName.split(' ')[0]} (₹${p.amount})`).join(' + ')
+          : cleanAlloc[0].memberName;
+      }
+    }
     if (splitType !== undefined) existing.splitType = splitType;
     if (Array.isArray(splits) && splits.length > 0) existing.splits = splits;
     if (roundingRemainder !== undefined) existing.roundingRemainder = Number(roundingRemainder) || 0;

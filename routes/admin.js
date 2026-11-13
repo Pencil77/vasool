@@ -2,6 +2,8 @@ const express = require('express');
 const { connectToDatabase } = require('../lib/mongodb');
 const User = require('../models/User');
 const Group = require('../models/Group');
+const Expense = require('../models/Expense');
+const Settlement = require('../models/Settlement');
 const SystemConfig = require('../models/SystemConfig');
 const {
   requireAuth,
@@ -496,7 +498,7 @@ router.get('/system-status', async (req, res) => {
   res.status(200).json({
     service: 'vasool',
     status: 'operational',
-    version: '3.0.0',
+    version: '3.1.0',
     mongodb: dbStatus,
     googleOAuthConfigured: Boolean(process.env.VASOOL_GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID),
     infisicalConfigured: Boolean(process.env.MONGO_URI || process.env.MONGODB_URI),
@@ -510,6 +512,106 @@ router.get('/system-status', async (req, res) => {
     uptimeSeconds: Math.floor(process.uptime()),
     timestamp: new Date().toISOString()
   });
+});
+
+
+/**
+ * GET /api/admin/groups
+ * Lists all groups across the entire platform with members, bill counts, and total spend for Super Admin.
+ */
+router.get('/groups', async (req, res) => {
+  try {
+    await connectToDatabase();
+    const groups = await Group.find().sort({ updatedAt: -1, createdAt: -1 }).lean();
+    const expenses = await Expense.find({}, 'groupId amount type').lean();
+    const settlements = await Settlement.find({}, 'groupId amount status').lean();
+
+    const expStatsMap = {};
+    expenses.forEach((e) => {
+      const gid = String(e.groupId || '');
+      if (!expStatsMap[gid]) expStatsMap[gid] = { billCount: 0, totalSpend: 0 };
+      expStatsMap[gid].billCount += 1;
+      if (e.type !== 'income') {
+        expStatsMap[gid].totalSpend += Number(e.amount) || 0;
+      }
+    });
+
+    const stlStatsMap = {};
+    settlements.forEach((s) => {
+      const gid = String(s.groupId || '');
+      if (!stlStatsMap[gid]) stlStatsMap[gid] = { settlementCount: 0 };
+      stlStatsMap[gid].settlementCount += 1;
+    });
+
+    const enrichedGroups = groups.map((g) => {
+      const gid = g._id.toString();
+      const eStat = expStatsMap[gid] || { billCount: 0, totalSpend: 0 };
+      const sStat = stlStatsMap[gid] || { settlementCount: 0 };
+      return {
+        id: gid,
+        _id: gid,
+        name: g.name,
+        category: g.category || 'Trip',
+        currency: g.currency || 'INR',
+        inviteCode: g.inviteCode,
+        createdByEmail: g.createdByEmail,
+        adminEmail: g.adminEmail || (g.members && g.members[0] ? g.members[0].email : ''),
+        isArchived: Boolean(g.isArchived),
+        adminHubSettlement: Boolean(g.adminHubSettlement),
+        minimizeDebts: g.minimizeDebts !== false,
+        splitsVisibility: g.splitsVisibility || 'personal_only',
+        members: g.members || [],
+        memberCount: (g.members || []).length,
+        billCount: eStat.billCount,
+        totalSpend: Math.round(eStat.totalSpend * 100) / 100,
+        settlementCount: sStat.settlementCount,
+        createdAt: g.createdAt,
+        updatedAt: g.updatedAt
+      };
+    });
+
+    return res.status(200).json({
+      groups: enrichedGroups,
+      total: enrichedGroups.length
+    });
+  } catch (err) {
+    logger.error('[admin:groups] Failed to list platform groups:', err);
+    return res.status(500).json({ error: err.message || 'Failed to fetch platform groups.' });
+  }
+});
+
+/**
+ * DELETE /api/admin/groups/:groupId
+ * Permanently deletes a group and all its associated expenses and settlements (Super Admin only).
+ */
+router.delete('/groups/:groupId', async (req, res) => {
+  try {
+    await connectToDatabase();
+    const { groupId } = req.params;
+    const group = await Group.findById(groupId);
+    if (!group) {
+      return res.status(404).json({ error: 'Group not found.' });
+    }
+
+    const groupName = group.name;
+    const [delExp, delStl] = await Promise.all([
+      Expense.deleteMany({ groupId: group._id }),
+      Settlement.deleteMany({ groupId: group._id }),
+      Group.findByIdAndDelete(group._id)
+    ]);
+
+    logger.info(`[admin:groups] Super Admin ${req.user.email} permanently deleted group "${groupName}" (${groupId})`);
+    otel.metrics.counter('vasool_admin_actions_total', 1, { action: 'delete_group' });
+
+    return res.status(200).json({
+      success: true,
+      message: `Group "${groupName}" and its ${delExp.deletedCount || 0} bill(s) & ${delStl.deletedCount || 0} settlement(s) have been permanently deleted.`,
+      deletedGroupId: groupId
+    });
+  } catch (err) {
+    logger.error('[admin:groups] Failed to delete group:', err);
+    return res.status(500).json({ error: err.message || 'Failed to delete group.' });
+  }
 });
 
 module.exports = { adminRouter: router };

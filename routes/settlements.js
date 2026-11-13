@@ -17,6 +17,7 @@ const {
   simplifyDebtsGreedy,
   simplifyDebtsAdminHub,
   calculateDirectDebts,
+  getExpensePayerAllocations,
   computeGroupBalanceMap,
   computeGroupSimplifiedDebts
 } = require('../lib/debt-engine');
@@ -54,22 +55,25 @@ router.get('/balances', requireAuth, async (req, res) => {
 
     expenses.forEach((exp) => {
       const isIncome = exp.type === 'income';
-      const payer = ensureMember(exp.paidByEmail, exp.paidByName);
+      const payers = getExpensePayerAllocations(exp);
 
       if (isIncome) {
-        // Income/Refund: Payer received the money (e.g. deposit returned), so Payer owes participants their split back!
-        payer.paid -= exp.amount;
-        payer.net -= exp.amount;
-
+        payers.forEach((p) => {
+          const payer = ensureMember(p.memberEmail, p.memberName);
+          payer.paid -= p.amount;
+          payer.net -= p.amount;
+        });
         exp.splits.forEach((s) => {
           const participant = ensureMember(s.memberEmail, s.memberName);
           participant.owed -= s.amount;
           participant.net += s.amount;
         });
       } else {
-        payer.paid += exp.amount;
-        payer.net += exp.amount;
-
+        payers.forEach((p) => {
+          const payer = ensureMember(p.memberEmail, p.memberName);
+          payer.paid += p.amount;
+          payer.net += p.amount;
+        });
         exp.splits.forEach((s) => {
           const participant = ensureMember(s.memberEmail, s.memberName);
           participant.owed += s.amount;
@@ -125,18 +129,24 @@ router.get('/balances', requireAuth, async (req, res) => {
         } else {
           grpExpenses.forEach((exp) => {
             const isIncome = exp.type === 'income';
-            const payer = ensureGroupMember(exp.paidByEmail, exp.paidByName);
+            const payers = getExpensePayerAllocations(exp);
             if (isIncome) {
-              payer.paid -= exp.amount;
-              payer.net -= exp.amount;
+              payers.forEach((payObj) => {
+                const payer = ensureGroupMember(payObj.memberEmail, payObj.memberName);
+                payer.paid -= payObj.amount;
+                payer.net -= payObj.amount;
+              });
               exp.splits.forEach((s) => {
                 const p = ensureGroupMember(s.memberEmail, s.memberName);
                 p.owed -= s.amount;
                 p.net += s.amount;
               });
             } else {
-              payer.paid += exp.amount;
-              payer.net += exp.amount;
+              payers.forEach((payObj) => {
+                const payer = ensureGroupMember(payObj.memberEmail, payObj.memberName);
+                payer.paid += payObj.amount;
+                payer.net += payObj.amount;
+              });
               exp.splits.forEach((s) => {
                 const p = ensureGroupMember(s.memberEmail, s.memberName);
                 p.owed += s.amount;

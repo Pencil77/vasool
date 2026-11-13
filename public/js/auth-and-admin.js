@@ -117,6 +117,15 @@
         }
         const welcomeEl = document.getElementById('welcomeUserName');
         if (welcomeEl) welcomeEl.textContent = (appState.currentUser.name || 'Friend').split(' ')[0];
+
+        // Strictly restrict System Status footer option to Super Admin only
+        ['btnFooterSystemStatus', 'sepFooterSystemStatus', 'btnAuthFooterSystemStatus', 'sepAuthFooterSystemStatus'].forEach((id) => {
+          const el = document.getElementById(id);
+          if (el) {
+            if (isSuper) el.classList.remove('hidden');
+            else el.classList.add('hidden');
+          }
+        });
       } else {
         if (headerArea) {
           headerArea.classList.add('hidden');
@@ -137,6 +146,10 @@
           mobileNavGrid.classList.remove('grid-cols-5');
           mobileNavGrid.classList.add('grid-cols-4');
         }
+        ['btnFooterSystemStatus', 'sepFooterSystemStatus', 'btnAuthFooterSystemStatus', 'sepAuthFooterSystemStatus'].forEach((id) => {
+          const el = document.getElementById(id);
+          if (el) el.classList.add('hidden');
+        });
       }
     }
 
@@ -363,6 +376,7 @@
           refreshAllViews();
           showToast(`Welcome to Vasool, ${res.user.name}!`);
           await syncWithBackend();
+          if (typeof openOnboardingWizard === 'function') openOnboardingWizard(0);
           await checkAndProcessPendingJoin();
         }
       } catch (err) {
@@ -860,6 +874,21 @@
         }
       }
 
+      const nameInp = document.getElementById('settingsNameInput');
+      const upiInp = document.getElementById('settingsUpiInput');
+      const upiStatusBadge = document.getElementById('settingsUpiStatusBadge');
+      if (nameInp) nameInp.value = user.name || '';
+      if (upiInp) upiInp.value = user.upiId || '';
+      if (upiStatusBadge) {
+        if (user.upiId && String(user.upiId).trim()) {
+          upiStatusBadge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold';
+          upiStatusBadge.textContent = '✓ UPI Active';
+        } else {
+          upiStatusBadge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 font-semibold';
+          upiStatusBadge.textContent = 'No UPI Linked';
+        }
+      }
+
       const curr = document.getElementById('settingsCurrentPassword');
       const nw = document.getElementById('settingsNewPassword');
       const conf = document.getElementById('settingsConfirmPassword');
@@ -872,6 +901,95 @@
       if (lbl) lbl.textContent = 'Weak';
 
       openModal('accountSettingsModal');
+    }
+
+    function clearProfileUpiField() {
+      const upiInp = document.getElementById('settingsUpiInput');
+      if (upiInp) {
+        upiInp.value = '';
+        upiInp.focus();
+      }
+    }
+
+    async function handleUpdateProfileUpiSubmit(e) {
+      e.preventDefault();
+      if (!appState.currentUser) return;
+
+      const nameInp = document.getElementById('settingsNameInput');
+      const upiInp = document.getElementById('settingsUpiInput');
+      const newName = (nameInp ? nameInp.value.trim() : '') || appState.currentUser.name;
+      const newUpi = upiInp ? upiInp.value.trim() : '';
+
+      if (newUpi && (!newUpi.includes('@') || /\s/.test(newUpi) || newUpi.length < 4)) {
+        showToast('Please enter a valid UPI ID (e.g. yourname@okaxis) or leave blank to disable UPI redirect.', 'error');
+        return;
+      }
+
+      const btn = document.getElementById('btnSaveProfileUpi');
+      const origHtml = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span>Saving Profile & UPI...</span>';
+      }
+
+      try {
+        if (localStorage.getItem(AUTH_TOKEN_KEY)) {
+          const res = await apiFetch('/api/auth/profile', {
+            method: 'PATCH',
+            body: JSON.stringify({ name: newName, upiId: newUpi })
+          });
+          if (res && res.user) {
+            appState.currentUser = { ...appState.currentUser, ...res.user };
+          }
+        }
+
+        // Sync in-memory user & group member records immediately
+        appState.currentUser.name = newName;
+        appState.currentUser.upiId = newUpi;
+        const myEmail = (appState.currentUser.email || '').toLowerCase().trim();
+        (appState.groups || []).forEach((g) => {
+          (g.members || []).forEach((m) => {
+            if ((m.email || '').toLowerCase().trim() === myEmail) {
+              m.upiId = newUpi;
+              m.name = newName;
+            }
+          });
+        });
+        (appState.users || []).forEach((u) => {
+          if ((u.email || '').toLowerCase().trim() === myEmail) {
+            u.upiId = newUpi;
+            u.name = newName;
+          }
+        });
+
+        saveState();
+        refreshAllViews();
+
+        // Refresh modal badges
+        const nameEl = document.getElementById('settingsProfileName');
+        const upiEl = document.getElementById('settingsProfileUpi');
+        const upiStatusBadge = document.getElementById('settingsUpiStatusBadge');
+        if (nameEl) nameEl.textContent = newName;
+        if (upiEl) upiEl.textContent = newUpi ? `UPI: ${newUpi}` : 'UPI Handle: Not configured';
+        if (upiStatusBadge) {
+          if (newUpi) {
+            upiStatusBadge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold';
+            upiStatusBadge.textContent = '✓ UPI Active';
+          } else {
+            upiStatusBadge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 font-semibold';
+            upiStatusBadge.textContent = 'No UPI Linked';
+          }
+        }
+
+        showToast(newUpi ? `✅ UPI ID updated to ${newUpi}!` : '✅ UPI ID cleared. Direct UPI redirect is now hidden for payers.');
+      } catch (err) {
+        showToast(err.message || 'Failed to update profile & UPI ID.', 'error');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = origHtml;
+        }
+      }
     }
 
     async function handleChangePasswordSubmit(e) {
@@ -1071,6 +1189,10 @@
         if (totalEl) totalEl.textContent = total;
         if (activeEl) activeEl.textContent = active;
         if (suspEl) suspEl.textContent = suspended;
+        const subTabUsersCount = document.getElementById('adminSubTabUsersCount');
+        if (subTabUsersCount) subTabUsersCount.textContent = total;
+        fetchAdminGroups(true);
+        fetchAdminFeedback(true);
 
         const searchVal = document.getElementById('adminUserSearchInput') ? document.getElementById('adminUserSearchInput').value : '';
         filterAdminUsers(searchVal);
@@ -1528,25 +1650,183 @@
     // =========================================================================
     let activeAdminSubTab = 'users';
     let adminFeedbackCache = [];
+    let adminGroupsCache = [];
 
     function switchAdminSubTab(subTab) {
       activeAdminSubTab = subTab;
       const btnUsers = document.getElementById('btnAdminTabUsers');
+      const btnGroups = document.getElementById('btnAdminTabGroups');
       const btnFeedback = document.getElementById('btnAdminTabFeedback');
       const usersSection = document.getElementById('adminUsersSubSection');
+      const groupsSection = document.getElementById('adminGroupsSubSection');
       const feedbackSection = document.getElementById('adminFeedbackSubSection');
 
-      if (subTab === 'users') {
-        if (btnUsers) btnUsers.className = 'px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 transition flex items-center gap-2';
-        if (btnFeedback) btnFeedback.className = 'px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-slate-300 hover:bg-slate-800/80 transition flex items-center gap-2';
-        if (usersSection) usersSection.classList.remove('hidden');
-        if (feedbackSection) feedbackSection.classList.add('hidden');
-      } else {
-        if (btnUsers) btnUsers.className = 'px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-slate-300 hover:bg-slate-800/80 transition flex items-center gap-2';
-        if (btnFeedback) btnFeedback.className = 'px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 transition flex items-center gap-2';
-        if (usersSection) usersSection.classList.add('hidden');
-        if (feedbackSection) feedbackSection.classList.remove('hidden');
+      const activeCls = 'px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 transition flex items-center gap-2';
+      const inactiveCls = 'px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-slate-300 hover:bg-slate-800/80 transition flex items-center gap-2';
+
+      if (btnUsers) btnUsers.className = subTab === 'users' ? activeCls : inactiveCls;
+      if (btnGroups) btnGroups.className = subTab === 'groups' ? activeCls : inactiveCls;
+      if (btnFeedback) btnFeedback.className = subTab === 'feedback' ? activeCls : inactiveCls;
+
+      if (usersSection) usersSection.classList.toggle('hidden', subTab !== 'users');
+      if (groupsSection) groupsSection.classList.toggle('hidden', subTab !== 'groups');
+      if (feedbackSection) feedbackSection.classList.toggle('hidden', subTab !== 'feedback');
+
+      if (subTab === 'groups') {
+        fetchAdminGroups();
+      } else if (subTab === 'feedback') {
         fetchAdminFeedback();
+      }
+    }
+
+    async function fetchAdminGroups(silent = false) {
+      const container = document.getElementById('adminGroupsListContainer');
+      if (container && !silent) {
+        container.innerHTML = `
+          <div class="text-center py-10 text-slate-500 text-xs flex items-center justify-center gap-2">
+            <span class="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin"></span>
+            <span>Fetching all platform groups from MongoDB Atlas...</span>
+          </div>`;
+      }
+
+      try {
+        const res = await apiFetch('/api/admin/groups');
+        adminGroupsCache = (res && res.groups) || [];
+
+        const totalGroupsEl = document.getElementById('adminTotalGroupsStat');
+        const subTabGroupsCount = document.getElementById('adminSubTabGroupsCount');
+        if (totalGroupsEl) totalGroupsEl.textContent = adminGroupsCache.length;
+        if (subTabGroupsCount) subTabGroupsCount.textContent = adminGroupsCache.length;
+
+        const q = document.getElementById('adminGroupSearchInput') ? document.getElementById('adminGroupSearchInput').value : '';
+        filterAdminGroups(q);
+      } catch (err) {
+        if (container && !silent) {
+          container.innerHTML = `
+            <div class="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs text-center">
+              Failed to load platform groups: ${escapeHtml(err.message || 'Access restricted')}
+            </div>`;
+        }
+      }
+    }
+
+    function filterAdminGroups(query) {
+      const q = String(query || '').trim().toLowerCase();
+      let filtered = adminGroupsCache;
+      if (q) {
+        filtered = filtered.filter((g) =>
+          (g.name && g.name.toLowerCase().includes(q)) ||
+          (g.inviteCode && g.inviteCode.toLowerCase().includes(q)) ||
+          (g.adminEmail && g.adminEmail.toLowerCase().includes(q)) ||
+          (Array.isArray(g.members) && g.members.some((m) =>
+            (m.name && m.name.toLowerCase().includes(q)) ||
+            (m.email && m.email.toLowerCase().includes(q))
+          ))
+        );
+      }
+      renderAdminGroups(filtered);
+    }
+
+    function renderAdminGroups(items) {
+      const container = document.getElementById('adminGroupsListContainer');
+      if (!container) return;
+
+      if (!items || items.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-12 p-6 rounded-2xl bg-slate-900/60 border border-slate-800 text-slate-500 text-xs space-y-1">
+            <span class="text-2xl block mb-2">🏘️</span>
+            <p class="font-medium text-slate-400">No platform groups found matching your search.</p>
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = items.map((g) => {
+        const gid = g.id || g._id;
+        const createdStr = g.createdAt ? new Date(g.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recent';
+        const membersHtml = (g.members || []).map((m) => {
+          const isAdm = m.role === 'admin' || m.role === 'owner' || (g.adminEmail && m.email && g.adminEmail.toLowerCase() === m.email.toLowerCase());
+          const isPend = m.status === 'pending_acceptance';
+          return `
+            <div class="px-2.5 py-1.5 rounded-xl bg-slate-950/90 border ${isAdm ? 'border-amber-500/40' : 'border-slate-800'} flex items-center justify-between gap-2 text-xs">
+              <div class="min-w-0 truncate">
+                <span class="font-semibold text-white">${escapeHtml(m.name || 'Member')}</span>
+                <span class="text-[11px] text-slate-400 font-mono ml-1">(${escapeHtml(m.email || '')})</span>
+              </div>
+              <div class="flex items-center gap-1 flex-shrink-0">
+                ${isAdm ? '<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">👑 Admin</span>' : ''}
+                ${isPend ? '<span class="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-500/15 text-amber-200 border border-amber-500/25">⏳ Pending</span>' : '<span class="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/25">Active</span>'}
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        return `
+          <div class="p-4 sm:p-5 rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 transition space-y-3 overflow-hidden" data-testid="admin-group-card-${escapeHtml(gid)}">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
+              <div class="min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <h4 class="text-sm sm:text-base font-extrabold text-white truncate">${escapeHtml(g.name)}</h4>
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-teal-500/15 text-teal-300 border border-teal-500/30">${escapeHtml(g.category || 'Trip')}</span>
+                  <span class="px-2 py-0.5 rounded text-[10px] font-mono-code bg-slate-800 text-emerald-300 border border-slate-700">${escapeHtml(g.inviteCode || '')}</span>
+                  ${g.isArchived ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-300">Archived</span>' : ''}
+                </div>
+                <div class="text-[11px] text-slate-400 mt-1 flex items-center gap-2 flex-wrap">
+                  <span>Admin: <strong class="text-amber-300">${escapeHtml(g.adminEmail || g.createdByEmail || 'Unknown')}</strong></span>
+                  <span>·</span>
+                  <span>Created: ${createdStr}</span>
+                  <span>·</span>
+                  <span>${g.billCount || 0} bills (${formatINR(g.totalSpend || 0)})</span>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 flex-shrink-0 self-end sm:self-auto">
+                <button
+                  type="button"
+                  data-testid="btn-admin-delete-group-${escapeHtml(gid)}"
+                  onclick="deleteAdminGroup('${escapeHtml(gid)}', '${escapeHtml(g.name)}')"
+                  class="px-3 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 text-xs font-bold transition flex items-center gap-1.5"
+                >
+                  <span>🗑️</span>
+                  <span>Delete Group</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="space-y-1.5">
+              <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                Group Members (${(g.members || []).length})
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-1.5 max-h-48 overflow-y-auto custom-scroll pr-1">
+                ${membersHtml || '<div class="text-xs text-slate-500">No members in this group.</div>'}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function deleteAdminGroup(groupId, groupName) {
+      if (!groupId) return;
+      try {
+        const res = await apiFetch(`/api/admin/groups/${groupId}`, {
+          method: 'DELETE'
+        });
+        showToast(`🗑️ ${res.message || `Deleted group "${groupName}".`}`);
+        adminGroupsCache = adminGroupsCache.filter((g) => (g.id || g._id) !== groupId);
+        appState.groups = (appState.groups || []).filter((g) => g.id !== groupId);
+        appState.expenses = (appState.expenses || []).filter((e) => e.groupId !== groupId);
+        appState.settlements = (appState.settlements || []).filter((s) => s.groupId !== groupId);
+
+        const totalGroupsEl = document.getElementById('adminTotalGroupsStat');
+        const subTabGroupsCount = document.getElementById('adminSubTabGroupsCount');
+        if (totalGroupsEl) totalGroupsEl.textContent = adminGroupsCache.length;
+        if (subTabGroupsCount) subTabGroupsCount.textContent = adminGroupsCache.length;
+
+        saveState();
+        refreshAllViews();
+        const q = document.getElementById('adminGroupSearchInput') ? document.getElementById('adminGroupSearchInput').value : '';
+        filterAdminGroups(q);
+      } catch (err) {
+        showToast(err.message || 'Failed to delete group.', 'error');
       }
     }
 
@@ -1681,14 +1961,14 @@
           : '';
 
         return `
-          <div class="p-4 sm:p-5 rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 transition space-y-3" id="feedbackCard_${f._id}">
+          <div class="p-3.5 sm:p-5 rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 transition space-y-3 overflow-hidden max-w-full" id="feedbackCard_${f._id}">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
-              <div class="flex items-center gap-2.5 min-w-0">
+              <div class="flex items-start sm:items-center gap-2.5 min-w-0">
                 <div class="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold text-slate-300 flex-shrink-0">
                   ${userInitial}
                 </div>
-                <div class="min-w-0 truncate">
-                  <div class="text-xs truncate">${userDisplay}</div>
+                <div class="min-w-0 flex-1">
+                  <div class="text-xs break-words">${userDisplay}</div>
                   <div class="text-[10px] text-slate-500">${dateStr}</div>
                 </div>
               </div>
@@ -1705,52 +1985,54 @@
             </div>
 
             <!-- Message Body -->
-            <div class="text-xs sm:text-sm text-slate-200 leading-relaxed whitespace-pre-wrap bg-slate-950/60 p-3.5 rounded-xl border border-slate-800/80">
+            <div class="text-xs sm:text-sm text-slate-200 leading-relaxed whitespace-pre-wrap break-words bg-slate-950/60 p-3 sm:p-3.5 rounded-xl border border-slate-800/80">
               ${escapeHtml(f.message)}
             </div>
 
-            <!-- Admin Action Row: Status Changer & Notes -->
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1">
-              <div class="flex items-center gap-2 flex-1">
-                <span class="text-[11px] text-slate-400 whitespace-nowrap">Status:</span>
-                <select
-                  onchange="updateAdminFeedbackStatus('${f._id}', this.value)"
-                  class="px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-700 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
-                >
-                  <option value="new" ${f.status === 'new' ? 'selected' : ''}>🟡 New</option>
-                  <option value="reviewed" ${f.status === 'reviewed' ? 'selected' : ''}>🔵 Reviewed</option>
-                  <option value="in_progress" ${f.status === 'in_progress' ? 'selected' : ''}>🟣 In Progress</option>
-                  <option value="resolved" ${f.status === 'resolved' ? 'selected' : ''}>🟢 Resolved</option>
-                </select>
-
-                <div class="relative flex-1 min-w-[140px]">
-                  <input
-                    type="text"
-                    id="adminNotes_${f._id}"
-                    value="${escapeHtml(f.adminNotes || '')}"
-                    placeholder="Internal developer notes..."
-                    class="w-full px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-700 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-amber-500"
-                  />
+            <!-- Admin Action Controls: Mobile-First Responsive Grid/Flex (Zero Horizontal Overflow) -->
+            <div class="flex flex-col gap-2 pt-1 w-full">
+              <div class="flex items-center justify-between gap-2 w-full">
+                <div class="flex items-center gap-2 min-w-0 flex-1 sm:flex-initial">
+                  <span class="text-[11px] text-slate-400 whitespace-nowrap flex-shrink-0">Status:</span>
+                  <select
+                    onchange="updateAdminFeedbackStatus('${f._id}', this.value)"
+                    class="flex-1 sm:flex-initial min-w-0 px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="new" ${f.status === 'new' ? 'selected' : ''}>🟡 New</option>
+                    <option value="reviewed" ${f.status === 'reviewed' ? 'selected' : ''}>🔵 Reviewed</option>
+                    <option value="in_progress" ${f.status === 'in_progress' ? 'selected' : ''}>🟣 In Progress</option>
+                    <option value="resolved" ${f.status === 'resolved' ? 'selected' : ''}>🟢 Resolved</option>
+                  </select>
                 </div>
+
                 <button
                   type="button"
-                  onclick="saveAdminFeedbackNotes('${f._id}')"
-                  class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition"
-                  title="Save Notes"
+                  onclick="deleteAdminFeedback('${f._id}')"
+                  class="px-2.5 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs font-semibold transition flex items-center justify-center gap-1 flex-shrink-0 whitespace-nowrap"
+                  title="Delete this feedback entry"
                 >
-                  Save Note
+                  <span>🗑️</span>
+                  <span>Delete</span>
                 </button>
               </div>
 
-              <button
-                type="button"
-                onclick="deleteAdminFeedback('${f._id}')"
-                class="px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs font-semibold transition flex items-center justify-center gap-1 self-end sm:self-auto"
-                title="Delete this feedback entry"
-              >
-                <span>🗑️</span>
-                <span>Delete</span>
-              </button>
+              <div class="flex items-center gap-2 w-full">
+                <input
+                  type="text"
+                  id="adminNotes_${f._id}"
+                  value="${escapeHtml(f.adminNotes || '')}"
+                  placeholder="Internal developer notes..."
+                  class="flex-1 min-w-0 px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-amber-500"
+                />
+                <button
+                  type="button"
+                  onclick="saveAdminFeedbackNotes('${f._id}')"
+                  class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition flex-shrink-0 whitespace-nowrap"
+                  title="Save Notes"
+                >
+                  💾 Save Note
+                </button>
+              </div>
             </div>
           </div>`;
       }).join('');

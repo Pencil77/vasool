@@ -1,6 +1,20 @@
 const STORAGE_KEY = 'vasool_clean_state_v1';
     const AUTH_TOKEN_KEY = 'vasool_jwt_token';
 
+    // Pre-auth URL Hash Sanitization: prevent premature #admin routing for unauthenticated sessions
+    if (typeof window !== 'undefined' && (window.location.hash === '#admin' || window.location.hash === '#tests')) {
+      try {
+        const token = localStorage.getItem(AUTH_TOKEN_KEY);
+        if (!token) {
+          if (window.history && window.history.replaceState) {
+            window.history.replaceState(null, '', window.location.pathname);
+          } else {
+            window.location.hash = '';
+          }
+        }
+      } catch {}
+    }
+
     // Clear any obsolete browser service workers to ensure fresh code delivery
     if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations().then((registrations) => {
@@ -183,18 +197,27 @@ const STORAGE_KEY = 'vasool_clean_state_v1';
             groupId: e.groupId ? e.groupId.toString() : e.groupId,
             description: e.description,
             amount: e.amount,
+            originalAmount: e.originalAmount || e.amount,
+            originalCurrency: e.originalCurrency || e.currency || 'INR',
+            exchangeRate: e.exchangeRate || 1,
             type: e.type || 'expense',
             category: e.category,
+            parentExpenseId: e.parentExpenseId || null,
+            parentExpenseDesc: e.parentExpenseDesc || '',
             paidByEmail: e.paidByEmail,
             paidByName: e.paidByName,
+            paidByAllocations: Array.isArray(e.paidByAllocations) ? e.paidByAllocations : [],
             splitType: e.splitType || 'equal',
+            roundingRemainder: e.roundingRemainder || 0,
+            remainderAbsorbedBy: e.remainderAbsorbedBy || '',
             date: e.expenseDate ? e.expenseDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
             splits: (e.splits || []).map((s) => ({
               memberEmail: s.memberEmail,
               memberName: s.memberName,
               amount: s.amount,
               percentage: s.percentage,
-              shares: s.shares
+              shares: s.shares,
+              roundingAdjustment: s.roundingAdjustment || 0
             }))
           }));
         }

@@ -1,7 +1,7 @@
 {
   "name": "vasool",
-  "version": "3.0.0",
-  "description": "Vasool - Shared Expense Splitting Web App with Modular Full-Stack Architecture, Email/Password + Google OAuth 2.0, MongoDB Atlas, Infisical Vault",
+  "version": "3.1.0",
+  "description": "Vasool - Shared Expense Splitting Web App v3.1 Modular Full-Stack Edition (Multi-Payer, Interactive Onboarding Wizard, Super Admin Group Controls, Dynamic UPI Settlement)",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

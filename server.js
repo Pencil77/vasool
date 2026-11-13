@@ -97,7 +97,7 @@ app.get('/api/health', async (req, res) => {
     return res.status(200).json({
       service: 'vasool',
       status: isDbConnected ? 'operational' : 'degraded',
-      version: '3.0.0',
+      version: '3.1.0',
       mongodb: isDbConnected ? 'connected' : 'disconnected',
       googleOAuthConfigured: Boolean(process.env.VASOOL_GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID),
       infisicalConfigured: Boolean(process.env.MONGO_URI || process.env.MONGODB_URI),
@@ -112,7 +112,7 @@ app.get('/api/health', async (req, res) => {
   res.status(200).json({
     service: 'vasool',
     status: isDbConnected ? 'operational' : 'degraded',
-    version: '3.0.0',
+    version: '3.1.0',
     timestamp: new Date().toISOString()
   });
 });

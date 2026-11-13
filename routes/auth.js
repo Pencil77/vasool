@@ -782,6 +782,75 @@ router.get('/users/check-email', requireAuth, async (req, res) => {
   }
 });
 
+
+/**
+ * PATCH / PUT /api/auth/profile
+ * Allows an authenticated user to add, edit, update, or clear their UPI ID and display name,
+ * and propagates the updated UPI ID & name across all Group member entries.
+ */
+async function handleUpdateUserProfile(req, res) {
+  try {
+    await connectToDatabase();
+    const userEmail = String(req.user.email || '').toLowerCase().trim();
+    const user = await User.findOne({ email: userEmail });
+    if (!user) {
+      return res.status(404).json({ error: 'User account not found.' });
+    }
+
+    const { upiId, name, defaultCurrency } = req.body || {};
+
+    if (upiId !== undefined) {
+      const cleanUpi = String(upiId || '').trim();
+      if (cleanUpi && (!cleanUpi.includes('@') || /\s/.test(cleanUpi) || cleanUpi.length < 4)) {
+        return res.status(400).json({ error: 'Please enter a valid UPI ID (e.g. yourname@okaxis) or leave blank to clear.' });
+      }
+      user.upiId = cleanUpi;
+    }
+
+    if (name !== undefined && String(name).trim().length >= 2) {
+      user.name = String(name).trim();
+    }
+
+    if (defaultCurrency !== undefined && String(defaultCurrency).trim()) {
+      user.defaultCurrency = String(defaultCurrency).trim().toUpperCase();
+    }
+
+    await user.save();
+
+    // Propagate updated upiId and name across all Group member records for this user
+    try {
+      const Group = require('../models/Group');
+      const groups = await Group.find({ 'members.email': userEmail });
+      for (const g of groups) {
+        let changed = false;
+        g.members.forEach((m) => {
+          if (m.email && m.email.toLowerCase().trim() === userEmail) {
+            m.upiId = user.upiId || '';
+            if (user.name) m.name = user.name;
+            changed = true;
+          }
+        });
+        if (changed) await g.save();
+      }
+    } catch (syncErr) {
+      logger.warn('[auth:profile] Non-blocking group member UPI sync warning:', syncErr.message);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: user.upiId
+        ? `Profile updated! UPI ID set to ${user.upiId}.`
+        : 'Profile updated! UPI ID cleared (direct UPI app redirect disabled for payers).',
+      user: sanitizeUser(user)
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Failed to update profile.' });
+  }
+}
+
+router.patch('/profile', requireAuth, handleUpdateUserProfile);
+router.put('/profile', requireAuth, handleUpdateUserProfile);
+
 module.exports = {
   authRouter: router,
   requireAuth,

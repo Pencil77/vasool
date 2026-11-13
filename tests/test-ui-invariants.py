@@ -6,7 +6,7 @@ import threading
 from playwright.async_api import async_playwright
 
 CHROME_BIN = "/home/mrzoromit3/.agent-reach/cloak-binaries/chromium-146.0.7680.177.5/chrome"
-PUBLIC_DIR = "/tmp/vasool-v3/public"
+PUBLIC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../public"))
 
 class StaticHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
@@ -45,7 +45,7 @@ async def main():
                 context = await browser.new_context(viewport={"width": vp["width"], "height": vp["height"]})
                 page = await context.new_page()
 
-                await page.goto(base_url, wait_until="domcontentloaded")
+                await page.goto(base_url + '/', wait_until="networkidle")
                 await page.wait_for_timeout(1000)
 
                 # Simulate active authenticated Super Admin
@@ -77,7 +77,7 @@ async def main():
                         visibility: style.visibility
                     };
                 }""")
-                print(f"  [Invariant 2] #btnHeaderLogout right edge: {logout_box['right']}px vs Viewport: {vp['width']}px")
+                print(f"  [Invariant 2] #btnHeaderLogout right edge: {logout_box['right']}px vs Viewport: {vp['width']}px, box: {logout_box}")
                 if logout_box["right"] > vp["width"]:
                     raise Exception(f"#btnHeaderLogout is cut off! (right: {logout_box['right']} > viewport {vp['width']})")
                 if logout_box["width"] == 0 or logout_box["height"] == 0 or logout_box["display"] == "none":
