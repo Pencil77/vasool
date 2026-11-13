@@ -46,7 +46,8 @@ async def main():
                 page = await context.new_page()
 
                 await page.goto(base_url + '/', wait_until="networkidle")
-                await page.wait_for_timeout(1000)
+                await page.wait_for_function('() => typeof window.refreshAllViews !== "undefined"', timeout=10000)
+                await page.wait_for_timeout(500)
 
                 # Simulate active authenticated Super Admin
                 await page.evaluate("""() => {

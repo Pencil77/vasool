@@ -784,6 +784,11 @@
       window.nextOnboardingStep = nextOnboardingStep;
       window.prevOnboardingStep = prevOnboardingStep;
       window.skipOnboardingWizard = skipOnboardingWizard;
+      window.toggleAllSplitMembers = toggleAllSplitMembers;
+      window.selectAllSplitMembers = selectAllSplitMembers;
+      window.unselectAllSplitMembers = unselectAllSplitMembers;
+      window.handleMemberCheckChange = handleMemberCheckChange;
+      window.updateToggleAllSplitButton = updateToggleAllSplitButton;
     }
 
     window.onload = async function () {

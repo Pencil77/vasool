@@ -48,6 +48,7 @@ async function testLocalHtml() {
     '<option value="' + createdGroup.id + '">' + createdGroup.name + '</option>';
   window.document.getElementById('expGroupSelect').value = createdGroup.id;
   window.populateExpenseModalMembers();
+  if (typeof window.selectAllSplitMembers === 'function') window.selectAllSplitMembers();
   window.document.getElementById('expAmountInput').value = '3000';
   window.setSplitMode('equal');
   window.document.getElementById('expDescInput').value = 'Beach Dinner';

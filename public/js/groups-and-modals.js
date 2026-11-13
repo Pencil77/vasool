@@ -992,6 +992,7 @@
             inp.value = String(match.amount);
           }
         });
+        updateToggleAllSplitButton();
         recalculateSplitPreview();
       }
 
@@ -1128,7 +1129,7 @@
           (m) => `
         <div class="flex items-center justify-between gap-2 py-1.5 border-b border-slate-800/60 last:border-none" data-member-email="${escapeHtml(m.email)}" data-member-name="${escapeHtml(m.name)}" data-default-weight="${m.defaultWeight || 1}">
           <label class="flex items-center gap-2 text-xs text-slate-200 cursor-pointer flex-1 min-w-0">
-            <input type="checkbox" checked onchange="recalculateSplitPreview()" class="exp-member-check rounded text-emerald-500 focus:ring-0" />
+            <input type="checkbox" onchange="handleMemberCheckChange()" class="exp-member-check rounded text-emerald-500 focus:ring-0" />
             <span class="truncate font-medium">${escapeHtml(m.name)}</span>
             ${m.role === 'admin' || (group.adminEmail && group.adminEmail.toLowerCase() === m.email.toLowerCase()) ? '<span class="px-1.5 py-0.5 rounded text-[10px] bg-amber-500/20 text-amber-300 font-semibold border border-amber-500/30">👑 Admin</span>' : ''}
             ${(m.defaultWeight && m.defaultWeight !== 1) ? `<span class="px-1.5 py-0.5 rounded text-[10px] bg-teal-500/20 text-teal-300 font-semibold border border-teal-500/30">⚖️ ${m.defaultWeight}x Weight</span>` : ''}
@@ -1152,7 +1153,49 @@
         )
         .join('');
 
+      updateToggleAllSplitButton();
       recalculateSplitPreview();
+    }
+
+    function updateToggleAllSplitButton() {
+      const btn = document.getElementById('btnToggleAllSplitMembers');
+      if (!btn) return;
+      const rows = Array.from(document.querySelectorAll('#expMemberSplitsContainer > div'));
+      if (!rows.length) {
+        btn.textContent = 'Select All';
+        return;
+      }
+      const checkboxes = rows.map((r) => r.querySelector('.exp-member-check')).filter(Boolean);
+      const allChecked = checkboxes.length > 0 && checkboxes.every((c) => c.checked);
+      btn.textContent = allChecked ? 'Unselect All' : 'Select All';
+    }
+
+    function handleMemberCheckChange() {
+      updateToggleAllSplitButton();
+      recalculateSplitPreview();
+    }
+
+    function toggleAllSplitMembers(forceState = null) {
+      const rows = Array.from(document.querySelectorAll('#expMemberSplitsContainer > div'));
+      if (!rows.length) return;
+      const checkboxes = rows.map((r) => r.querySelector('.exp-member-check')).filter(Boolean);
+      const allChecked = checkboxes.length > 0 && checkboxes.every((c) => c.checked);
+      const targetState = forceState !== null ? Boolean(forceState) : !allChecked;
+
+      checkboxes.forEach((chk) => {
+        chk.checked = targetState;
+      });
+
+      updateToggleAllSplitButton();
+      recalculateSplitPreview();
+    }
+
+    function selectAllSplitMembers() {
+      toggleAllSplitMembers(true);
+    }
+
+    function unselectAllSplitMembers() {
+      toggleAllSplitMembers(false);
     }
 
     function setSplitMode(mode) {
@@ -1391,6 +1434,7 @@
       } else {
         banner.className = 'text-xs font-medium text-amber-400 flex items-center justify-between px-1';
       }
+      updateToggleAllSplitButton();
     }
 
     async function handleSaveExpense(e) {
@@ -2575,4 +2619,12 @@
       } else {
         showToast(`⏳ Payment of ${formatINR(amount)} marked as paid. Awaiting creditor or admin confirmation.`);
       }
+    }
+
+    if (typeof window !== 'undefined') {
+      window.toggleAllSplitMembers = toggleAllSplitMembers;
+      window.selectAllSplitMembers = selectAllSplitMembers;
+      window.unselectAllSplitMembers = unselectAllSplitMembers;
+      window.handleMemberCheckChange = handleMemberCheckChange;
+      window.updateToggleAllSplitButton = updateToggleAllSplitButton;
     }

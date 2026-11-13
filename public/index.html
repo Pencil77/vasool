@@ -1237,8 +1237,22 @@
         </div>
 
         <!-- Dynamic Member Split Rows -->
-        <div class="rounded-xl bg-slate-900/90 border border-slate-800 p-3 space-y-2 max-h-52 overflow-y-auto custom-scroll">
-          <div id="expMemberSplitsContainer" data-testid="exp-member-splits-container" class="space-y-2"></div>
+        <div class="space-y-1.5">
+          <div class="flex items-center justify-between px-0.5">
+            <label class="block text-xs font-medium text-slate-300">Split Among Members</label>
+            <button
+              type="button"
+              id="btnToggleAllSplitMembers"
+              data-testid="btn-toggle-all-split-members"
+              onclick="toggleAllSplitMembers()"
+              class="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-[11px] font-semibold text-emerald-400 hover:text-emerald-300 border border-slate-700 transition flex items-center gap-1 shadow-sm"
+            >
+              Select All
+            </button>
+          </div>
+          <div class="rounded-xl bg-slate-900/90 border border-slate-800 p-3 space-y-2 max-h-52 overflow-y-auto custom-scroll">
+            <div id="expMemberSplitsContainer" data-testid="exp-member-splits-container" class="space-y-2"></div>
+          </div>
         </div>
 
         <div id="splitValidationBanner" data-testid="split-validation-banner" class="text-xs font-medium text-emerald-400 flex items-center justify-between px-1">
