@@ -40,158 +40,35 @@ router.get('/balances', requireAuth, async (req, res) => {
       Settlement.find({ groupId: { $in: groupIds } }).sort({ settledAt: -1 })
     ]);
 
+    let simplifiedTransactions = [];
     const balanceMap = {};
-    const ensureMember = (email, name) => {
-      const key = String(email).toLowerCase().trim();
-      if (!balanceMap[key]) {
-        balanceMap[key] = { email: key, name: name || key, paid: 0, owed: 0, net: 0 };
-      }
-      return balanceMap[key];
-    };
 
     groups.forEach((g) => {
-      g.members.forEach((m) => ensureMember(m.email, m.name));
-    });
+      const grpExpenses = expenses.filter((e) => String(e.groupId) === String(g._id));
+      const grpSettlements = settlements.filter((s) => String(s.groupId) === String(g._id));
 
-    expenses.forEach((exp) => {
-      const isIncome = exp.type === 'income';
-      const payers = getExpensePayerAllocations(exp);
+      const grpBalanceMap = computeGroupBalanceMap(g, grpExpenses, grpSettlements);
+      const grpSimplified = computeGroupSimplifiedDebts(g, grpBalanceMap, grpExpenses, grpSettlements);
+      simplifiedTransactions.push(...grpSimplified);
 
-      if (isIncome) {
-        payers.forEach((p) => {
-          const payer = ensureMember(p.memberEmail, p.memberName);
-          payer.paid -= p.amount;
-          payer.net -= p.amount;
-        });
-        exp.splits.forEach((s) => {
-          const participant = ensureMember(s.memberEmail, s.memberName);
-          participant.owed -= s.amount;
-          participant.net += s.amount;
-        });
-      } else {
-        payers.forEach((p) => {
-          const payer = ensureMember(p.memberEmail, p.memberName);
-          payer.paid += p.amount;
-          payer.net += p.amount;
-        });
-        exp.splits.forEach((s) => {
-          const participant = ensureMember(s.memberEmail, s.memberName);
-          participant.owed += s.amount;
-          participant.net -= s.amount;
-        });
-      }
-    });
-
-    settlements.forEach((st) => {
-      // Handshake rule: Only CONFIRMED settlements reduce net debt balances!
-      if (st.status === 'confirmed') {
-        const payer = ensureMember(st.fromEmail, st.fromName);
-        const receiver = ensureMember(st.toEmail, st.toName);
-        payer.net += st.amount;
-        receiver.net -= st.amount;
-      }
-    });
-
-    let simplifiedTransactions = [];
-    if (groups.length === 1) {
-      const g = groups[0];
-      const isMinimized = g.minimizeDebts !== false;
-      if (!isMinimized) {
-        simplifiedTransactions = calculateDirectDebts(expenses, settlements);
-      } else if (g.adminHubSettlement === true) {
-        const adminMember = g.members.find((m) => m.role === 'admin') ||
-          (g.adminEmail ? g.members.find((m) => m.email.toLowerCase() === g.adminEmail.toLowerCase()) : null) ||
-          g.members[0];
-        simplifiedTransactions = simplifyDebtsAdminHub(balanceMap, adminMember);
-      } else {
-        simplifiedTransactions = simplifyDebtsGreedy(balanceMap);
-      }
-    } else if (groups.length > 1) {
-      // Calculate transactions for each group
-      groups.forEach((g) => {
-        const groupBalanceMap = {};
-        const ensureGroupMember = (email, name) => {
-          const key = String(email).toLowerCase().trim();
-          if (!groupBalanceMap[key]) {
-            groupBalanceMap[key] = { email: key, name: name || key, paid: 0, owed: 0, net: 0 };
-          }
-          return groupBalanceMap[key];
-        };
-
-        g.members.forEach((m) => ensureGroupMember(m.email, m.name));
-
-        const grpExpenses = expenses.filter((e) => String(e.groupId) === String(g._id));
-        const grpSettlements = settlements.filter((s) => String(s.groupId) === String(g._id));
-
-        const isMinimized = g.minimizeDebts !== false;
-        if (!isMinimized) {
-          simplifiedTransactions.push(...calculateDirectDebts(grpExpenses, grpSettlements));
+      Object.values(grpBalanceMap).forEach((b) => {
+        if (!balanceMap[b.email]) {
+          balanceMap[b.email] = { ...b };
         } else {
-          grpExpenses.forEach((exp) => {
-            const isIncome = exp.type === 'income';
-            const payers = getExpensePayerAllocations(exp);
-            if (isIncome) {
-              payers.forEach((payObj) => {
-                const payer = ensureGroupMember(payObj.memberEmail, payObj.memberName);
-                payer.paid -= payObj.amount;
-                payer.net -= payObj.amount;
-              });
-              exp.splits.forEach((s) => {
-                const p = ensureGroupMember(s.memberEmail, s.memberName);
-                p.owed -= s.amount;
-                p.net += s.amount;
-              });
-            } else {
-              payers.forEach((payObj) => {
-                const payer = ensureGroupMember(payObj.memberEmail, payObj.memberName);
-                payer.paid += payObj.amount;
-                payer.net += payObj.amount;
-              });
-              exp.splits.forEach((s) => {
-                const p = ensureGroupMember(s.memberEmail, s.memberName);
-                p.owed += s.amount;
-                p.net -= s.amount;
-              });
-            }
-          });
-
-          grpSettlements.forEach((st) => {
-            if (st.status === 'confirmed') {
-              const payer = ensureGroupMember(st.fromEmail, st.fromName);
-              const receiver = ensureGroupMember(st.toEmail, st.toName);
-              payer.net += st.amount;
-              receiver.net -= st.amount;
-            }
-          });
-
-          if (g.adminHubSettlement === true) {
-            const adminMember = g.members.find((m) => m.role === 'admin') ||
-              (g.adminEmail ? g.members.find((m) => m.email.toLowerCase() === g.adminEmail.toLowerCase()) : null) ||
-              g.members[0];
-            simplifiedTransactions.push(...simplifyDebtsAdminHub(groupBalanceMap, adminMember));
-          } else {
-            simplifiedTransactions.push(...simplifyDebtsGreedy(groupBalanceMap));
-          }
+          balanceMap[b.email].paid = Math.round((balanceMap[b.email].paid + b.paid) * 100) / 100;
+          balanceMap[b.email].owed = Math.round((balanceMap[b.email].owed + b.owed) * 100) / 100;
+          balanceMap[b.email].net = Math.round((balanceMap[b.email].net + b.net) * 100) / 100;
+          balanceMap[b.email].paidExpenses = Math.round(((balanceMap[b.email].paidExpenses || 0) + (b.paidExpenses || 0)) * 100) / 100;
+          balanceMap[b.email].owedSplits = Math.round(((balanceMap[b.email].owedSplits || 0) + (b.owedSplits || 0)) * 100) / 100;
+          balanceMap[b.email].settledPaid = Math.round(((balanceMap[b.email].settledPaid || 0) + (b.settledPaid || 0)) * 100) / 100;
+          balanceMap[b.email].settledReceived = Math.round(((balanceMap[b.email].settledReceived || 0) + (b.settledReceived || 0)) * 100) / 100;
         }
       });
-    } else {
-      simplifiedTransactions = simplifyDebtsGreedy(balanceMap);
-    }
-
-    // Attach pending approval amounts to transactions
-    const pendingSettlements = settlements.filter((s) => s.status === 'pending_admin_approval');
-    const pendingMap = {};
-    pendingSettlements.forEach((s) => {
-      const key = `${s.fromEmail}->${s.toEmail}`;
-      pendingMap[key] = (pendingMap[key] || 0) + s.amount;
     });
 
-    simplifiedTransactions.forEach((t) => {
-      const key = `${t.fromEmail}->${t.toEmail}`;
-      t.pendingApprovalAmount = Math.round((pendingMap[key] || 0) * 100) / 100;
-      t.isPendingApproval = t.pendingApprovalAmount > 0;
-      t.remainingDue = Math.max(0, Math.round((t.amount - t.pendingApprovalAmount) * 100) / 100);
-    });
+    const pendingSettlements = settlements.filter(
+      (s) => s.status === 'pending_admin_approval' || s.status === 'pending_confirmation' || s.status === 'pending'
+    );
 
     const requesterEmail = req.user.email.toLowerCase().trim();
     let balances = Object.values(balanceMap);

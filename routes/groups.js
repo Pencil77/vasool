@@ -267,7 +267,7 @@ router.get('/groups/:id', requireAuth, async (req, res) => {
       };
     });
 
-    const totalSpend = Math.round(expenses.reduce((sum, e) => sum + (e.type === 'income' ? 0 : e.amount), 0) * 100) / 100;
+    const totalSpend = Math.round(expenses.reduce((sum, e) => sum + (e.type === 'income' ? -e.amount : e.amount), 0) * 100) / 100;
     const myBalance = balanceMap[requesterEmail] || { paid: 0, owed: 0, net: 0 };
 
     return res.status(200).json({

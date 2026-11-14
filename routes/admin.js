@@ -531,7 +531,9 @@ router.get('/groups', async (req, res) => {
       const gid = String(e.groupId || '');
       if (!expStatsMap[gid]) expStatsMap[gid] = { billCount: 0, totalSpend: 0 };
       expStatsMap[gid].billCount += 1;
-      if (e.type !== 'income') {
+      if (e.type === 'income') {
+        expStatsMap[gid].totalSpend -= Number(e.amount) || 0;
+      } else {
         expStatsMap[gid].totalSpend += Number(e.amount) || 0;
       }
     });

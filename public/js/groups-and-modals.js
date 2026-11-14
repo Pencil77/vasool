@@ -765,6 +765,7 @@
                     ${t.type === 'pay_to_admin' ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">Pay to Admin 👑</span>' : ''}
                     ${t.type === 'admin_payout' ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/20 text-teal-300 border border-teal-500/40">Admin Settlement 💸</span>' : ''}
                     ${t.type === 'standard_greedy' || (!t.isAdminTransfer && !t.type) ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">Direct P2P ⚡</span>' : ''}
+                    ${t.groupName ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-teal-300 border border-slate-700">📁 ${escapeHtml(t.groupName)}</span>` : ''}
                   </div>
                   <div class="text-[11px] text-slate-400 mt-0.5">${escapeHtml(t.fromEmail)} &rarr; ${escapeHtml(t.toEmail)}</div>
                   ${pendingAmt > 0 ? `
@@ -788,7 +789,7 @@
                       ⏳ Pending Approval
                     </span>
                   ` : `
-                    <button data-testid="btn-record-payment-${idx}" onclick="openSettleConfirm('${escapeHtml(t.fromEmail)}', '${escapeHtml(t.fromName)}', '${escapeHtml(t.toEmail)}', '${escapeHtml(t.toName)}', ${remDue})" class="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition">
+                    <button data-testid="btn-record-payment-${idx}" onclick="openSettleConfirm('${escapeHtml(t.fromEmail)}', '${escapeHtml(t.fromName)}', '${escapeHtml(t.toEmail)}', '${escapeHtml(t.toName)}', ${remDue}, '${escapeHtml(t.groupId || '')}')" class="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition">
                       ${isViewerAdminOfAny ? 'Record Payment' : 'Mark as Settled'}
                     </button>
                   `}
@@ -811,10 +812,13 @@
             const isPending = s.status === 'pending_admin_approval';
             const isRejected = s.status === 'rejected';
 
+            const isPartial = Boolean(s.originalClaimedAmount && Number(s.originalClaimedAmount) > Number(s.amount));
             let statusBadge = '';
             if (isConfirmed) {
               const roleTitle = s.confirmedRole === 'creditor' ? 'Creditor' : 'Admin';
-              statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">✅ Confirmed by ${roleTitle}</span>`;
+              statusBadge = isPartial
+                ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/20 text-teal-300 border border-teal-500/40">⚖️ Partial: ${formatINR(s.amount)} Confirmed by ${roleTitle}</span>`
+                : `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">✅ Confirmed by ${roleTitle}</span>`;
             } else if (isPending) {
               statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">⏳ Awaiting Confirmation</span>`;
             } else if (isRejected) {
@@ -835,7 +839,10 @@
                     ${s.confirmedByEmail ? `· Confirmed by ${escapeHtml(s.confirmedByEmail)}` : ''}
                   </div>
                 </div>
-                <div class="text-sm font-bold ${isConfirmed ? 'text-emerald-400' : isRejected ? 'text-rose-400 line-through' : 'text-amber-300'}">${formatINR(s.amount)}</div>
+                <div class="text-sm font-bold ${isConfirmed ? 'text-emerald-400' : isRejected ? 'text-rose-400 line-through' : 'text-amber-300'}">
+                  ${formatINR(s.amount)}
+                  ${isPartial ? `<span class="text-[10px] text-slate-400 font-normal block sm:inline"> (of ${formatINR(s.originalClaimedAmount)} claimed)</span>` : ''}
+                </div>
               </div>
             `;
           })
@@ -2487,8 +2494,8 @@
       return '';
     }
 
-    async function openSettleConfirm(fromEmail, fromName, toEmail, toName, amount) {
-      const targetGroupId = selectedGroupId === 'ALL' ? appState.groups[0]?.id || '' : selectedGroupId;
+    async function openSettleConfirm(fromEmail, fromName, toEmail, toName, amount, groupId = null) {
+      const targetGroupId = groupId || (selectedGroupId === 'ALL' ? appState.groups[0]?.id || '' : selectedGroupId);
       document.getElementById('settleFromEmail').value = fromEmail;
       document.getElementById('settleFromName').value = fromName;
       document.getElementById('settleToEmail').value = toEmail;

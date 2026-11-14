@@ -30,169 +30,226 @@
       const activeGroupIds = new Set(activeGroups.map((g) => g.id));
 
       const balanceMap = {};
-      const ensurePerson = (email, name) => {
-        const key = String(email).toLowerCase().trim();
-        if (!balanceMap[key]) {
-          balanceMap[key] = { email: key, name: name || key, paid: 0, owed: 0, net: 0 };
-        }
-        return balanceMap[key];
-      };
-
-      activeGroups.forEach((g) => {
-        g.members.forEach((m) => ensurePerson(m.email, m.name));
-      });
+      const simplified = [];
+      let totalSpend = 0;
 
       const filteredExpenses = stateRef.expenses.filter((e) => activeGroupIds.has(e.groupId));
       const filteredSettlements = stateRef.settlements.filter((s) => activeGroupIds.has(s.groupId));
 
-      let totalSpend = 0;
-      filteredExpenses.forEach((exp) => {
-        const isIncome = exp.type === 'income';
-        const amt = Number(exp.amount) || 0;
-        const payers = getClientExpensePayerAllocations(exp);
+      activeGroups.forEach((g) => {
+        const grpExpenses = stateRef.expenses.filter((e) => e.groupId === g.id);
+        const grpSettlements = stateRef.settlements.filter((s) => s.groupId === g.id);
 
-        if (isIncome) {
-          totalSpend -= amt;
-          payers.forEach((p) => {
-            const payer = ensurePerson(p.memberEmail, p.memberName);
-            payer.paid -= p.amount;
-            payer.net -= p.amount;
-          });
-          (exp.splits || []).forEach((s) => {
-            const part = ensurePerson(s.memberEmail, s.memberName);
-            part.owed -= Number(s.amount);
-            part.net += Number(s.amount);
-          });
-        } else {
-          totalSpend += amt;
-          payers.forEach((p) => {
-            const payer = ensurePerson(p.memberEmail, p.memberName);
-            payer.paid += p.amount;
-            payer.net += p.amount;
-          });
-          (exp.splits || []).forEach((s) => {
-            const part = ensurePerson(s.memberEmail, s.memberName);
-            part.owed += Number(s.amount);
-            part.net -= Number(s.amount);
-          });
-        }
-      });
+        const grpBalanceMap = {};
+        const ensureGrpPerson = (email, name) => {
+          const key = String(email || '').toLowerCase().trim();
+          if (!key) return null;
+          if (!grpBalanceMap[key]) {
+            grpBalanceMap[key] = {
+              email: key,
+              name: name || key,
+              paid: 0,
+              owed: 0,
+              net: 0,
+              paidExpenses: 0,
+              owedSplits: 0,
+              settledPaid: 0,
+              settledReceived: 0
+            };
+          }
+          return grpBalanceMap[key];
+        };
 
-      filteredSettlements.forEach((st) => {
-        if (st.status === 'confirmed' || (!st.status && !st.isPending)) {
-          const fromP = ensurePerson(st.fromEmail, st.fromName);
-          const toP = ensurePerson(st.toEmail, st.toName);
-          fromP.net += Number(st.amount);
-          toP.net -= Number(st.amount);
-        }
-      });
+        (g.members || []).forEach((m) => ensureGrpPerson(m.email, m.name));
 
-      // Settle Up Feature: Debt Minimization Mode Toggle
-      const isMinimized = activeGroups.every((g) => g.minimizeDebts !== false);
-      const simplified = [];
-
-      if (!isMinimized) {
-        // Direct pair-wise debts mode: members only settle with the exact person who paid
-        const netPairMap = {};
-        filteredExpenses.forEach((exp) => {
-          const payers = getClientExpensePayerAllocations(exp);
-          const totalExpAmt = payers.reduce((acc, p) => acc + p.amount, 0) || Number(exp.amount) || 1;
+        let grpSpend = 0;
+        grpExpenses.forEach((exp) => {
           const isIncome = exp.type === 'income';
+          const amt = Number(exp.amount) || 0;
+          const payers = getClientExpensePayerAllocations(exp);
 
-          (exp.splits || []).forEach((s) => {
-            const debtorEmail = String(s.memberEmail).toLowerCase().trim();
-            const debtorName = s.memberName;
-
+          if (isIncome) {
+            grpSpend -= amt;
             payers.forEach((p) => {
-              const payerEmail = p.memberEmail;
-              const payerName = p.memberName;
-              if (debtorEmail === payerEmail) return;
-              const sharePortion = Number(s.amount) * (p.amount / totalExpAmt);
-              if (sharePortion <= 0) return;
+              const payer = ensureGrpPerson(p.memberEmail, p.memberName);
+              if (payer) {
+                payer.paid -= p.amount;
+                payer.paidExpenses -= p.amount;
+                payer.net -= p.amount;
+              }
+            });
+            (exp.splits || []).forEach((s) => {
+              const part = ensureGrpPerson(s.memberEmail, s.memberName);
+              if (part) {
+                part.owed -= Number(s.amount);
+                part.owedSplits -= Number(s.amount);
+                part.net += Number(s.amount);
+              }
+            });
+          } else {
+            grpSpend += amt;
+            payers.forEach((p) => {
+              const payer = ensureGrpPerson(p.memberEmail, p.memberName);
+              if (payer) {
+                payer.paid += p.amount;
+                payer.paidExpenses += p.amount;
+                payer.net += p.amount;
+              }
+            });
+            (exp.splits || []).forEach((s) => {
+              const part = ensureGrpPerson(s.memberEmail, s.memberName);
+              if (part) {
+                part.owed += Number(s.amount);
+                part.owedSplits += Number(s.amount);
+                part.net -= Number(s.amount);
+              }
+            });
+          }
+        });
 
-              const key = isIncome ? `${payerEmail}->${debtorEmail}` : `${debtorEmail}->${payerEmail}`;
+        grpSettlements.forEach((st) => {
+          if (st.status === 'confirmed' || (!st.status && !st.isPending)) {
+            const fromP = ensureGrpPerson(st.fromEmail, st.fromName);
+            const toP = ensureGrpPerson(st.toEmail, st.toName);
+            if (fromP) {
+              fromP.net += Number(st.amount);
+              fromP.settledPaid = (fromP.settledPaid || 0) + Number(st.amount);
+            }
+            if (toP) {
+              toP.net -= Number(st.amount);
+              toP.settledReceived = (toP.settledReceived || 0) + Number(st.amount);
+            }
+          }
+        });
+
+        Object.values(grpBalanceMap).forEach((b) => {
+          b.paid = Math.round(b.paid * 100) / 100;
+          b.owed = Math.round(b.owed * 100) / 100;
+          b.net = Math.round(b.net * 100) / 100;
+          b.paidExpenses = Math.round((b.paidExpenses || 0) * 100) / 100;
+          b.owedSplits = Math.round((b.owedSplits || 0) * 100) / 100;
+          b.settledPaid = Math.round((b.settledPaid || 0) * 100) / 100;
+          b.settledReceived = Math.round((b.settledReceived || 0) * 100) / 100;
+        });
+
+        totalSpend += grpSpend;
+
+        // Group Debt Simplification
+        const isMinimized = g.minimizeDebts !== false;
+        const grpSimplified = [];
+
+        if (!isMinimized) {
+          // Direct Pair-Wise Mode
+          const netPairMap = {};
+          grpExpenses.forEach((exp) => {
+            const payers = getClientExpensePayerAllocations(exp);
+            const totalExpAmt = payers.reduce((acc, p) => acc + p.amount, 0) || Number(exp.amount) || 1;
+            const isIncome = exp.type === 'income';
+
+            (exp.splits || []).forEach((s) => {
+              const debtorEmail = String(s.memberEmail).toLowerCase().trim();
+              const debtorName = s.memberName;
+
+              payers.forEach((p) => {
+                const payerEmail = p.memberEmail;
+                const payerName = p.memberName;
+                if (debtorEmail === payerEmail) return;
+                const sharePortion = Number(s.amount) * (p.amount / totalExpAmt);
+                if (sharePortion <= 0) return;
+
+                const key = isIncome ? `${payerEmail}->${debtorEmail}` : `${debtorEmail}->${payerEmail}`;
+                if (!netPairMap[key]) {
+                  netPairMap[key] = {
+                    fromEmail: isIncome ? payerEmail : debtorEmail,
+                    fromName: isIncome ? payerName : debtorName,
+                    toEmail: isIncome ? debtorEmail : payerEmail,
+                    toName: isIncome ? debtorName : payerName,
+                    amount: 0,
+                    isAdminTransfer: false,
+                    type: 'direct_pairwise'
+                  };
+                }
+                netPairMap[key].amount += sharePortion;
+              });
+            });
+          });
+
+          grpSettlements.forEach((st) => {
+            if (st.status === 'confirmed' || (!st.status && !st.isPending)) {
+              const fromKey = String(st.fromEmail).toLowerCase().trim();
+              const toKey = String(st.toEmail).toLowerCase().trim();
+              const key = `${fromKey}->${toKey}`;
               if (!netPairMap[key]) {
                 netPairMap[key] = {
-                  fromEmail: isIncome ? payerEmail : debtorEmail,
-                  fromName: isIncome ? payerName : debtorName,
-                  toEmail: isIncome ? debtorEmail : payerEmail,
-                  toName: isIncome ? debtorName : payerName,
+                  fromEmail: fromKey,
+                  fromName: st.fromName || fromKey,
+                  toEmail: toKey,
+                  toName: st.toName || toKey,
                   amount: 0,
                   isAdminTransfer: false,
                   type: 'direct_pairwise'
                 };
               }
-              netPairMap[key].amount += sharePortion;
-            });
+              netPairMap[key].amount -= Number(st.amount);
+            }
           });
-        });
 
-        filteredSettlements.forEach((st) => {
-          if (st.status === 'confirmed' || (!st.status && !st.isPending)) {
-            const key = `${String(st.fromEmail).toLowerCase().trim()}->${String(st.toEmail).toLowerCase().trim()}`;
-            if (netPairMap[key]) netPairMap[key].amount -= Number(st.amount);
-          }
-        });
+          const processed = new Set();
+          Object.keys(netPairMap).forEach((key) => {
+            if (processed.has(key)) return;
+            const [from, to] = key.split('->');
+            const revKey = `${to}->${from}`;
+            const direct = netPairMap[key]?.amount || 0;
+            const reverse = netPairMap[revKey]?.amount || 0;
+            const net = Math.round((direct - reverse) * 100) / 100;
 
-        const processed = new Set();
-        Object.keys(netPairMap).forEach((key) => {
-          if (processed.has(key)) return;
-          const [from, to] = key.split('->');
-          const revKey = `${to}->${from}`;
-          const direct = netPairMap[key]?.amount || 0;
-          const reverse = netPairMap[revKey]?.amount || 0;
-          const net = Math.round((direct - reverse) * 100) / 100;
+            processed.add(key);
+            processed.add(revKey);
 
-          processed.add(key);
-          processed.add(revKey);
+            if (net > 0.01) {
+              grpSimplified.push({
+                groupId: g.id,
+                groupName: g.name,
+                fromEmail: from,
+                fromName: netPairMap[key]?.fromName || from,
+                toEmail: to,
+                toName: netPairMap[key]?.toName || to,
+                amount: net,
+                isAdminTransfer: false,
+                type: 'direct_pairwise'
+              });
+            } else if (net < -0.01) {
+              grpSimplified.push({
+                groupId: g.id,
+                groupName: g.name,
+                fromEmail: to,
+                fromName: netPairMap[revKey]?.fromName || netPairMap[key]?.toName || to,
+                toEmail: from,
+                toName: netPairMap[revKey]?.toName || netPairMap[key]?.fromName || from,
+                amount: Math.abs(net),
+                isAdminTransfer: false,
+                type: 'direct_pairwise'
+              });
+            }
+          });
 
-          if (net > 0.01) {
-            simplified.push({
-              fromEmail: from,
-              fromName: netPairMap[key]?.fromName || from,
-              toEmail: to,
-              toName: netPairMap[key]?.toName || to,
-              amount: net,
-              isAdminTransfer: false,
-              type: 'direct_pairwise'
-            });
-          } else if (net < -0.01) {
-            simplified.push({
-              fromEmail: to,
-              fromName: netPairMap[revKey]?.fromName || to,
-              toEmail: from,
-              toName: netPairMap[key]?.fromName || from,
-              amount: Math.abs(net),
-              isAdminTransfer: false,
-              type: 'direct_pairwise'
-            });
-          }
-        });
-
-        simplified.sort((a, b) => b.amount - a.amount);
-      } else {
-        const useAdminHub = activeGroups.length > 0 && activeGroups.some((g) => g.adminHubSettlement === true);
-
-        if (useAdminHub) {
-          // Admin-Hub Debt Calibration:
-          // Everyone pays to the group Admin, and the Admin settles back to all creditors.
-          let activeAdmin = null;
-          if (activeGroups.length >= 1) {
-            const primary = activeGroups[0];
-            activeAdmin = primary.members?.find((m) => m.role === 'admin' || (primary.adminEmail && primary.adminEmail.toLowerCase() === m.email.toLowerCase())) || primary.members?.[0];
-          }
-
+          grpSimplified.sort((a, b) => b.amount - a.amount);
+        } else if (g.adminHubSettlement === true) {
+          // Admin Hub Mode
+          const activeAdmin = g.members?.find((m) => m.role === 'admin' || (g.adminEmail && g.adminEmail.toLowerCase() === m.email.toLowerCase())) || g.members?.[0];
           if (activeAdmin && activeAdmin.email) {
             const adminEmail = String(activeAdmin.email).toLowerCase().trim();
             const adminName = activeAdmin.name || 'Admin';
 
-            Object.values(balanceMap).forEach((p) => {
+            Object.values(grpBalanceMap).forEach((p) => {
               const pEmail = String(p.email).toLowerCase().trim();
               if (pEmail === adminEmail) return;
 
               const rounded = Math.round(p.net * 100) / 100;
               if (rounded < -0.01) {
-                simplified.push({
+                grpSimplified.push({
+                  groupId: g.id,
+                  groupName: g.name,
                   fromEmail: p.email,
                   fromName: p.name,
                   toEmail: adminEmail,
@@ -202,7 +259,9 @@
                   type: 'pay_to_admin'
                 });
               } else if (rounded > 0.01) {
-                simplified.push({
+                grpSimplified.push({
+                  groupId: g.id,
+                  groupName: g.name,
                   fromEmail: adminEmail,
                   fromName: adminName,
                   toEmail: p.email,
@@ -214,17 +273,17 @@
               }
             });
 
-            simplified.sort((a, b) => {
+            grpSimplified.sort((a, b) => {
               if (a.toEmail === adminEmail && b.toEmail !== adminEmail) return -1;
               if (a.toEmail !== adminEmail && b.toEmail === adminEmail) return 1;
               return b.amount - a.amount;
             });
           }
         } else {
-          // Standard / Default: Greedy Peer-to-Peer Minimum Cash Flow Simplification
+          // Standard Greedy Mode
           const debtors = [];
           const creditors = [];
-          Object.values(balanceMap).forEach((p) => {
+          Object.values(grpBalanceMap).forEach((p) => {
             const rounded = Math.round(p.net * 100) / 100;
             if (rounded < -0.01) debtors.push({ ...p, amount: Math.abs(rounded) });
             else if (rounded > 0.01) creditors.push({ ...p, amount: rounded });
@@ -240,7 +299,9 @@
             const c = creditors[j];
             const amt = Math.round(Math.min(d.amount, c.amount) * 100) / 100;
             if (amt > 0) {
-              simplified.push({
+              grpSimplified.push({
+                groupId: g.id,
+                groupName: g.name,
                 fromEmail: d.email,
                 fromName: d.name,
                 toEmail: c.email,
@@ -256,19 +317,41 @@
             if (c.amount <= 0.01) j++;
           }
         }
-      }
+
+        simplified.push(...grpSimplified);
+
+        // Merge grpBalanceMap into overall balanceMap
+        Object.values(grpBalanceMap).forEach((b) => {
+          if (!balanceMap[b.email]) {
+            balanceMap[b.email] = { ...b };
+          } else {
+            balanceMap[b.email].paid = Math.round((balanceMap[b.email].paid + b.paid) * 100) / 100;
+            balanceMap[b.email].owed = Math.round((balanceMap[b.email].owed + b.owed) * 100) / 100;
+            balanceMap[b.email].net = Math.round((balanceMap[b.email].net + b.net) * 100) / 100;
+            balanceMap[b.email].paidExpenses = Math.round(((balanceMap[b.email].paidExpenses || 0) + (b.paidExpenses || 0)) * 100) / 100;
+            balanceMap[b.email].owedSplits = Math.round(((balanceMap[b.email].owedSplits || 0) + (b.owedSplits || 0)) * 100) / 100;
+            balanceMap[b.email].settledPaid = Math.round(((balanceMap[b.email].settledPaid || 0) + (b.settledPaid || 0)) * 100) / 100;
+            balanceMap[b.email].settledReceived = Math.round(((balanceMap[b.email].settledReceived || 0) + (b.settledReceived || 0)) * 100) / 100;
+          }
+        });
+      });
 
       // Calculate pending settlement amounts awaiting admin approval
+      const pendingSettlements = filteredSettlements.filter(
+        (s) => s.status === 'pending_admin_approval' || s.status === 'pending_confirmation' || s.status === 'pending'
+      );
       const pendingMap = {};
-      const pendingSettlements = filteredSettlements.filter((s) => s.status === 'pending_admin_approval');
       pendingSettlements.forEach((s) => {
-        const key = `${String(s.fromEmail).toLowerCase().trim()}->${String(s.toEmail).toLowerCase().trim()}`;
-        pendingMap[key] = (pendingMap[key] || 0) + Number(s.amount);
+        const groupSpecificKey = `${s.groupId || ''}:${String(s.fromEmail).toLowerCase().trim()}->${String(s.toEmail).toLowerCase().trim()}`;
+        const pairKey = `${String(s.fromEmail).toLowerCase().trim()}->${String(s.toEmail).toLowerCase().trim()}`;
+        pendingMap[groupSpecificKey] = (pendingMap[groupSpecificKey] || 0) + Number(s.amount);
+        pendingMap[pairKey] = (pendingMap[pairKey] || 0) + Number(s.amount);
       });
 
       simplified.forEach((t) => {
-        const key = `${String(t.fromEmail).toLowerCase().trim()}->${String(t.toEmail).toLowerCase().trim()}`;
-        t.pendingApprovalAmount = Math.round((pendingMap[key] || 0) * 100) / 100;
+        const groupSpecificKey = `${t.groupId || ''}:${String(t.fromEmail).toLowerCase().trim()}->${String(t.toEmail).toLowerCase().trim()}`;
+        const pairKey = `${String(t.fromEmail).toLowerCase().trim()}->${String(t.toEmail).toLowerCase().trim()}`;
+        t.pendingApprovalAmount = Math.round((pendingMap[groupSpecificKey] || pendingMap[pairKey] || 0) * 100) / 100;
         t.isPendingApproval = t.pendingApprovalAmount > 0;
         t.remainingDue = Math.max(0, Math.round((t.amount - t.pendingApprovalAmount) * 100) / 100);
       });
@@ -317,18 +400,34 @@
         }
       }
 
+      // Dictionary of net balances for quick lookup (balances[email])
+      const balances = {};
+      Object.values(balanceMap).forEach((b) => {
+        balances[b.email] = b.net;
+      });
+
+      const myEntry = balanceMap[currentEmail] || { email: currentEmail, name: stateRef.currentUser?.name || 'Me', paid: 0, owed: 0, net: 0 };
+      const myNet = myEntry.net;
+      const myPaid = myEntry.paid;
+      const myOwed = myEntry.owed;
+
       return {
+        balances,
+        balanceMap,
         balanceList: finalBalanceList,
         simplified: finalSimplified,
+        myNet,
+        myEntry,
+        myPaid,
+        myOwed,
         filteredExpenses,
         filteredSettlements,
         pendingSettlements,
         isFullyClosed,
-        totalSpend,
+        totalSpend: Math.round(totalSpend * 100) / 100,
         whoShouldPay
       };
     }
-
     // =========================================================================
     // UI RENDERING & CHARTS
     // =========================================================================
