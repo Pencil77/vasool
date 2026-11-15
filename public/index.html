@@ -1167,14 +1167,45 @@
         <div id="expPaidByMultiWrapper" class="space-y-1.5">
           <div id="expMultiPayerToggle" class="flex items-center justify-between">
             <label class="block text-xs font-medium text-slate-300">Paid By (Who Paid?)</label>
-            <span id="expPaidBySummaryBadge" data-testid="exp-paid-by-summary-badge" class="text-[11px] font-semibold text-emerald-400">1 payer selected</span>
+            <button
+              type="button"
+              id="btnToggleMultiPayer"
+              data-testid="btn-toggle-multi-payer"
+              onclick="toggleMultiPayerMode()"
+              class="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-[11px] font-semibold text-emerald-400 hover:text-emerald-300 border border-slate-700 transition flex items-center gap-1 shadow-sm"
+            >
+              <span id="btnToggleMultiPayerIcon">👥</span>
+              <span id="btnToggleMultiPayerText">+ Multiple Payers</span>
+            </button>
           </div>
-          <p class="text-[11px] text-slate-400">By default you are selected. Uncheck yourself or select multiple people to enter how much each person spent.</p>
+
+          <!-- Single Payer View (Default: only shows user name, with dropdown option) -->
+          <div id="expSinglePayerSection" class="relative">
+            <select
+              id="expPaidBySingleSelect"
+              data-testid="select-expense-paid-by-single"
+              onchange="handleSinglePayerChange()"
+              class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white font-medium focus:outline-none focus:border-emerald-500 appearance-none pr-8 cursor-pointer"
+            >
+            </select>
+            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-slate-400">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+            </div>
+          </div>
+
           <!-- Hidden select preserved for backwards compatibility -->
           <select id="expPaidBySelect" data-testid="select-expense-paid-by" class="hidden"></select>
-          <div id="expPaidByMultiContainer" data-testid="exp-paid-by-multi-container" class="rounded-xl bg-slate-900/90 border border-slate-800 p-2.5 space-y-1.5 max-h-44 overflow-y-auto custom-scroll"></div>
-          <div id="expMultiPayerAllocations" class="hidden"></div>
-          <div id="expPayerValidationBanner" data-testid="exp-payer-validation-banner" class="hidden text-[11px] font-medium px-1 flex items-center justify-between"></div>
+
+          <!-- Multiple Payers View (Hidden by default, shown when toggled) -->
+          <div id="expMultiPayerSection" class="hidden space-y-1.5">
+            <div class="flex items-center justify-between px-0.5">
+              <p class="text-[11px] text-slate-400">Select multiple people and enter how much each person spent.</p>
+              <span id="expPaidBySummaryBadge" data-testid="exp-paid-by-summary-badge" class="text-[11px] font-semibold text-emerald-400">1 payer selected</span>
+            </div>
+            <div id="expPaidByMultiContainer" data-testid="exp-paid-by-multi-container" class="rounded-xl bg-slate-900/90 border border-slate-800 p-2.5 space-y-1.5 max-h-44 overflow-y-auto custom-scroll"></div>
+            <div id="expMultiPayerAllocations" class="hidden"></div>
+            <div id="expPayerValidationBanner" data-testid="exp-payer-validation-banner" class="hidden text-[11px] font-medium px-1 flex items-center justify-between"></div>
+          </div>
         </div>
 
         <!-- Split Mode Selector -->

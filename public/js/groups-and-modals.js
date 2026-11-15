@@ -1169,26 +1169,83 @@
       openModal('addExpenseModal');
     }
 
+    let isMultiPayerActive = false;
+
+    function toggleMultiPayerMode(forceMulti = null) {
+      if (typeof forceMulti === 'boolean') {
+        isMultiPayerActive = forceMulti;
+      } else {
+        isMultiPayerActive = !isMultiPayerActive;
+      }
+
+      const singleSec = document.getElementById('expSinglePayerSection');
+      const multiSec = document.getElementById('expMultiPayerSection');
+      const btnText = document.getElementById('btnToggleMultiPayerText');
+      const btnIcon = document.getElementById('btnToggleMultiPayerIcon');
+      const btn = document.getElementById('btnToggleMultiPayer');
+
+      if (isMultiPayerActive) {
+        if (singleSec) singleSec.classList.add('hidden');
+        if (multiSec) multiSec.classList.remove('hidden');
+        if (btnText) btnText.textContent = 'Single Payer';
+        if (btnIcon) btnIcon.textContent = '👤';
+        if (btn) {
+          btn.className = 'px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-[11px] font-semibold text-slate-300 hover:text-white border border-slate-700 transition flex items-center gap-1 shadow-sm';
+        }
+      } else {
+        if (singleSec) singleSec.classList.remove('hidden');
+        if (multiSec) multiSec.classList.add('hidden');
+        if (btnText) btnText.textContent = '+ Multiple Payers';
+        if (btnIcon) btnIcon.textContent = '👥';
+        if (btn) {
+          btn.className = 'px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-[11px] font-semibold text-emerald-400 hover:text-emerald-300 border border-slate-700 transition flex items-center gap-1 shadow-sm';
+        }
+        handleSinglePayerChange();
+      }
+    }
+
+    function handleSinglePayerChange() {
+      const singleSel = document.getElementById('expPaidBySingleSelect');
+      const payerEmail = (singleSel?.value || '').toLowerCase().trim();
+      const hiddenSel = document.getElementById('expPaidBySelect');
+      if (hiddenSel && singleSel?.value) hiddenSel.value = singleSel.value;
+
+      const total = Number(document.getElementById('expAmountInput')?.value) || 0;
+      const rows = Array.from(document.querySelectorAll('#expPaidByMultiContainer > div'));
+      rows.forEach((r) => {
+        const em = (r.dataset.memberEmail || '').toLowerCase().trim();
+        const chk = r.querySelector('.exp-payer-check');
+        const inp = r.querySelector('.exp-payer-amount');
+        const isThisPayer = em === payerEmail;
+        if (chk) chk.checked = isThisPayer;
+        if (inp) {
+          inp.disabled = !isThisPayer;
+          inp.value = isThisPayer ? String(Math.round(total * 100) / 100) : '0';
+        }
+        r.className = `flex items-center justify-between gap-2 py-1.5 px-2 rounded-lg border ${isThisPayer ? 'bg-emerald-950/25 border-emerald-500/35' : 'bg-slate-950/60 border-slate-800/80'} transition`;
+      });
+
+      updatePayerSummaryUI();
+      recalculateSplitPreview(true);
+    }
+
     function openExpenseWithSuggestedPayer() {
       openAddExpenseModal();
       if (appState.suggestedPayer && appState.suggestedPayer.email) {
         const sugEmail = appState.suggestedPayer.email.toLowerCase().trim();
+        const singleSel = document.getElementById('expPaidBySingleSelect');
+        if (singleSel) {
+          const options = Array.from(singleSel.options);
+          const match = options.find((opt) => opt.value.toLowerCase() === sugEmail);
+          if (match) singleSel.value = match.value;
+        }
         const paidBySel = document.getElementById('expPaidBySelect');
         if (paidBySel) {
           const options = Array.from(paidBySel.options);
           const match = options.find((opt) => opt.value.toLowerCase() === sugEmail);
           if (match) paidBySel.value = match.value;
         }
-        const payerRows = Array.from(document.querySelectorAll('#expPaidByMultiContainer > div'));
-        const total = Number(document.getElementById('expAmountInput')?.value) || 0;
-        payerRows.forEach((row) => {
-          const em = (row.dataset.memberEmail || '').toLowerCase().trim();
-          const chk = row.querySelector('.exp-payer-check');
-          const amtInp = row.querySelector('.exp-payer-amount');
-          if (chk) chk.checked = (em === sugEmail);
-          if (amtInp) amtInp.value = (em === sugEmail) ? String(total) : '0';
-        });
-        handlePayerSelectionChange(false);
+        handleSinglePayerChange();
       }
     }
 
@@ -1229,6 +1286,22 @@
       const group = appState.groups.find((g) => g.id === groupId) || appState.groups[0];
       if (!group) return;
 
+      const currentEmail = (appState.currentUser?.email || '').toLowerCase().trim();
+      const defaultPayerEmail = group.members.some((m) => (m.email || '').toLowerCase().trim() === currentEmail)
+        ? currentEmail
+        : (group.members[0]?.email || '').toLowerCase().trim();
+
+      const singleSel = document.getElementById('expPaidBySingleSelect');
+      if (singleSel) {
+        singleSel.innerHTML = group.members
+          .map((m) => {
+            const mEmail = (m.email || '').toLowerCase().trim();
+            const isMe = mEmail === currentEmail;
+            return `<option value="${escapeHtml(m.email)}">${escapeHtml(m.name)}${isMe ? ' (You)' : ''}</option>`;
+          })
+          .join('');
+      }
+
       const paidBySel = document.getElementById('expPaidBySelect');
       if (paidBySel) {
         paidBySel.innerHTML = group.members
@@ -1236,30 +1309,42 @@
           .join('');
       }
 
-      const currentEmail = (appState.currentUser?.email || '').toLowerCase().trim();
-      const defaultPayerEmail = group.members.some((m) => (m.email || '').toLowerCase().trim() === currentEmail)
-        ? currentEmail
-        : (group.members[0]?.email || '').toLowerCase().trim();
-
-      if (paidBySel && defaultPayerEmail) {
-        const matchOpt = Array.from(paidBySel.options).find((o) => o.value.toLowerCase().trim() === defaultPayerEmail);
-        if (matchOpt) paidBySel.value = matchOpt.value;
-      }
-
       const totalBill = Number(document.getElementById('expAmountInput')?.value) || 0;
       const payerMap = {};
+      const hasMultiPreselected = Array.isArray(preselectedPayers) && preselectedPayers.length > 1;
+
       if (Array.isArray(preselectedPayers) && preselectedPayers.length > 0) {
         preselectedPayers.forEach((p) => {
           const em = String(p.memberEmail || p.email || '').toLowerCase().trim();
           if (em) payerMap[em] = Number(p.amount) || 0;
         });
-      } else if (defaultPayerEmail) {
-        payerMap[defaultPayerEmail] = totalBill;
+        const firstPayer = String(preselectedPayers[0].memberEmail || preselectedPayers[0].email || '').toLowerCase().trim();
+        if (singleSel && firstPayer) {
+          const matchOpt = Array.from(singleSel.options).find((o) => o.value.toLowerCase().trim() === firstPayer);
+          singleSel.value = matchOpt ? matchOpt.value : firstPayer;
+        }
+        if (paidBySel && firstPayer) {
+          const matchOpt = Array.from(paidBySel.options).find((o) => o.value.toLowerCase().trim() === firstPayer);
+          paidBySel.value = matchOpt ? matchOpt.value : firstPayer;
+        }
+      } else {
+        if (defaultPayerEmail) {
+          payerMap[defaultPayerEmail] = totalBill;
+          if (singleSel) {
+            const matchOpt = Array.from(singleSel.options).find((o) => o.value.toLowerCase().trim() === defaultPayerEmail);
+            singleSel.value = matchOpt ? matchOpt.value : defaultPayerEmail;
+          }
+          if (paidBySel) {
+            const matchOpt = Array.from(paidBySel.options).find((o) => o.value.toLowerCase().trim() === defaultPayerEmail);
+            paidBySel.value = matchOpt ? matchOpt.value : defaultPayerEmail;
+          }
+        }
       }
+
+      toggleMultiPayerMode(hasMultiPreselected);
 
       const multiContainer = document.getElementById('expPaidByMultiContainer');
       if (multiContainer) {
-        const checkedCount = Object.keys(payerMap).length || 1;
         multiContainer.innerHTML = group.members
           .map((m) => {
             const mEmail = (m.email || '').toLowerCase().trim();
@@ -1290,6 +1375,10 @@
           })
           .join('');
         updatePayerSummaryUI();
+      }
+
+      if (!hasMultiPreselected) {
+        handleSinglePayerChange();
       }
 
       const container = document.getElementById('expMemberSplitsContainer');
@@ -1457,10 +1546,19 @@
         }
       }
 
-      // Sync hidden #expPaidBySelect to first checked payer
+      // Sync hidden #expPaidBySelect and single select to first checked payer
       const paidBySel = document.getElementById('expPaidBySelect');
-      if (paidBySel && checkedRows.length > 0) {
-        paidBySel.value = checkedRows[0].dataset.memberEmail || paidBySel.value;
+      const singleSel = document.getElementById('expPaidBySingleSelect');
+      if (checkedRows.length > 0) {
+        const firstEmail = (checkedRows[0].dataset.memberEmail || '').toLowerCase().trim();
+        if (paidBySel) {
+          const matchOpt = Array.from(paidBySel.options).find((o) => o.value.toLowerCase().trim() === firstEmail);
+          if (matchOpt) paidBySel.value = matchOpt.value;
+        }
+        if (singleSel) {
+          const matchOpt = Array.from(singleSel.options).find((o) => o.value.toLowerCase().trim() === firstEmail);
+          if (matchOpt) singleSel.value = matchOpt.value;
+        }
       }
 
       updatePayerSummaryUI();
@@ -1537,9 +1635,16 @@
       if (!skipPayerSync) {
         const payerRows = Array.from(document.querySelectorAll('#expPaidByMultiContainer > div'));
         const checkedPayers = payerRows.filter((r) => r.querySelector('.exp-payer-check')?.checked);
-        if (checkedPayers.length === 1) {
-          const pInp = checkedPayers[0].querySelector('.exp-payer-amount');
-          if (pInp) pInp.value = String(Math.round(total * 100) / 100);
+        if (checkedPayers.length === 1 || !isMultiPayerActive) {
+          const singleSel = document.getElementById('expPaidBySingleSelect');
+          const targetEmail = (singleSel?.value || '').toLowerCase().trim();
+          const activePayer = (checkedPayers.length === 1)
+            ? checkedPayers[0]
+            : (payerRows.find((r) => (r.dataset.memberEmail || '').toLowerCase().trim() === targetEmail) || checkedPayers[0]);
+          if (activePayer) {
+            const pInp = activePayer.querySelector('.exp-payer-amount');
+            if (pInp) pInp.value = String(Math.round(total * 100) / 100);
+          }
         }
         updatePayerSummaryUI();
       }
@@ -1590,19 +1695,23 @@
 
       const banner = document.getElementById('splitValidationBanner');
       const summary = document.getElementById('splitAllocationSummary');
-      if (currentSplitMode === 'percentage') {
-        summary.textContent = `${formatINR(allocatedSum)} / ${formatINR(total)} (${Math.round(totalPercent * 10) / 10}%)`;
-      } else if (currentSplitMode === 'shares') {
-        summary.textContent = `${formatINR(allocatedSum)} / ${formatINR(total)} (${Math.round(totalShares * 10) / 10} parts)`;
-      } else {
-        summary.textContent = `${formatINR(allocatedSum)} / ${formatINR(total)}`;
+      if (summary) {
+        if (currentSplitMode === 'percentage') {
+          summary.textContent = `${formatINR(allocatedSum)} / ${formatINR(total)} (${Math.round(totalPercent * 10) / 10}%)`;
+        } else if (currentSplitMode === 'shares') {
+          summary.textContent = `${formatINR(allocatedSum)} / ${formatINR(total)} (${Math.round(totalShares * 10) / 10} parts)`;
+        } else {
+          summary.textContent = `${formatINR(allocatedSum)} / ${formatINR(total)}`;
+        }
       }
 
-      const diff = Math.abs(total - allocatedSum);
-      if (diff <= 0.05 && activeRows.length > 0) {
-        banner.className = 'text-xs font-medium text-emerald-400 flex items-center justify-between px-1';
-      } else {
-        banner.className = 'text-xs font-medium text-amber-400 flex items-center justify-between px-1';
+      if (banner) {
+        const diff = Math.abs(total - allocatedSum);
+        if (diff <= 0.05 && activeRows.length > 0) {
+          banner.className = 'text-xs font-medium text-emerald-400 flex items-center justify-between px-1';
+        } else {
+          banner.className = 'text-xs font-medium text-amber-400 flex items-center justify-between px-1';
+        }
       }
       updateToggleAllSplitButton();
     }
