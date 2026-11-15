@@ -213,7 +213,10 @@ const STORAGE_KEY = 'vasool_clean_state_v1';
             splitType: e.splitType || 'equal',
             roundingRemainder: e.roundingRemainder || 0,
             remainderAbsorbedBy: e.remainderAbsorbedBy || '',
-            date: e.expenseDate ? e.expenseDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
+            expenseDate: e.expenseDate || e.createdAt,
+            date: e.expenseDate
+              ? (typeof e.expenseDate === 'string' ? e.expenseDate.slice(0, 10) : new Date(e.expenseDate).toISOString().slice(0, 10))
+              : (e.date ? String(e.date).slice(0, 10) : (e.createdAt ? new Date(e.createdAt).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10))),
             splits: (e.splits || []).map((s) => ({
               memberEmail: s.memberEmail,
               memberName: s.memberName,

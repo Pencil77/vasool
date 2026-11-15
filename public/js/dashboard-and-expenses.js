@@ -1023,6 +1023,30 @@
       window.getSplitSettlementStatus = getSplitSettlementStatus;
     }
 
+    function formatEventDisplayDate(dateVal) {
+      if (!dateVal) return 'Today';
+      try {
+        const dStr = typeof dateVal === 'string' ? dateVal : new Date(dateVal).toISOString();
+        const clean = dStr.slice(0, 10);
+        const now = new Date();
+        const todayLocal = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        if (clean === todayLocal || clean === now.toISOString().slice(0, 10)) return 'Today';
+        const parts = clean.split('-');
+        if (parts.length === 3) {
+          const [y, m, d] = parts;
+          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          const mName = months[parseInt(m, 10) - 1] || m;
+          return `${parseInt(d, 10)} ${mName} ${y}`;
+        }
+        return clean;
+      } catch (_) {
+        return String(dateVal);
+      }
+    }
+    if (typeof window !== 'undefined') {
+      window.formatEventDisplayDate = formatEventDisplayDate;
+    }
+
     function renderExpensesList() {
       const container = document.getElementById('expensesFullList');
       if (!container) return;
@@ -1244,7 +1268,7 @@
                     Array.isArray(e.paidByAllocations) && e.paidByAllocations.length > 1
                       ? e.paidByAllocations.map((p) => `${escapeHtml(p.memberName.split(' ')[0])} (${formatINR(p.amount)})`).join(' + ')
                       : escapeHtml(e.paidByName)
-                  }</strong> in <span class="text-teal-300">${escapeHtml(grp ? grp.name : 'Group')}</span> · ${escapeHtml(e.date || 'Today')}</span>
+                  }</strong> in <span class="text-teal-300">${escapeHtml(grp ? grp.name : 'Group')}</span> · 📅 ${escapeHtml(formatEventDisplayDate(e.date || e.expenseDate))}</span>
                   ${Array.isArray(e.paidByAllocations) && e.paidByAllocations.length > 1 ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/15 text-teal-300 border border-teal-500/30">👥 ${e.paidByAllocations.length} Payers</span>` : ''}
                 </div>
                 <div class="flex flex-wrap gap-1.5 pt-1">${splitsPills}</div>

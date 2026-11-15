@@ -471,7 +471,7 @@
                         <div class="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
                           <span>Paid by <strong class="${isPayerMe ? 'text-teal-300' : 'text-slate-200'}">${escapeHtml(exp.paidByName || exp.paidByEmail)}</strong></span>
                           <span>·</span>
-                          <span>${exp.expenseDate ? new Date(exp.expenseDate).toLocaleDateString() : ''}</span>
+                          <span>📅 ${exp.expenseDate ? new Date(exp.expenseDate).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }) : escapeHtml(exp.date || 'Today')}</span>
                           <span class="px-1.5 py-0.2 rounded text-[9px] uppercase font-bold bg-slate-800 text-slate-400 border border-slate-700">${escapeHtml(exp.splitType || 'equal')}</span>
                         </div>
                       </div>
@@ -1091,6 +1091,15 @@
       }
       document.getElementById('expDescInput').value = '';
       document.getElementById('expAmountInput').value = '';
+
+      // Prefill event date with current day in local YYYY-MM-DD
+      const now = new Date();
+      const todayLocal = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const dateInp = document.getElementById('expDateInput');
+      if (dateInp) {
+        dateInp.value = todayLocal;
+      }
+
       if (document.getElementById('expBillCurrencySelect')) {
         document.getElementById('expBillCurrencySelect').value = 'INR';
         handleBillCurrencyChange();
@@ -1130,6 +1139,23 @@
       document.getElementById('expCategorySelect').value = exp.category || '🍔 Food & Dining';
       document.getElementById('expDescInput').value = exp.description || '';
       document.getElementById('expAmountInput').value = String(exp.amount || 0);
+
+      // Restore event date on edit
+      const editDateInp = document.getElementById('expDateInput');
+      if (editDateInp) {
+        let dStr = '';
+        if (exp.expenseDate) {
+          dStr = typeof exp.expenseDate === 'string' ? exp.expenseDate.slice(0, 10) : new Date(exp.expenseDate).toISOString().slice(0, 10);
+        } else if (exp.date) {
+          dStr = String(exp.date).slice(0, 10);
+        } else if (exp.createdAt) {
+          dStr = new Date(exp.createdAt).toISOString().slice(0, 10);
+        } else {
+          const n = new Date();
+          dStr = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
+        }
+        editDateInp.value = dStr;
+      }
 
       if (document.getElementById('expBillCurrencySelect')) {
         const origCurr = exp.originalCurrency || 'INR';
@@ -1857,6 +1883,10 @@
         : null;
       const parentExpenseDesc = parentExpenseObj ? parentExpenseObj.description : '';
 
+      const dateInpVal = (document.getElementById('expDateInput')?.value || '').trim();
+      const eventDateStr = dateInpVal || new Date().toISOString().slice(0, 10);
+      const expenseDateIso = new Date(eventDateStr + 'T12:00:00Z').toISOString();
+
       const payload = {
         groupId,
         description,
@@ -1874,7 +1904,9 @@
         splitType: currentSplitMode,
         splits,
         roundingRemainder: roundingDiff,
-        remainderAbsorbedBy
+        remainderAbsorbedBy,
+        expenseDate: expenseDateIso,
+        date: eventDateStr
       };
 
       isSavingExpense = true;
@@ -1903,9 +1935,12 @@
             appState.expenses[idx] = {
               ...appState.expenses[idx],
               ...payload,
+              expenseDate: expenseDateIso,
+              date: eventDateStr,
               id: editingExpenseId
             };
           }
+          appState.expenses.sort((a, b) => new Date(b.expenseDate || b.date || b.createdAt || 0) - new Date(a.expenseDate || a.date || a.createdAt || 0));
           recordLocalGroupAudit(
             groupId,
             'expense_updated',
@@ -1943,9 +1978,11 @@
           appState.expenses.unshift({
             id: expId,
             ...payload,
-            date: new Date().toISOString().slice(0, 10)
+            expenseDate: expenseDateIso,
+            date: eventDateStr
           });
         }
+        appState.expenses.sort((a, b) => new Date(b.expenseDate || b.date || b.createdAt || 0) - new Date(a.expenseDate || a.date || a.createdAt || 0));
 
         recordLocalGroupAudit(
           groupId,

@@ -135,7 +135,9 @@ router.post('/expenses', requireAuth, async (req, res) => {
       roundingRemainder = 0,
       remainderAbsorbedBy = '',
       notes = '',
-      type = 'expense'
+      type = 'expense',
+      expenseDate,
+      date
     } = req.body;
 
     const totalAmount = Number(amount);
@@ -192,6 +194,15 @@ router.post('/expenses', requireAuth, async (req, res) => {
       });
     }
 
+    let resolvedExpenseDate = new Date();
+    if (expenseDate) {
+      const parsed = new Date(expenseDate);
+      if (!isNaN(parsed.getTime())) resolvedExpenseDate = parsed;
+    } else if (date) {
+      const parsed = new Date(date);
+      if (!isNaN(parsed.getTime())) resolvedExpenseDate = parsed;
+    }
+
     const expense = await Expense.create({
       groupId,
       description: cleanDescription,
@@ -213,6 +224,7 @@ router.post('/expenses', requireAuth, async (req, res) => {
       splits,
       roundingRemainder: Number(roundingRemainder) || 0,
       remainderAbsorbedBy: String(remainderAbsorbedBy || '').trim(),
+      expenseDate: resolvedExpenseDate,
       notes
     });
 
@@ -300,7 +312,9 @@ router.put('/expenses/:id', requireAuth, async (req, res) => {
       roundingRemainder,
       remainderAbsorbedBy,
       notes,
-      type
+      type,
+      expenseDate,
+      date
     } = req.body;
 
     const prevAmount = existing.amount;
@@ -343,6 +357,13 @@ router.put('/expenses/:id', requireAuth, async (req, res) => {
     if (roundingRemainder !== undefined) existing.roundingRemainder = Number(roundingRemainder) || 0;
     if (remainderAbsorbedBy !== undefined) existing.remainderAbsorbedBy = String(remainderAbsorbedBy || '').trim();
     if (notes !== undefined) existing.notes = String(notes || '');
+    if (expenseDate !== undefined || date !== undefined) {
+      const targetDate = expenseDate || date;
+      const parsed = new Date(targetDate);
+      if (!isNaN(parsed.getTime())) {
+        existing.expenseDate = parsed;
+      }
+    }
 
     await existing.save();
 

@@ -46,7 +46,7 @@ const ExpenseSchema = new mongoose.Schema(
     splits: { type: [SplitAllocationSchema], required: true },
     roundingRemainder: { type: Number, default: 0 },
     remainderAbsorbedBy: { type: String, default: '' },
-    expenseDate: { type: Date, default: Date.now },
+    expenseDate: { type: Date, default: Date.now, index: true },
     notes: { type: String, default: '' }
   },
   { timestamps: true }
