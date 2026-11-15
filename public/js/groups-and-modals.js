@@ -5,6 +5,16 @@
     let activeDetailsTab = 'members';
     let activeExitGroupId = null;
 
+    let groupBillsScopeFilter = 'involved';
+    function setGroupBillsScopeFilter(scope) {
+      groupBillsScopeFilter = scope;
+      const grp = appState.groups.find((g) => g.id === activeDetailsGroupId);
+      if (grp) renderGroupDetailsData(grp);
+    }
+    if (typeof window !== 'undefined') {
+      window.setGroupBillsScopeFilter = setGroupBillsScopeFilter;
+    }
+
     async function openGroupDetailsModal(groupId) {
       activeDetailsGroupId = groupId;
       const grp = appState.groups.find((g) => g.id === groupId);
@@ -141,10 +151,13 @@
             }
           : computeBalancesAndSimplifications(grp.id);
 
+      const myInvolvedBills = filteredExpenses.filter((exp) => (typeof isUserInvolvedInExpense === 'function' ? isUserInvolvedInExpense(exp, currentEmail) : true));
+      const visibleBills = (!isCurrentUserAdmin || groupBillsScopeFilter === 'involved') ? myInvolvedBills : filteredExpenses;
+
       // Quick summary numbers
       document.getElementById('groupDetailsTotalSpend').textContent = formatINR(totalSpend);
       document.getElementById('groupDetailsMemberCount').textContent = grp.members.length;
-      document.getElementById('groupDetailsBillCount').textContent = filteredExpenses.length;
+      document.getElementById('groupDetailsBillCount').textContent = visibleBills.length;
 
       // User's own balance in this group
       const myBal = balanceList.find((b) => (b.email || '').toLowerCase().trim() === currentEmail) || { net: 0 };
@@ -208,7 +221,7 @@
 
       // Tab count labels
       document.getElementById('tabCountMembers').textContent = grp.members.length;
-      document.getElementById('tabCountBills').textContent = filteredExpenses.length;
+      document.getElementById('tabCountBills').textContent = visibleBills.length;
       document.getElementById('tabCountSettle').textContent = simplified.length;
       const tabCountAct = document.getElementById('tabCountActivity');
       if (tabCountAct) tabCountAct.textContent = rawAudit.length;
@@ -296,14 +309,37 @@
       // 2. Render Tab: Bills & Splits
       const billsContainer = document.getElementById('groupDetailsBillsList');
       if (billsContainer) {
-        if (!filteredExpenses.length) {
+        if (!visibleBills.length) {
           billsContainer.innerHTML = `
-            <div class="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 text-center text-xs text-slate-400">
-              No bills recorded for this group yet. Click "+ Add Bill" to record your first expense!
+            ${isCurrentUserAdmin ? `
+              <div class="flex items-center justify-between gap-2 p-2 rounded-xl bg-slate-900 border border-slate-800 mb-3">
+                <span class="text-xs text-slate-400">👑 Admin Filter:</span>
+                <div class="flex items-center gap-1">
+                  <button type="button" data-testid="btn-group-scope-involved" onclick="setGroupBillsScopeFilter('involved')" class="px-2.5 py-1 rounded-lg text-xs font-semibold ${groupBillsScopeFilter === 'involved' ? 'bg-emerald-500 text-slate-950 font-bold' : 'bg-slate-800 text-slate-400'}">Involved (${myInvolvedBills.length})</button>
+                  <button type="button" data-testid="btn-group-scope-all" onclick="setGroupBillsScopeFilter('all')" class="px-2.5 py-1 rounded-lg text-xs font-semibold ${groupBillsScopeFilter === 'all' ? 'bg-emerald-500 text-slate-950 font-bold' : 'bg-slate-800 text-slate-400'}">All (${filteredExpenses.length})</button>
+                </div>
+              </div>
+            ` : ''}
+            <div class="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 text-center text-xs text-slate-400 space-y-1">
+              <div class="text-xl">🧾</div>
+              <div class="font-bold text-slate-300">No bills found where you are involved.</div>
+              <div class="text-[11px] text-slate-500">Only bills where you paid, participated in the split, or created are displayed.</div>
             </div>
           `;
         } else {
-          billsContainer.innerHTML = filteredExpenses
+          let billsHeader = '';
+          if (isCurrentUserAdmin) {
+            billsHeader = `
+              <div class="flex items-center justify-between gap-2 p-2 rounded-xl bg-slate-900 border border-slate-800 mb-3">
+                <span class="text-xs text-slate-400">👑 Admin Filter:</span>
+                <div class="flex items-center gap-1">
+                  <button type="button" data-testid="btn-group-scope-involved" onclick="setGroupBillsScopeFilter('involved')" class="px-2.5 py-1 rounded-lg text-xs font-semibold ${groupBillsScopeFilter === 'involved' ? 'bg-emerald-500 text-slate-950 font-bold' : 'bg-slate-800 text-slate-400 hover:text-white'}">Involved (${myInvolvedBills.length})</button>
+                  <button type="button" data-testid="btn-group-scope-all" onclick="setGroupBillsScopeFilter('all')" class="px-2.5 py-1 rounded-lg text-xs font-semibold ${groupBillsScopeFilter === 'all' ? 'bg-emerald-500 text-slate-950 font-bold' : 'bg-slate-800 text-slate-400 hover:text-white'}">All (${filteredExpenses.length})</button>
+                </div>
+              </div>
+            `;
+          }
+          billsContainer.innerHTML = billsHeader + visibleBills
             .map((exp) => {
               const payerEmail = (exp.paidByEmail || '').toLowerCase().trim();
               const isPayerMe = payerEmail === currentEmail;
@@ -413,14 +449,25 @@
       // 3. Render Tab: Settle Up Transfers
       const settleContainer = document.getElementById('groupDetailsSettleList');
       if (settleContainer) {
+        const isMinMode = grp.minimizeDebts !== false;
+        const algoBanner = `
+          <div class="mb-3 px-3 py-2 rounded-xl text-xs flex items-center justify-between gap-2 ${isMinMode ? 'bg-amber-500/10 border border-amber-500/30 text-amber-300' : 'bg-teal-500/10 border border-teal-500/30 text-teal-300'}">
+            <span class="flex items-center gap-1.5">
+              <span>${isMinMode ? '⚡' : '🤝'}</span>
+              <strong>Algorithm: ${isMinMode ? 'Fewest Transfers (Minimized Net Cash Flow)' : 'Direct Pair-Wise (Exact person-to-person debts)'}</strong>
+            </span>
+            <span class="text-[10px] opacity-80">Applies to all unsettled bills</span>
+          </div>
+        `;
         if (!simplified.length) {
           settleContainer.innerHTML = `
+            ${algoBanner}
             <div class="p-6 rounded-2xl bg-emerald-950/20 border border-emerald-500/30 text-center text-xs text-emerald-300">
               🎉 All settled up! There are no outstanding balances in this group.
             </div>
           `;
         } else {
-          settleContainer.innerHTML = simplified
+          settleContainer.innerHTML = algoBanner + simplified
             .map((t) => {
               const fromEmail = (t.fromEmail || '').toLowerCase().trim();
               const toEmail = (t.toEmail || '').toLowerCase().trim();
@@ -767,6 +814,7 @@
 
       // 3. Routing Mode Banner
       const isHubActive = activeGroups.length > 0 && activeGroups.some((g) => g.adminHubSettlement === true);
+      const isDirectPairwise = activeGroups.length > 0 && (selectedGroupId === 'ALL' ? activeGroups.some((g) => g.minimizeDebts === false) : activeGroups[0]?.minimizeDebts === false);
       if (isHubActive) {
         html += `
           <div class="mb-3 px-3.5 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-between text-xs text-amber-300">
@@ -776,12 +824,21 @@
             </span>
           </div>
         `;
+      } else if (isDirectPairwise) {
+        html += `
+          <div class="mb-3 px-3.5 py-2.5 rounded-xl bg-teal-500/10 border border-teal-500/30 flex items-center justify-between text-xs text-teal-300">
+            <span class="flex items-center gap-2">
+              <span class="text-base">🤝</span>
+              <span><strong>Direct Pair-Wise Debts Active:</strong> Calculating exact person-to-person IOUs directly between each debtor and the member who paid across all unsettled bills in this group. Minimization is OFF.</span>
+            </span>
+          </div>
+        `;
       } else {
         html += `
           <div class="mb-3 px-3.5 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-between text-xs text-emerald-300">
             <span class="flex items-center gap-2">
               <span class="text-base">⚡</span>
-              <span><strong>Direct Peer-to-Peer Settlement (Standard):</strong> Minimized cash flow calculates the fewest direct transfers between debtors and creditors.</span>
+              <span><strong>Direct Peer-to-Peer Settlement (Standard):</strong> Fewest Transfers Active (Minimized Net Cash Flow) simplifies all unsettled bills in this group into the fewest possible direct transfers.</span>
             </span>
           </div>
         `;
@@ -809,7 +866,8 @@
                     <strong class="text-emerald-300">${escapeHtml(t.toName)}</strong>
                     ${t.type === 'pay_to_admin' ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">Pay to Admin 👑</span>' : ''}
                     ${t.type === 'admin_payout' ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/20 text-teal-300 border border-teal-500/40">Admin Settlement 💸</span>' : ''}
-                    ${t.type === 'standard_greedy' || (!t.isAdminTransfer && !t.type) ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">Direct P2P ⚡</span>' : ''}
+                    ${t.type === 'direct_pairwise' ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/20 text-teal-300 border border-teal-500/40">Direct Pair-Wise 🤝</span>' : ''}
+                    ${t.type === 'standard_greedy' || (!t.isAdminTransfer && !t.type) ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">Fewest Transfers ⚡</span>' : ''}
                     ${t.groupName ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-teal-300 border border-slate-700">📁 ${escapeHtml(t.groupName)}</span>` : ''}
                   </div>
                   <div class="text-[11px] text-slate-400 mt-0.5">${escapeHtml(t.fromEmail)} &rarr; ${escapeHtml(t.toEmail)}</div>

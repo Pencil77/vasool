@@ -612,8 +612,12 @@
       document.getElementById('kpiYouAreOwed').textContent = formatINR(owedToMe);
       document.getElementById('kpiYouOwe').textContent = formatINR(iOwe);
       document.getElementById('kpiTotalSpend').textContent = formatINR(totalSpend);
-      document.getElementById('kpiExpenseCountBadge').textContent = `${filteredExpenses.length} bills`;
-      document.getElementById('kpiSimplifiedCount').textContent = `${simplified.length} simplified transfer(s) needed`;
+      const userInvolvedTotal = filteredExpenses.filter((e) => (typeof isUserInvolvedInExpense === 'function' ? isUserInvolvedInExpense(e, myEmail) : true));
+      document.getElementById('kpiExpenseCountBadge').textContent = `${userInvolvedTotal.length} involved bill(s)`;
+      const isMinimizedMode = selectedGroupId === 'ALL'
+        ? activeGroups.every((g) => g.minimizeDebts !== false)
+        : (activeGroups[0]?.minimizeDebts !== false);
+      document.getElementById('kpiSimplifiedCount').textContent = `${simplified.length} ${isMinimizedMode ? 'simplified transfer(s)' : 'direct debt(s)'}`;
 
       // Update Settle Up "Who Should Pay Next?" recommendation banner
       const whoBanner = document.getElementById('whoPaysNextBanner');
@@ -646,10 +650,13 @@
 
     function renderDashboardWidgets(filteredExpenses, simplified, balanceList) {
       const recentContainer = document.getElementById('dashboardRecentExpenses');
-      if (!filteredExpenses.length) {
-        recentContainer.innerHTML = `<div class="text-xs text-slate-500 py-6 text-center">No expenses logged for this filter yet. Click "+ Add Expense" to start.</div>`;
+      const currentEmail = (appState.currentUser?.email || '').toLowerCase().trim();
+      const userInvolvedExpenses = filteredExpenses.filter((e) => (typeof isUserInvolvedInExpense === 'function' ? isUserInvolvedInExpense(e, currentEmail) : true));
+
+      if (!userInvolvedExpenses.length) {
+        recentContainer.innerHTML = `<div class="text-xs text-slate-500 py-6 text-center">No bills where you are involved logged yet. Click "+ Add Bill" to start.</div>`;
       } else {
-        recentContainer.innerHTML = filteredExpenses
+        recentContainer.innerHTML = userInvolvedExpenses
           .slice(0, 4)
           .map((e) => {
             const grp = appState.groups.find((g) => g.id === e.groupId);
@@ -782,13 +789,32 @@
       }
     }
 
+    let expensesScopeFilter = 'involved';
+    function setExpensesScopeFilter(scope) {
+      expensesScopeFilter = scope;
+      renderExpensesList();
+    }
+    if (typeof window !== 'undefined') {
+      window.setExpensesScopeFilter = setExpensesScopeFilter;
+    }
+
     function renderExpensesList() {
       const container = document.getElementById('expensesFullList');
       if (!container) return;
       const searchQ = (document.getElementById('expenseSearchInput')?.value || '').toLowerCase().trim();
       const catFilter = document.getElementById('expenseCategoryFilter')?.value || 'ALL';
 
-      const list = appState.expenses.filter((e) => {
+      const currentEmail = (appState.currentUser?.email || '').toLowerCase().trim();
+      const activeGroups = selectedGroupId === 'ALL'
+        ? appState.groups
+        : appState.groups.filter((g) => g.id === selectedGroupId);
+
+      const isViewerAdmin = activeGroups.some((g) => {
+        const adm = g.members?.find((m) => m.role === 'admin' || (g.adminEmail && g.adminEmail.toLowerCase() === m.email.toLowerCase())) || g.members?.[0];
+        return adm && adm.email.toLowerCase().trim() === currentEmail;
+      }) || (typeof isSuperAdminUser === 'function' && isSuperAdminUser(appState.currentUser));
+
+      const baseList = appState.expenses.filter((e) => {
         if (selectedGroupId !== 'ALL' && e.groupId !== selectedGroupId) return false;
         if (catFilter !== 'ALL' && e.category !== catFilter) return false;
         if (
@@ -802,8 +828,41 @@
         return true;
       });
 
+      const involvedList = baseList.filter((e) => (typeof isUserInvolvedInExpense === 'function' ? isUserInvolvedInExpense(e, currentEmail) : true));
+      const list = (!isViewerAdmin || expensesScopeFilter === 'involved') ? involvedList : baseList;
+
+      // Update Scope Toggle Container
+      const scopeToggleContainer = document.getElementById('expensesScopeToggleContainer');
+      if (scopeToggleContainer) {
+        if (isViewerAdmin) {
+          scopeToggleContainer.classList.remove('hidden');
+          scopeToggleContainer.innerHTML = `
+            <div class="flex items-center gap-1.5 text-xs text-slate-300">
+              <span class="text-base">👑</span>
+              <span><strong>Admin Filter:</strong> View bills you are part of, or audit all group bills.</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <button type="button" data-testid="btn-scope-involved" onclick="setExpensesScopeFilter('involved')" class="px-2.5 py-1 rounded-lg text-xs font-semibold transition ${expensesScopeFilter === 'involved' ? 'bg-emerald-500 text-slate-950 font-bold shadow-sm' : 'bg-slate-800 text-slate-400 hover:text-white'}">
+                📌 Involved (${involvedList.length})
+              </button>
+              <button type="button" data-testid="btn-scope-all" onclick="setExpensesScopeFilter('all')" class="px-2.5 py-1 rounded-lg text-xs font-semibold transition ${expensesScopeFilter === 'all' ? 'bg-emerald-500 text-slate-950 font-bold shadow-sm' : 'bg-slate-800 text-slate-400 hover:text-white'}">
+                🌐 All Group Bills (${baseList.length})
+              </button>
+            </div>
+          `;
+        } else {
+          scopeToggleContainer.classList.add('hidden');
+        }
+      }
+
       if (!list.length) {
-        container.innerHTML = `<div class="glass-panel rounded-2xl p-8 text-center text-xs text-slate-400">No matching expenses found.</div>`;
+        container.innerHTML = `
+          <div class="glass-panel rounded-2xl p-8 text-center text-xs text-slate-400 space-y-1.5">
+            <div class="text-2xl">🧾</div>
+            <div class="font-bold text-slate-200">No matching bills found.</div>
+            <div class="text-slate-500">${(!isViewerAdmin || expensesScopeFilter === 'involved') ? 'You only see bills in which you are directly involved as a payer, split participant, or creator.' : 'No bills found matching your current filter criteria.'}</div>
+          </div>
+        `;
         return;
       }
 
@@ -1408,8 +1467,8 @@
                       <button data-testid="btn-toggle-adminhub-${escapeHtml(g.id)}" onclick="toggleGroupAdminHub('${escapeHtml(g.id)}')" title="Admin control: Toggle Admin-Hub routing vs Direct Peer-to-Peer" class="text-[10px] font-semibold px-2 py-0.5 rounded-lg border transition ${g.adminHubSettlement === true ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'}">
                         ${g.adminHubSettlement === true ? '👑 Admin-Hub' : '⚡ Direct P2P'}
                       </button>
-                      <button data-testid="btn-toggle-minimize-${escapeHtml(g.id)}" onclick="toggleGroupMinimizeDebts('${escapeHtml(g.id)}')" title="Toggle Settle Up Debt Minimization mode" class="text-[10px] font-semibold px-2 py-0.5 rounded-lg border transition ${g.minimizeDebts !== false ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'}">
-                        ${g.minimizeDebts !== false ? '⚡ Minimized' : '🤝 Direct'}
+                      <button data-testid="btn-toggle-minimize-${escapeHtml(g.id)}" onclick="toggleGroupMinimizeDebts('${escapeHtml(g.id)}')" title="Toggle Settle Up Debt Minimization mode across all unsettled bills" class="text-[10px] font-semibold px-2 py-0.5 rounded-lg border transition ${g.minimizeDebts !== false ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30' : 'bg-teal-500/20 text-teal-300 border-teal-500/40 hover:bg-teal-500/30'}">
+                        ${g.minimizeDebts !== false ? '⚡ Fewest Transfers' : '🤝 Direct Pair-Wise'}
                       </button>
                       <button data-testid="btn-toggle-visibility-${escapeHtml(g.id)}" onclick="toggleGroupSplitVisibility('${escapeHtml(g.id)}')" title="Admin control: Toggle member split visibility" class="text-[10px] font-semibold px-2 py-0.5 rounded-lg border transition ${isPersonalOnly ? 'bg-purple-500/20 text-purple-300 border-purple-500/40 hover:bg-purple-500/30' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'}">
                         ${isPersonalOnly ? '🔒 Personal' : '🌐 All'}
@@ -1418,8 +1477,8 @@
                       <span class="text-[10px] font-medium px-2 py-0.5 rounded-lg border ${g.adminHubSettlement === true ? 'bg-amber-500/15 text-amber-300 border-amber-500/30' : 'bg-slate-800/80 text-slate-400 border-slate-700/50'}">
                         ${g.adminHubSettlement === true ? '👑 Admin-Hub' : '⚡ Direct P2P'}
                       </span>
-                      <span class="text-[10px] font-medium px-2 py-0.5 rounded-lg border ${g.minimizeDebts !== false ? 'bg-amber-500/15 text-amber-300 border-amber-500/30' : 'bg-slate-800/80 text-slate-400 border-slate-700/50'}">
-                        ${g.minimizeDebts !== false ? '⚡ Minimized' : '🤝 Direct'}
+                      <span class="text-[10px] font-medium px-2 py-0.5 rounded-lg border ${g.minimizeDebts !== false ? 'bg-amber-500/15 text-amber-300 border-amber-500/30' : 'bg-teal-500/15 text-teal-300 border-teal-500/30'}">
+                        ${g.minimizeDebts !== false ? '⚡ Fewest Transfers' : '🤝 Direct Pair-Wise'}
                       </span>
                       <span class="text-[10px] font-medium px-2 py-0.5 rounded-lg border ${isPersonalOnly ? 'bg-purple-500/15 text-purple-300 border-purple-500/30' : 'bg-slate-800/80 text-slate-400 border-slate-700/50'}">
                         ${isPersonalOnly ? '🔒 Personal' : '🌐 All'}
@@ -1546,8 +1605,8 @@
         refreshAllViews();
         showToast(
           next
-            ? '⚡ Debt Minimization ON: Transactions simplified to fewest transfers.'
-            : '🤝 Debt Minimization OFF: Showing direct bilateral pairwise debts.'
+            ? '⚡ Fewest Transfers ON: All unsettled group bills simplified to minimum cash-flow transfers.'
+            : '🤝 Direct Pair-Wise ON: All unsettled group bills calculated as exact person-to-person debts.'
         );
       } catch (err) {
         showToast('Error updating debt mode: ' + err.message, 'error');

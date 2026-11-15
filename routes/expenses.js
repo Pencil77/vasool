@@ -13,6 +13,7 @@ const otel = require('../lib/otel');
 const {
   SUPER_ADMIN_EMAIL,
   isSuperAdminUser,
+  isUserInvolvedInExpense,
   appendGroupAuditLog,
   simplifyDebtsGreedy,
   simplifyDebtsAdminHub,
@@ -86,10 +87,17 @@ router.get('/expenses', requireAuth, async (req, res) => {
         return expObj;
       }
 
-      return exp;
+      const expObj = exp.toObject ? exp.toObject() : { ...exp };
+      expObj.isInvolved = isUserInvolvedInExpense(exp, requesterEmail);
+      return expObj;
     });
 
-    return res.status(200).json({ expenses: sanitizedExpenses });
+    let finalExpenses = sanitizedExpenses;
+    if (req.query.involvedOnly === 'true') {
+      finalExpenses = finalExpenses.filter((e) => isUserInvolvedInExpense(e, requesterEmail));
+    }
+
+    return res.status(200).json({ expenses: finalExpenses });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }

@@ -568,9 +568,39 @@ exec node server.js`
       return Boolean(user.isSuperAdmin) || user.role === 'super_admin' || email === SUPER_ADMIN_EMAIL.toLowerCase();
     }
 
+    function isUserInvolvedInExpense(exp, userEmail) {
+      if (!exp || !userEmail) return false;
+      const email = String(userEmail).toLowerCase().trim();
+      if (!email) return false;
+
+      // 1. User is single payer
+      const paidBy = String(exp.paidByEmail || '').toLowerCase().trim();
+      if (paidBy === email) return true;
+
+      // 2. User is in multi-payer allocations
+      if (
+        Array.isArray(exp.paidByAllocations) &&
+        exp.paidByAllocations.some((p) => String(p.memberEmail || p.email || '').toLowerCase().trim() === email && (Number(p.amount) > 0 || p.amount === undefined))
+      ) {
+        return true;
+      }
+
+      // 3. User is in split shares
+      if (Array.isArray(exp.splits) && exp.splits.some((s) => String(s.memberEmail || '').toLowerCase().trim() === email)) {
+        return true;
+      }
+
+      // 4. User created the bill/expense
+      const createdBy = String(exp.createdByEmail || '').toLowerCase().trim();
+      if (createdBy === email) return true;
+
+      return false;
+    }
+
     if (typeof window !== 'undefined') {
       window.appState = appState;
       window.isSuperAdminUser = isSuperAdminUser;
+      window.isUserInvolvedInExpense = isUserInvolvedInExpense;
       window.SUPER_ADMIN_EMAIL = SUPER_ADMIN_EMAIL;
     }
 
