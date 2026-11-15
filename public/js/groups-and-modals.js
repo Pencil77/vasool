@@ -1099,7 +1099,7 @@
       }
       setSplitMode(exp.splitType || 'equal');
 
-      // Restore per-member amounts if exact
+      // Restore per-member amounts and split participants
       if (Array.isArray(exp.splits)) {
         const splitEmails = new Set(exp.splits.map((s) => (s.memberEmail || '').toLowerCase().trim()));
         const rows = Array.from(document.querySelectorAll('#expMemberSplitsContainer > div'));
@@ -1109,12 +1109,18 @@
           const inp = r.querySelector('.exp-member-input');
           const match = exp.splits.find((s) => (s.memberEmail || '').toLowerCase().trim() === em);
           if (chk) chk.checked = splitEmails.has(em);
-          if (match && inp && exp.splitType === 'exact') {
-            inp.value = String(match.amount);
+          if (match && inp) {
+            if (exp.splitType === 'exact') {
+              inp.value = String(match.amount);
+            } else if (exp.splitType === 'percentage' && match.percentage) {
+              inp.value = String(match.percentage);
+            } else if (exp.splitType === 'shares' && match.shares) {
+              inp.value = String(match.shares);
+            }
           }
         });
         updateToggleAllSplitButton();
-        recalculateSplitPreview();
+        recalculateSplitPreview(true);
       }
 
       openModal('addExpenseModal');
@@ -1660,7 +1666,9 @@
           splits.push({
             memberEmail: r.dataset.memberEmail,
             memberName: r.dataset.memberName,
-            amount: mAmt
+            amount: mAmt,
+            percentage: currentSplitMode === 'percentage' ? (Number(r.querySelector('.exp-member-input')?.value) || 0) : 0,
+            shares: currentSplitMode === 'shares' ? (Number(r.querySelector('.exp-member-input')?.value) || 1) : 1
           });
         }
       });

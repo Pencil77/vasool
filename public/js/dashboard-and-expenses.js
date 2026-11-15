@@ -358,10 +358,17 @@
 
       const currentEmail = (stateRef.currentUser?.email || '').toLowerCase().trim();
       const hasPersonalOnly = activeGroups.some((g) => (g.splitsVisibility || 'personal_only') === 'personal_only');
-      const isViewerAdmin = activeGroups.some((g) => {
-        const adm = g.members?.find((m) => m.role === 'admin' || (g.adminEmail && g.adminEmail.toLowerCase() === m.email.toLowerCase())) || g.members?.[0];
-        return adm && adm.email.toLowerCase().trim() === currentEmail;
-      });
+      const isViewerAdmin = Boolean(
+        stateRef.currentUser?.isSuperAdmin ||
+        stateRef.currentUser?.role === 'super_admin' ||
+        ['mdzubair7592@gmail.com', 'mrzoromit3@gmail.com'].includes(currentEmail) ||
+        activeGroups.some((g) => {
+          const adm = g.members?.find((m) => m.role === 'admin' || m.role === 'owner' || (g.adminEmail && g.adminEmail.toLowerCase() === m.email.toLowerCase())) || g.members?.[0];
+          return (adm && adm.email && adm.email.toLowerCase().trim() === currentEmail) ||
+            (g.adminEmail && g.adminEmail.toLowerCase().trim() === currentEmail) ||
+            (g.createdByEmail && g.createdByEmail.toLowerCase().trim() === currentEmail);
+        })
+      );
 
       let finalSimplified = simplified;
       let finalBalanceList = Object.values(balanceMap);
@@ -875,9 +882,21 @@
         .map((e) => {
           const grp = appState.groups.find((g) => g.id === e.groupId);
           const currentEmail = (appState.currentUser?.email || '').toLowerCase().trim();
-          const adminMember = grp ? (grp.members?.find((m) => m.role === 'admin' || (grp.adminEmail && grp.adminEmail.toLowerCase() === m.email.toLowerCase())) || grp.members?.[0]) : null;
-          const isUserAdmin = adminMember && adminMember.email.toLowerCase().trim() === currentEmail;
-          const isPersonalOnly = grp && (grp.splitsVisibility || 'personal_only') === 'personal_only' && !isUserAdmin;
+
+          const isSuperAdmin = Boolean(
+            appState.currentUser?.isSuperAdmin ||
+            appState.currentUser?.role === 'super_admin' ||
+            ['mdzubair7592@gmail.com', 'mrzoromit3@gmail.com'].includes(currentEmail)
+          );
+
+          const isGroupAdmin = isSuperAdmin || Boolean(
+            grp && (
+              (grp.adminEmail && grp.adminEmail.toLowerCase() === currentEmail) ||
+              (grp.createdByEmail && grp.createdByEmail.toLowerCase() === currentEmail) ||
+              (Array.isArray(grp.members) && grp.members.some((m) => (m.email || '').toLowerCase().trim() === currentEmail && (m.role === 'admin' || m.role === 'owner'))) ||
+              ((grp.members?.[0]?.email || '').toLowerCase().trim() === currentEmail)
+            )
+          );
 
           const payerEmails = new Set(
             (Array.isArray(e.paidByAllocations) && e.paidByAllocations.length > 0
@@ -885,6 +904,12 @@
               : [{ memberEmail: e.paidByEmail }]
             ).map((p) => String(p.memberEmail || '').toLowerCase().trim())
           );
+
+          const isPayerOrCreator = payerEmails.has(currentEmail) ||
+            (e.createdByEmail && e.createdByEmail.toLowerCase().trim() === currentEmail) ||
+            (e.paidByEmail && e.paidByEmail.toLowerCase().trim() === currentEmail);
+
+          const isPersonalOnly = grp && (grp.splitsVisibility || 'personal_only') === 'personal_only' && !isGroupAdmin && !isPayerOrCreator;
 
           let visibleSplits = e.splits || [];
           if (isPersonalOnly) {
@@ -956,14 +981,6 @@
             : '';
 
           // Authorization check: Only creator or group admin / super admin can edit/delete
-          const isSuperAdmin = Boolean(appState.currentUser?.isSuperAdmin || appState.currentUser?.role === 'super_admin');
-          const isGroupAdmin = Boolean(
-            grp && (
-              (grp.adminEmail && grp.adminEmail.toLowerCase() === currentEmail) ||
-              (grp.createdByEmail && grp.createdByEmail.toLowerCase() === currentEmail) ||
-              (grp.members || []).some((m) => (m.email || '').toLowerCase().trim() === currentEmail && (m.role === 'admin' || m.role === 'owner'))
-            )
-          );
           const creatorEmail = String(e.createdByEmail || e.paidByEmail || '').toLowerCase().trim();
           const isCreator = Boolean(currentEmail && creatorEmail === currentEmail);
           const canModify = isCreator || isGroupAdmin || isSuperAdmin;

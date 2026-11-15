@@ -76,11 +76,12 @@ router.get('/balances', requireAuth, async (req, res) => {
     // Privacy rule: If group is personal_only and user is not admin,
     // they only see their own part of the share, not others
     const hasPersonalOnly = groups.some((g) => (g.splitsVisibility || 'personal_only') === 'personal_only');
-    const isRequesterAdmin = groups.some((g) => {
-      const adm = g.members.find((m) => m.role === 'admin') ||
-        (g.adminEmail ? g.members.find((m) => m.email.toLowerCase() === g.adminEmail.toLowerCase()) : null) ||
-        g.members[0];
-      return adm && adm.email.toLowerCase().trim() === requesterEmail;
+    const isRequesterAdmin = isSuperAdminUser(req.user) || groups.some((g) => {
+      const isGrpAdmin = (g.adminEmail && g.adminEmail.toLowerCase() === requesterEmail) ||
+        (g.createdByEmail && g.createdByEmail.toLowerCase() === requesterEmail) ||
+        (Array.isArray(g.members) && g.members.some((m) => m.email.toLowerCase().trim() === requesterEmail && (m.role === 'admin' || m.role === 'owner'))) ||
+        ((g.members?.[0]?.email || '').toLowerCase().trim() === requesterEmail);
+      return Boolean(isGrpAdmin);
     });
 
     if (hasPersonalOnly && !isRequesterAdmin) {

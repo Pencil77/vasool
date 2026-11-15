@@ -207,6 +207,9 @@ const STORAGE_KEY = 'vasool_clean_state_v1';
             paidByEmail: e.paidByEmail,
             paidByName: e.paidByName,
             paidByAllocations: Array.isArray(e.paidByAllocations) ? e.paidByAllocations : [],
+            createdByEmail: e.createdByEmail || e.paidByEmail || '',
+            createdByName: e.createdByName || e.paidByName || '',
+            isPersonalView: Boolean(e.isPersonalView),
             splitType: e.splitType || 'equal',
             roundingRemainder: e.roundingRemainder || 0,
             remainderAbsorbedBy: e.remainderAbsorbedBy || '',
@@ -217,7 +220,8 @@ const STORAGE_KEY = 'vasool_clean_state_v1';
               amount: s.amount,
               percentage: s.percentage,
               shares: s.shares,
-              roundingAdjustment: s.roundingAdjustment || 0
+              roundingAdjustment: s.roundingAdjustment || 0,
+              isPrivate: Boolean(s.isPrivate)
             }))
           }));
         }
