@@ -160,14 +160,26 @@
       document.getElementById('groupDetailsBillCount').textContent = visibleBills.length;
 
       // User's own balance in this group
-      const myBal = balanceList.find((b) => (b.email || '').toLowerCase().trim() === currentEmail) || { net: 0 };
+      const myBal = balanceList.find((b) => (b.email || '').toLowerCase().trim() === currentEmail) || {
+        net: 0,
+        pendingPaid: 0,
+        pendingReceived: 0,
+        unconfirmedNet: 0
+      };
       const myBalEl = document.getElementById('groupDetailsMyBalance');
       if (myBal.net > 0.01) {
         myBalEl.className = 'text-sm font-bold text-emerald-400 mt-0.5 block';
-        myBalEl.textContent = `+${formatINR(myBal.net)} (Owed)`;
+        const unconfirmedText = (myBal.pendingReceived > 0)
+          ? ` <span class="text-xs font-semibold text-amber-300">(⏳ ${formatINR(myBal.pendingReceived)} unconfirmed)</span>`
+          : '';
+        myBalEl.innerHTML = `+${formatINR(myBal.net)} (Owed)${unconfirmedText}`;
       } else if (myBal.net < -0.01) {
         myBalEl.className = 'text-sm font-bold text-rose-400 mt-0.5 block';
-        myBalEl.textContent = `-${formatINR(Math.abs(myBal.net))} (Debt)`;
+        const rem = Math.max(0, Math.round((Math.abs(myBal.net) - (myBal.pendingPaid || 0)) * 100) / 100);
+        const unconfirmedText = (myBal.pendingPaid > 0)
+          ? ` <span class="text-xs font-semibold text-amber-300">(⏳ ${formatINR(myBal.pendingPaid)} unconfirmed · Due: ${formatINR(rem)})</span>`
+          : '';
+        myBalEl.innerHTML = `-${formatINR(Math.abs(myBal.net))} (Debt)${unconfirmedText}`;
       } else {
         myBalEl.className = 'text-sm font-bold text-slate-300 mt-0.5 block';
         myBalEl.textContent = '₹0.00 (Settled)';
@@ -264,10 +276,15 @@
               .toUpperCase();
 
             let balanceChip = '';
+            const hasPendingSent = (mBal.pendingPaid || 0) > 0;
+            const hasPendingRecv = (mBal.pendingReceived || 0) > 0;
             if (mBal.net > 0.01) {
-              balanceChip = `<span class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Owed +${formatINR(mBal.net)}</span>`;
+              const pendingRecvText = hasPendingRecv ? ` <span class="text-amber-300 font-semibold">(⏳ ${formatINR(mBal.pendingReceived)} unconfirmed)</span>` : '';
+              balanceChip = `<span class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Owed +${formatINR(mBal.net)}${pendingRecvText}</span>`;
             } else if (mBal.net < -0.01) {
-              balanceChip = `<span class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-rose-500/15 text-rose-300 border border-rose-500/30">Owes -${formatINR(Math.abs(mBal.net))}</span>`;
+              const rem = Math.max(0, Math.round((Math.abs(mBal.net) - (mBal.pendingPaid || 0)) * 100) / 100);
+              const pendingPaidText = hasPendingSent ? ` <span class="text-amber-300 font-semibold">(⏳ ${formatINR(mBal.pendingPaid)} unconfirmed · Due: ${formatINR(rem)})</span>` : '';
+              balanceChip = `<span class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-rose-500/15 text-rose-300 border border-rose-500/30">Owes -${formatINR(Math.abs(mBal.net))}${pendingPaidText}</span>`;
             } else {
               balanceChip = `<span class="px-2 py-0.5 rounded-lg text-[10px] font-medium bg-slate-800 text-slate-400 border border-slate-700">Settled (₹0)</span>`;
             }
@@ -360,14 +377,22 @@
                   const isPayer = payerEmails.has(sEmail);
                   const b = balanceMap ? balanceMap[sEmail] : null;
                   const isSettled = isPayer || (b && b.net >= -0.01);
+                  const isUnconfirmedSettled = !isSettled && b && b.unconfirmedNet >= -0.01;
+                  const hasUnconfirmed = !isSettled && b && (b.pendingPaid || 0) > 0;
                   const statusTag = isPayer
                     ? '<span class="text-[8px] font-bold text-teal-300 uppercase ml-1">(Payer)</span>'
                     : isSettled
                       ? '<span class="text-[8px] font-bold text-emerald-400 uppercase ml-1">✓ Settled</span>'
-                      : '<span class="text-[8px] font-bold text-rose-300 uppercase ml-1">⏳ Left to Pay</span>';
+                      : isUnconfirmedSettled
+                        ? `<span class="text-[8px] font-bold text-amber-300 uppercase ml-1">⏳ Unconfirmed (⏳ ${formatINR(b.pendingPaid)} paid)</span>`
+                        : hasUnconfirmed
+                          ? `<span class="text-[8px] font-bold text-rose-300 uppercase ml-1">⏳ Left to Pay (⏳ ${formatINR(b.pendingPaid)} unconfirmed)</span>`
+                          : '<span class="text-[8px] font-bold text-rose-300 uppercase ml-1">⏳ Left to Pay</span>';
                   const chipBorder = isSettled
                     ? 'border-emerald-500/30 bg-emerald-950/30 text-emerald-200'
-                    : 'border-slate-700 bg-slate-800 text-slate-300';
+                    : isUnconfirmedSettled
+                      ? 'border-amber-500/40 bg-amber-950/30 text-amber-200'
+                      : 'border-slate-700 bg-slate-800 text-slate-300';
                   return `
                     <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] ${isThisMe ? 'ring-1 ring-teal-400/50' : ''} ${chipBorder}">
                       <span>${escapeHtml(s.memberName || s.memberEmail.split('@')[0])}:</span>
@@ -389,8 +414,18 @@
                 if (leftToPayList.length === 0) {
                   billSettlementBadge = '<span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">✓ All Settled</span>';
                 } else {
-                  const leftNames = leftToPayList.map((s) => escapeHtml((s.memberName || s.memberEmail).split(' ')[0])).join(', ');
-                  billSettlementBadge = `<span class="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">⏳ Pending (${leftNames})</span>`;
+                  const allCoveredByPending = leftToPayList.every((s) => {
+                    const sEmail = (s.memberEmail || '').toLowerCase().trim();
+                    const b = balanceMap ? balanceMap[sEmail] : null;
+                    return b && b.unconfirmedNet >= -0.01;
+                  });
+                  if (allCoveredByPending) {
+                    const pendingNames = leftToPayList.map((s) => escapeHtml((s.memberName || s.memberEmail).split(' ')[0])).join(', ');
+                    billSettlementBadge = `<span class="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/40">⏳ Paid · Awaiting Confirmation (${pendingNames})</span>`;
+                  } else {
+                    const leftNames = leftToPayList.map((s) => escapeHtml((s.memberName || s.memberEmail).split(' ')[0])).join(', ');
+                    billSettlementBadge = `<span class="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">⏳ Pending (${leftNames})</span>`;
+                  }
                 }
               }
 
@@ -492,12 +527,20 @@
                   </div>
 
                   <div class="flex items-center gap-3 flex-shrink-0">
-                    <div class="text-sm font-bold ${isPayer ? 'text-rose-400' : 'text-white'}">${formatINR(dueAmount)}</div>
-                    ${dueAmount > 0 ? `
+                    <div class="text-right">
+                      <div class="text-sm font-bold ${isPayer ? 'text-rose-400' : 'text-white'}">${formatINR(t.amount)}</div>
+                      ${t.isPendingApproval ? `<div class="text-[10px] text-slate-400 font-medium">Due: <strong class="text-rose-300">${formatINR(dueAmount)}</strong> <span class="text-amber-300 font-normal">(⏳ ${formatINR(t.pendingApprovalAmount)} unconfirmed)</span></div>` : ''}
+                    </div>
+                    ${dueAmount > 0.01 ? `
                       <button onclick="handleGroupDetailsSettleClick('${escapeHtml(t.fromEmail)}', '${escapeHtml(t.fromName)}', '${escapeHtml(t.toEmail)}', '${escapeHtml(t.toName)}', ${dueAmount}, '${escapeHtml(grp.id)}')" class="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow-lg transition">
                         Settle Up
                       </button>
-                    ` : ''}
+                    ` : (t.isPendingApproval ? `
+                      <span class="px-2.5 py-1.5 rounded-xl bg-amber-500/15 text-amber-300 border border-amber-500/30 font-semibold text-xs flex items-center gap-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                        Awaiting Confirmation
+                      </span>
+                    ` : '')}
                   </div>
                 </div>
               `;

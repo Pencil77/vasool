@@ -62,6 +62,9 @@ router.get('/balances', requireAuth, async (req, res) => {
           balanceMap[b.email].owedSplits = Math.round(((balanceMap[b.email].owedSplits || 0) + (b.owedSplits || 0)) * 100) / 100;
           balanceMap[b.email].settledPaid = Math.round(((balanceMap[b.email].settledPaid || 0) + (b.settledPaid || 0)) * 100) / 100;
           balanceMap[b.email].settledReceived = Math.round(((balanceMap[b.email].settledReceived || 0) + (b.settledReceived || 0)) * 100) / 100;
+          balanceMap[b.email].pendingPaid = Math.round(((balanceMap[b.email].pendingPaid || 0) + (b.pendingPaid || 0)) * 100) / 100;
+          balanceMap[b.email].pendingReceived = Math.round(((balanceMap[b.email].pendingReceived || 0) + (b.pendingReceived || 0)) * 100) / 100;
+          balanceMap[b.email].unconfirmedNet = Math.round((balanceMap[b.email].net + (balanceMap[b.email].pendingPaid || 0) - (balanceMap[b.email].pendingReceived || 0)) * 100) / 100;
         }
       });
     });

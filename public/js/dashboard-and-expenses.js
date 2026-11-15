@@ -54,7 +54,10 @@
               paidExpenses: 0,
               owedSplits: 0,
               settledPaid: 0,
-              settledReceived: 0
+              settledReceived: 0,
+              pendingPaid: 0,
+              pendingReceived: 0,
+              unconfirmedNet: 0
             };
           }
           return grpBalanceMap[key];
@@ -119,6 +122,15 @@
               toP.net -= Number(st.amount);
               toP.settledReceived = (toP.settledReceived || 0) + Number(st.amount);
             }
+          } else if (st.status === 'pending_admin_approval' || st.status === 'pending_confirmation' || st.status === 'pending') {
+            const fromP = ensureGrpPerson(st.fromEmail, st.fromName);
+            const toP = ensureGrpPerson(st.toEmail, st.toName);
+            if (fromP) {
+              fromP.pendingPaid = (fromP.pendingPaid || 0) + Number(st.amount);
+            }
+            if (toP) {
+              toP.pendingReceived = (toP.pendingReceived || 0) + Number(st.amount);
+            }
           }
         });
 
@@ -130,6 +142,9 @@
           b.owedSplits = Math.round((b.owedSplits || 0) * 100) / 100;
           b.settledPaid = Math.round((b.settledPaid || 0) * 100) / 100;
           b.settledReceived = Math.round((b.settledReceived || 0) * 100) / 100;
+          b.pendingPaid = Math.round((b.pendingPaid || 0) * 100) / 100;
+          b.pendingReceived = Math.round((b.pendingReceived || 0) * 100) / 100;
+          b.unconfirmedNet = Math.round((b.net + (b.pendingPaid || 0) - (b.pendingReceived || 0)) * 100) / 100;
         });
 
         totalSpend += grpSpend;
@@ -332,6 +347,9 @@
             balanceMap[b.email].owedSplits = Math.round(((balanceMap[b.email].owedSplits || 0) + (b.owedSplits || 0)) * 100) / 100;
             balanceMap[b.email].settledPaid = Math.round(((balanceMap[b.email].settledPaid || 0) + (b.settledPaid || 0)) * 100) / 100;
             balanceMap[b.email].settledReceived = Math.round(((balanceMap[b.email].settledReceived || 0) + (b.settledReceived || 0)) * 100) / 100;
+            balanceMap[b.email].pendingPaid = Math.round(((balanceMap[b.email].pendingPaid || 0) + (b.pendingPaid || 0)) * 100) / 100;
+            balanceMap[b.email].pendingReceived = Math.round(((balanceMap[b.email].pendingReceived || 0) + (b.pendingReceived || 0)) * 100) / 100;
+            balanceMap[b.email].unconfirmedNet = Math.round((balanceMap[b.email].net + (balanceMap[b.email].pendingPaid || 0) - (balanceMap[b.email].pendingReceived || 0)) * 100) / 100;
           }
         });
       });
@@ -603,7 +621,12 @@
         computeBalancesAndSimplifications(selectedGroupId);
 
       const myEmail = (appState.currentUser?.email || '').toLowerCase();
-      const myEntry = balanceList.find((b) => b.email === myEmail) || { net: 0 };
+      const myEntry = balanceList.find((b) => b.email === myEmail) || {
+        net: 0,
+        pendingPaid: 0,
+        pendingReceived: 0,
+        unconfirmedNet: 0
+      };
 
       let owedToMe = 0;
       let iOwe = 0;
@@ -612,12 +635,56 @@
         if (t.fromEmail === myEmail) iOwe += t.amount;
       });
 
-      const netEl = document.getElementById('kpiNetBalance');
-      netEl.textContent = (myEntry.net >= 0 ? '+' : '') + formatINR(myEntry.net);
-      netEl.className = `text-2xl font-extrabold ${myEntry.net >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+      const myPendingPaid = myEntry.pendingPaid || 0;
+      const myPendingReceived = myEntry.pendingReceived || 0;
+      const myUnconfirmedNet = typeof myEntry.unconfirmedNet === 'number'
+        ? myEntry.unconfirmedNet
+        : Math.round((myEntry.net + myPendingPaid - myPendingReceived) * 100) / 100;
+      const remOwe = Math.max(0, Math.round((iOwe - myPendingPaid) * 100) / 100);
+      const remOwed = Math.max(0, Math.round((owedToMe - myPendingReceived) * 100) / 100);
 
-      document.getElementById('kpiYouAreOwed').textContent = formatINR(owedToMe);
-      document.getElementById('kpiYouOwe').textContent = formatINR(iOwe);
+      const netEl = document.getElementById('kpiNetBalance');
+      const netSub = document.getElementById('kpiNetSubtext');
+      if (netEl) {
+        if (myPendingPaid > 0 || myPendingReceived > 0) {
+          netEl.innerHTML = `${(myEntry.net >= 0 ? '+' : '') + formatINR(myEntry.net)} <span class="text-xs sm:text-sm font-semibold text-amber-300 ml-1">(${myUnconfirmedNet >= 0 ? '+' : ''}${formatINR(myUnconfirmedNet)} after pending)</span>`;
+          if (netSub) {
+            netSub.innerHTML = `Confirmed: <strong class="text-slate-300">${(myEntry.net >= 0 ? '+' : '') + formatINR(myEntry.net)}</strong> · ⏳ <strong class="text-amber-300">${(myUnconfirmedNet >= 0 ? '+' : '') + formatINR(myUnconfirmedNet)} unconfirmed</strong> (${formatINR(myPendingPaid)} sent)`;
+          }
+        } else {
+          netEl.textContent = (myEntry.net >= 0 ? '+' : '') + formatINR(myEntry.net);
+          if (netSub) netSub.textContent = 'Across active groups';
+        }
+        netEl.className = `text-2xl font-extrabold ${myEntry.net >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+      }
+
+      const owedEl = document.getElementById('kpiYouAreOwed');
+      const owedSub = document.getElementById('kpiOwedByCount');
+      if (owedEl) {
+        if (myPendingReceived > 0) {
+          owedEl.innerHTML = `${formatINR(owedToMe)} <span class="text-xs sm:text-sm font-semibold text-amber-300 ml-1">(${formatINR(remOwed)} after pending)</span>`;
+          if (owedSub) {
+            owedSub.innerHTML = `Confirmed: <strong class="text-slate-300">${formatINR(owedToMe)}</strong> · ⏳ <strong class="text-amber-300">${formatINR(myPendingReceived)} unconfirmed</strong>`;
+          }
+        } else {
+          owedEl.textContent = formatINR(owedToMe);
+          if (owedSub) owedSub.textContent = 'Incoming receivables';
+        }
+      }
+
+      const oweEl = document.getElementById('kpiYouOwe');
+      const oweSub = document.getElementById('kpiOweToCount');
+      if (oweEl) {
+        if (myPendingPaid > 0) {
+          oweEl.innerHTML = `${formatINR(iOwe)} <span class="text-xs sm:text-sm font-semibold text-amber-300 ml-1">(${formatINR(remOwe)} due)</span>`;
+          if (oweSub) {
+            oweSub.innerHTML = `Confirmed: <strong class="text-slate-300">${formatINR(iOwe)}</strong> · ⏳ <strong class="text-amber-300">${formatINR(myPendingPaid)} unconfirmed</strong>`;
+          }
+        } else {
+          oweEl.textContent = formatINR(iOwe);
+          if (oweSub) oweSub.textContent = 'Pending splits';
+        }
+      }
       document.getElementById('kpiTotalSpend').textContent = formatINR(totalSpend);
       const userInvolvedTotal = filteredExpenses.filter((e) => (typeof isUserInvolvedInExpense === 'function' ? isUserInvolvedInExpense(e, myEmail) : true));
       document.getElementById('kpiExpenseCountBadge').textContent = `${userInvolvedTotal.length} involved bill(s)`;
@@ -694,19 +761,36 @@
       } else {
         simpContainer.innerHTML = simplified
           .map(
-            (t, idx) => `
+            (t, idx) => {
+              const hasPending = (t.pendingApprovalAmount || 0) > 0;
+              const remDue = typeof t.remainingDue === 'number' ? t.remainingDue : Math.max(0, t.amount - (t.pendingApprovalAmount || 0));
+              const pendingSubtext = hasPending
+                ? `<span class="text-[11px] font-normal text-amber-300/90 ml-1.5">(⏳ ${formatINR(t.pendingApprovalAmount)} unconfirmed · Due: ${formatINR(remDue)})</span>`
+                : '';
+              const settleBtn = (hasPending && remDue <= 0.01)
+                ? `<span class="px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-300 font-semibold text-[11px] flex items-center gap-1">
+                     <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                     Awaiting Confirmation
+                   </span>`
+                : `<button data-testid="btn-dashboard-settle-${idx}" onclick="openSettleConfirm('${escapeHtml(t.fromEmail)}', '${escapeHtml(t.fromName)}', '${escapeHtml(t.toEmail)}', '${escapeHtml(t.toName)}', ${remDue > 0 ? remDue : t.amount})" class="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition">
+                     Settle${hasPending && remDue > 0 ? ` (${formatINR(remDue)})` : ''}
+                   </button>`;
+
+              return `
           <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between gap-2">
             <div class="text-xs">
               <span class="font-semibold text-rose-300">${escapeHtml(t.fromName)}</span>
               <span class="text-slate-400 mx-1">owes</span>
               <span class="font-semibold text-emerald-300">${escapeHtml(t.toName)}</span>
-              <div class="text-sm font-bold text-white mt-0.5">${formatINR(t.amount)}</div>
+              <div class="text-sm font-bold text-white mt-0.5 flex flex-wrap items-center">
+                ${formatINR(t.amount)}
+                ${pendingSubtext}
+              </div>
             </div>
-            <button data-testid="btn-dashboard-settle-${idx}" onclick="openSettleConfirm('${escapeHtml(t.fromEmail)}', '${escapeHtml(t.fromName)}', '${escapeHtml(t.toEmail)}', '${escapeHtml(t.toName)}', ${t.amount})" class="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition">
-              Settle
-            </button>
+            ${settleBtn}
           </div>
-        `
+        `;
+            }
           )
           .join('');
       }
@@ -925,11 +1009,17 @@
                   const isPayer = payerEmails.has(sEmail);
                   const b = balanceMap ? balanceMap[sEmail] : null;
                   const isSettled = isPayer || (b && b.net >= -0.01);
+                  const isUnconfirmedSettled = !isSettled && b && b.unconfirmedNet >= -0.01;
+                  const hasUnconfirmed = !isSettled && b && (b.pendingPaid || 0) > 0;
                   const statusTag = isPayer
                     ? '<span class="text-[9px] font-bold text-teal-300 ml-1.5 uppercase">(Payer)</span>'
                     : isSettled
                       ? '<span class="text-[9px] font-bold text-emerald-300 ml-1.5 uppercase">✓ Settled</span>'
-                      : '<span class="text-[9px] font-bold text-rose-300 ml-1.5 uppercase">⏳ Left to Pay</span>';
+                      : isUnconfirmedSettled
+                        ? `<span class="text-[9px] font-bold text-amber-300 ml-1.5 uppercase">⏳ Unconfirmed (⏳ ${formatINR(b.pendingPaid)} paid)</span>`
+                        : hasUnconfirmed
+                          ? `<span class="text-[9px] font-bold text-rose-300 ml-1.5 uppercase">⏳ Left to Pay (⏳ ${formatINR(b.pendingPaid)} unconfirmed)</span>`
+                          : '<span class="text-[9px] font-bold text-rose-300 ml-1.5 uppercase">⏳ Left to Pay</span>';
                   return `<span class="px-2 py-0.5 rounded bg-purple-900/40 text-purple-200 border border-purple-500/30 font-semibold text-[11px] inline-flex items-center">Your Share: ${formatINR(s.amount)} ${statusTag}</span>`;
                 })
                 .join(' ') + ` <span class="px-2 py-0.5 rounded bg-slate-800/80 text-slate-400 text-[10px] italic border border-slate-700/50">🔒 Other member shares kept private by Admin</span>`;
@@ -943,14 +1033,22 @@
                 const isPayer = payerEmails.has(sEmail);
                 const b = balanceMap ? balanceMap[sEmail] : null;
                 const isSettled = isPayer || (b && b.net >= -0.01);
+                const isUnconfirmedSettled = !isSettled && b && b.unconfirmedNet >= -0.01;
+                const hasUnconfirmed = !isSettled && b && (b.pendingPaid || 0) > 0;
                 const statusTag = isPayer
                   ? '<span class="text-[9px] font-bold text-teal-300 uppercase">(Payer)</span>'
                   : isSettled
                     ? '<span class="text-[9px] font-bold text-emerald-400 uppercase">✓ Settled</span>'
-                    : '<span class="text-[9px] font-bold text-rose-300 uppercase">⏳ Left to Pay</span>';
+                    : isUnconfirmedSettled
+                      ? `<span class="text-[9px] font-bold text-amber-300 uppercase">⏳ Unconfirmed (⏳ ${formatINR(b.pendingPaid)} paid)</span>`
+                      : hasUnconfirmed
+                        ? `<span class="text-[9px] font-bold text-rose-300 uppercase">⏳ Left to Pay (⏳ ${formatINR(b.pendingPaid)} unconfirmed)</span>`
+                        : '<span class="text-[9px] font-bold text-rose-300 uppercase">⏳ Left to Pay</span>';
                 const pillBorder = isSettled
                   ? 'border-emerald-500/30 bg-emerald-950/30 text-emerald-200'
-                  : 'border-slate-700/80 bg-slate-800 text-slate-300';
+                  : isUnconfirmedSettled
+                    ? 'border-amber-500/40 bg-amber-950/30 text-amber-200'
+                    : 'border-slate-700/80 bg-slate-800 text-slate-300';
                 return `<span class="px-2 py-0.5 rounded text-[11px] border ${pillBorder} inline-flex items-center gap-1.5">${escapeHtml((s.memberName || s.memberEmail).split(' ')[0])}: ${formatINR(s.amount)} ${statusTag}</span>`;
               })
               .join(' ');
@@ -968,8 +1066,18 @@
             if (leftToPayList.length === 0) {
               billSettlementBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">✓ All Settled</span>';
             } else {
-              const leftNames = leftToPayList.map((s) => escapeHtml((s.memberName || s.memberEmail).split(' ')[0])).join(', ');
-              billSettlementBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">⏳ Left to Pay: ${leftNames}</span>`;
+              const allCoveredByPending = leftToPayList.every((s) => {
+                const sEmail = String(s.memberEmail || '').toLowerCase().trim();
+                const b = balanceMap ? balanceMap[sEmail] : null;
+                return b && b.unconfirmedNet >= -0.01;
+              });
+              if (allCoveredByPending) {
+                const pendingNames = leftToPayList.map((s) => escapeHtml((s.memberName || s.memberEmail).split(' ')[0])).join(', ');
+                billSettlementBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/40">⏳ Paid · Awaiting Confirmation (${pendingNames})</span>`;
+              } else {
+                const leftNames = leftToPayList.map((s) => escapeHtml((s.memberName || s.memberEmail).split(' ')[0])).join(', ');
+                billSettlementBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">⏳ Left to Pay: ${leftNames}</span>`;
+              }
             }
           }
 

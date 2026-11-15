@@ -258,12 +258,15 @@ router.get('/groups/:id', requireAuth, async (req, res) => {
 
     const membersWithBalances = group.members.map((m) => {
       const mEmail = m.email.toLowerCase().trim();
-      const b = balanceMap[mEmail] || { paid: 0, owed: 0, net: 0 };
+      const b = balanceMap[mEmail] || { paid: 0, owed: 0, net: 0, pendingPaid: 0, pendingReceived: 0, unconfirmedNet: 0 };
       return {
         ...(m.toObject ? m.toObject() : m),
         paid: b.paid,
         owed: b.owed,
-        net: b.net
+        net: b.net,
+        pendingPaid: b.pendingPaid || 0,
+        pendingReceived: b.pendingReceived || 0,
+        unconfirmedNet: b.unconfirmedNet !== undefined ? b.unconfirmedNet : b.net
       };
     });
 
