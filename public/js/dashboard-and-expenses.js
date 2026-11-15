@@ -614,6 +614,9 @@
       document.getElementById('kpiTotalSpend').textContent = formatINR(totalSpend);
       const userInvolvedTotal = filteredExpenses.filter((e) => (typeof isUserInvolvedInExpense === 'function' ? isUserInvolvedInExpense(e, myEmail) : true));
       document.getElementById('kpiExpenseCountBadge').textContent = `${userInvolvedTotal.length} involved bill(s)`;
+      const activeGroups = selectedGroupId === 'ALL'
+        ? appState.groups
+        : appState.groups.filter((g) => g.id === selectedGroupId);
       const isMinimizedMode = selectedGroupId === 'ALL'
         ? activeGroups.every((g) => g.minimizeDebts !== false)
         : (activeGroups[0]?.minimizeDebts !== false);

@@ -160,12 +160,35 @@ router.post('/expenses', requireAuth, async (req, res) => {
       }];
     }
 
+    const roundedTotal = Math.round(totalAmount * 100) / 100;
+    const cleanDescription = String(description).trim();
+    const createdByEmail = (req.user?.email || '').toLowerCase().trim();
+
+    // Rapid duplicate submission prevention (5-second window):
+    // Guards against rapid double-clicks, touch unresponsiveness, or mobile network re-transmissions.
+    const deduplicationWindow = new Date(Date.now() - 5000);
+    const existingRecent = await Expense.findOne({
+      groupId,
+      description: cleanDescription,
+      amount: roundedTotal,
+      createdByEmail,
+      createdAt: { $gte: deduplicationWindow }
+    }).lean();
+
+    if (existingRecent) {
+      return res.status(200).json({
+        message: 'Expense already recorded (rapid duplicate prevented).',
+        expense: existingRecent,
+        isDuplicatePrevented: true
+      });
+    }
+
     const expense = await Expense.create({
       groupId,
-      description: String(description).trim(),
-      amount: Math.round(totalAmount * 100) / 100,
+      description: cleanDescription,
+      amount: roundedTotal,
       currency: currency || 'INR',
-      originalAmount: originalAmount ? Math.round(Number(originalAmount) * 100) / 100 : Math.round(totalAmount * 100) / 100,
+      originalAmount: originalAmount ? Math.round(Number(originalAmount) * 100) / 100 : roundedTotal,
       originalCurrency: originalCurrency || currency || 'INR',
       exchangeRate: Number(exchangeRate) > 0 ? Number(exchangeRate) : 1,
       type: type === 'income' ? 'income' : 'expense',
@@ -175,8 +198,8 @@ router.post('/expenses', requireAuth, async (req, res) => {
       paidByEmail: resolvedPaidByEmail,
       paidByName: resolvedPaidByName,
       paidByAllocations: normalizedPayers,
-      createdByEmail: (req.user.email || '').toLowerCase().trim(),
-      createdByName: (req.user.name || '').trim(),
+      createdByEmail,
+      createdByName: (req.user?.name || '').trim(),
       splitType,
       splits,
       roundingRemainder: Number(roundingRemainder) || 0,

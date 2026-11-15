@@ -744,6 +744,7 @@
       window.populateExpenseModalMembers = populateExpenseModalMembers;
       window.setSplitMode = setSplitMode;
       window.handleSaveExpense = handleSaveExpense;
+      window.getIsSavingExpense = () => (typeof isSavingExpense !== 'undefined' ? isSavingExpense : false);
       window.promptTransferAdmin = promptTransferAdmin;
       window.handleTransferAdmin = handleTransferAdmin;
       window.toggleGroupSplitVisibility = toggleGroupSplitVisibility;

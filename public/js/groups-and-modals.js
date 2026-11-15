@@ -957,6 +957,7 @@
     // ADD EXPENSE & 4-WAY SPLIT CALCULATOR
     // =========================================================================
     let editingExpenseId = null;
+    let isSavingExpense = false;
     const DEFAULT_FX_RATES_TO_INR = {
       INR: 1,
       USD: 84.0,
@@ -1014,10 +1015,15 @@
 
     function openAddExpenseModal() {
       editingExpenseId = null;
+      isSavingExpense = false;
       const titleEl = document.getElementById('addExpenseModalTitle');
       const btnEl = document.getElementById('btnSaveExpenseSubmit');
       if (titleEl) titleEl.textContent = 'Add Shared Expense';
-      if (btnEl) btnEl.textContent = 'Save Expense';
+      if (btnEl) {
+        btnEl.disabled = false;
+        btnEl.classList.remove('opacity-75', 'cursor-not-allowed', 'pointer-events-none');
+        btnEl.innerHTML = 'Save Expense';
+      }
 
       const groupSel = document.getElementById('expGroupSelect');
       groupSel.innerHTML = appState.groups
@@ -1047,10 +1053,15 @@
         return;
       }
       editingExpenseId = exp.id || exp._id;
+      isSavingExpense = false;
       const titleEl = document.getElementById('addExpenseModalTitle');
       const btnEl = document.getElementById('btnSaveExpenseSubmit');
       if (titleEl) titleEl.textContent = `Edit Expense: ${exp.description}`;
-      if (btnEl) btnEl.textContent = 'Update Expense';
+      if (btnEl) {
+        btnEl.disabled = false;
+        btnEl.classList.remove('opacity-75', 'cursor-not-allowed', 'pointer-events-none');
+        btnEl.innerHTML = 'Update Expense';
+      }
 
       const groupSel = document.getElementById('expGroupSelect');
       groupSel.innerHTML = appState.groups
@@ -1548,12 +1559,40 @@
     }
 
     async function handleSaveExpense(e) {
-      e.preventDefault();
-      const groupId = document.getElementById('expGroupSelect').value;
-      const category = document.getElementById('expCategorySelect').value;
-      const description = document.getElementById('expDescInput').value.trim();
-      let amount = Number(document.getElementById('expAmountInput').value) || 0;
+      if (e && e.preventDefault) e.preventDefault();
+
+      if (isSavingExpense) {
+        console.warn('[Save Expense] Save operation already in flight. Ignoring duplicate submission.');
+        return;
+      }
+
+      const groupId = document.getElementById('expGroupSelect')?.value;
+      const category = document.getElementById('expCategorySelect')?.value || '🍔 Food & Dining';
+      const description = (document.getElementById('expDescInput')?.value || '').trim();
+      let amount = Number(document.getElementById('expAmountInput')?.value) || 0;
       const group = appState.groups.find((g) => g.id === groupId);
+
+      if (!groupId) {
+        showToast('Please select a group for this expense.', 'error');
+        return;
+      }
+
+      if (!description) {
+        showToast('Please enter a description for this expense.', 'error');
+        document.getElementById('expDescInput')?.focus();
+        return;
+      }
+
+      if (amount <= 0 || isNaN(amount)) {
+        showToast('Please enter a valid expense amount greater than ₹0.', 'error');
+        document.getElementById('expAmountInput')?.focus();
+        return;
+      }
+
+      // Proactively ensure split calculations and computed amounts are 100% refreshed
+      if (typeof recalculateSplitPreview === 'function') {
+        recalculateSplitPreview(true);
+      }
 
       // Extract multi-payer allocations from #expPaidByMultiContainer
       const payerRows = Array.from(document.querySelectorAll('#expPaidByMultiContainer > div'));
@@ -1608,8 +1647,15 @@
       let sum = 0;
 
       rows.forEach((r) => {
-        if (r.querySelector('.exp-member-check').checked) {
-          const mAmt = Number(r.dataset.computedAmount) || 0;
+        const chk = r.querySelector('.exp-member-check');
+        if (chk && chk.checked) {
+          let mAmt = Number(r.dataset.computedAmount) || 0;
+          if (mAmt === 0 && currentSplitMode === 'equal') {
+            const activeCount = rows.filter((row) => row.querySelector('.exp-member-check')?.checked).length;
+            if (activeCount > 0) {
+              mAmt = Math.round((amount / activeCount) * 100) / 100;
+            }
+          }
           sum += mAmt;
           splits.push({
             memberEmail: r.dataset.memberEmail,
@@ -1673,73 +1719,99 @@
         remainderAbsorbedBy
       };
 
-      if (editingExpenseId) {
+      isSavingExpense = true;
+      const btnEl = document.getElementById('btnSaveExpenseSubmit');
+      const isEditing = Boolean(editingExpenseId);
+      if (btnEl) {
+        btnEl.disabled = true;
+        btnEl.classList.add('opacity-75', 'cursor-not-allowed', 'pointer-events-none');
+        btnEl.innerHTML = `<span class="inline-flex items-center gap-1.5"><svg class="animate-spin -ml-1 mr-1 h-3.5 w-3.5 text-slate-950" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg><span>${isEditing ? 'Updating...' : 'Saving...'}</span></span>`;
+      }
+
+      try {
+        if (editingExpenseId) {
+          if (localStorage.getItem(AUTH_TOKEN_KEY)) {
+            try {
+              await apiFetch(`/api/expenses/${editingExpenseId}`, {
+                method: 'PUT',
+                body: JSON.stringify(payload)
+              });
+            } catch (err) {
+              console.warn('[Edit Expense] Server notice:', err.message);
+            }
+          }
+          const idx = appState.expenses.findIndex((x) => x.id === editingExpenseId || x._id === editingExpenseId);
+          if (idx !== -1) {
+            appState.expenses[idx] = {
+              ...appState.expenses[idx],
+              ...payload,
+              id: editingExpenseId
+            };
+          }
+          recordLocalGroupAudit(
+            groupId,
+            'expense_updated',
+            `${appState.currentUser?.name || 'Member'} edited "${description}" (${formatINR(amount)})`,
+            `${currentSplitMode.toUpperCase()} split`
+          );
+          editingExpenseId = null;
+          closeModal('addExpenseModal');
+          saveState();
+          refreshAllViews();
+          showToast(`✏️ Updated "${description}" (${formatINR(amount)}).`);
+          return;
+        }
+
+        let expId = 'exp_' + Date.now();
         if (localStorage.getItem(AUTH_TOKEN_KEY)) {
           try {
-            await apiFetch(`/api/expenses/${editingExpenseId}`, {
-              method: 'PUT',
+            const res = await apiFetch('/api/expenses', {
+              method: 'POST',
               body: JSON.stringify(payload)
             });
+            if (res && res.expense && res.expense._id) {
+              expId = res.expense._id.toString();
+            }
+            if (res && res.isDuplicatePrevented) {
+              console.info('[Save Expense] Rapid duplicate submission prevented by server deduplication.');
+            }
           } catch (err) {
-            console.warn('[Edit Expense] Server notice:', err.message);
+            console.warn('[Save Expense] Server notice:', err.message);
           }
         }
-        const idx = appState.expenses.findIndex((x) => x.id === editingExpenseId || x._id === editingExpenseId);
-        if (idx !== -1) {
-          appState.expenses[idx] = {
-            ...appState.expenses[idx],
+
+        const alreadyExists = appState.expenses.some((x) => String(x.id || x._id) === String(expId));
+        if (!alreadyExists) {
+          appState.expenses.unshift({
+            id: expId,
             ...payload,
-            id: editingExpenseId
-          };
+            date: new Date().toISOString().slice(0, 10)
+          });
         }
+
         recordLocalGroupAudit(
           groupId,
-          'expense_updated',
-          `${appState.currentUser?.name || 'Member'} edited "${description}" (${formatINR(amount)})`,
-          `${currentSplitMode.toUpperCase()} split`
+          currentExpenseType === 'income' ? 'refund_recorded' : 'expense_created',
+          `${appState.currentUser?.name || 'Member'} added "${description}" (${formatINR(amount)})`,
+          `${category} · ${currentSplitMode.toUpperCase()} split`
         );
-        const editedId = editingExpenseId;
-        editingExpenseId = null;
+
         closeModal('addExpenseModal');
         saveState();
         refreshAllViews();
-        showToast(`✏️ Updated "${description}" (${formatINR(amount)}).`);
-        return;
-      }
-
-      let expId = 'exp_' + Date.now();
-      if (localStorage.getItem(AUTH_TOKEN_KEY)) {
-        try {
-          const res = await apiFetch('/api/expenses', {
-            method: 'POST',
-            body: JSON.stringify(payload)
-          });
-          if (res && res.expense && res.expense._id) {
-            expId = res.expense._id.toString();
-          }
-        } catch (err) {
-          console.warn('[Save Expense] Server notice:', err.message);
+        recordRumAction('Save Expense', { category, split_type: currentSplitMode, amount });
+        showToast(`Added "${description}" (${formatINR(amount)}) to ${group ? group.name : 'group'}.`);
+      } catch (err) {
+        console.error('[Save Expense Error]', err);
+        showToast(err.message || 'Failed to save expense. Please try again.', 'error');
+      } finally {
+        isSavingExpense = false;
+        if (btnEl) {
+          btnEl.disabled = false;
+          btnEl.classList.remove('opacity-75', 'cursor-not-allowed', 'pointer-events-none');
+          btnEl.innerHTML = editingExpenseId ? 'Update Expense' : 'Save Expense';
         }
       }
-
-      appState.expenses.unshift({
-        id: expId,
-        ...payload,
-        date: new Date().toISOString().slice(0, 10)
-      });
-
-      recordLocalGroupAudit(
-        groupId,
-        currentExpenseType === 'income' ? 'refund_recorded' : 'expense_created',
-        `${appState.currentUser?.name || 'Member'} added "${description}" (${formatINR(amount)})`,
-        `${category} · ${currentSplitMode.toUpperCase()} split`
-      );
-
-      closeModal('addExpenseModal');
-      saveState();
-      refreshAllViews();
-      recordRumAction('Save Expense', { category, split_type: currentSplitMode, amount });
-      showToast(`Added "${description}" (${formatINR(amount)}) to ${group ? group.name : 'group'}.`);
     }
 
     // =========================================================================
