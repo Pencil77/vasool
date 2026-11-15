@@ -1102,17 +1102,6 @@
       </div>
 
       <form id="addExpenseForm" data-testid="add-expense-form" onsubmit="handleSaveExpense(event)" class="space-y-4 mt-4">
-        <!-- Settle Up Feature: Expense vs Income/Refund Toggle -->
-        <div class="flex items-center gap-1.5 p-1 rounded-xl bg-slate-900 border border-slate-800">
-          <button type="button" id="txTypeBtn_expense" onclick="setExpenseType('expense')" class="flex-1 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500 text-slate-950 transition">
-            💳 Expense (Bill)
-          </button>
-          <button type="button" id="txTypeBtn_income" onclick="setExpenseType('income')" class="flex-1 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition">
-            💵 Income / Refund
-          </button>
-        </div>
-        <p id="txTypeNotice" class="text-[11px] text-slate-400 hidden"></p>
-
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label for="expGroupSelect" class="block text-xs font-medium text-slate-300 mb-1">Group</label>
@@ -1129,7 +1118,6 @@
               <option value="🎉 Entertainment">🎉 Entertainment</option>
               <option value="🛍️ Shopping">🛍️ Shopping</option>
               <option value="💡 Bills & Utilities">💡 Bills &amp; Utilities</option>
-              <option value="💵 Income & Refunds">💵 Income &amp; Refunds</option>
               <option value="📦 Other">📦 Other</option>
             </select>
           </div>
@@ -1174,14 +1162,6 @@
               <input id="expExchangeRateInput" data-testid="input-expense-fx-rate" type="number" step="0.01" min="0.01" oninput="recalculateFxToBase()" value="84.00" class="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white font-mono-code" />
             </div>
           </div>
-        </div>
-
-        <!-- Linked Parent Expense Selector (Shown when Income / Refund is active) -->
-        <div id="expParentBillContainer" data-testid="exp-parent-bill-container" class="hidden p-3 rounded-xl bg-cyan-950/30 border border-cyan-500/30">
-          <label for="expParentBillSelect" class="block text-[11px] font-bold text-cyan-300 mb-1">🔗 Link Refund to Original Expense (Optional)</label>
-          <select id="expParentBillSelect" data-testid="select-expense-parent-bill" class="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-cyan-500">
-            <option value="">— General Group Income / Unlinked Refund —</option>
-          </select>
         </div>
 
         <div id="expPaidByMultiWrapper" class="space-y-1.5">
