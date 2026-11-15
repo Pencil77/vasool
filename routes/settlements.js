@@ -106,23 +106,8 @@ router.get('/balances', requireAuth, async (req, res) => {
 
     const isFullyClosed = simplifiedTransactions.length === 0 && pendingSettlements.length === 0;
 
-    // Settle Up "Who Should Pay Next?" Algorithm:
-    // Identify member with lowest (most negative) net balance across the group
-    let whoShouldPay = null;
-    const allBalances = Object.values(balanceMap);
-    if (allBalances.length > 0) {
-      const minNet = Math.min(...allBalances.map((b) => b.net));
-      if (minNet < -0.01) {
-        const candidate = allBalances.find((b) => Math.abs(b.net - minNet) < 0.001);
-        if (candidate) {
-          whoShouldPay = {
-            email: candidate.email,
-            name: candidate.name,
-            netDebt: Math.round(Math.abs(minNet) * 100) / 100
-          };
-        }
-      }
-    }
+    // Payer recommendation suggestion removed per user preference
+    const whoShouldPay = null;
 
     return res.status(200).json({
       balances,

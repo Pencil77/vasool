@@ -1231,22 +1231,6 @@
 
     function openExpenseWithSuggestedPayer() {
       openAddExpenseModal();
-      if (appState.suggestedPayer && appState.suggestedPayer.email) {
-        const sugEmail = appState.suggestedPayer.email.toLowerCase().trim();
-        const singleSel = document.getElementById('expPaidBySingleSelect');
-        if (singleSel) {
-          const options = Array.from(singleSel.options);
-          const match = options.find((opt) => opt.value.toLowerCase() === sugEmail);
-          if (match) singleSel.value = match.value;
-        }
-        const paidBySel = document.getElementById('expPaidBySelect');
-        if (paidBySel) {
-          const options = Array.from(paidBySel.options);
-          const match = options.find((opt) => opt.value.toLowerCase() === sugEmail);
-          if (match) paidBySel.value = match.value;
-        }
-        handleSinglePayerChange();
-      }
     }
 
     function setExpenseType(type) {

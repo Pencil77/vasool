@@ -408,22 +408,8 @@
 
       const isFullyClosed = finalSimplified.length === 0 && pendingSettlements.length === 0;
 
-      // Settle Up "Who Should Pay Next?" Algorithm:
-      let whoShouldPay = null;
-      const allBalances = Object.values(balanceMap);
-      if (allBalances.length > 0) {
-        const minNet = Math.min(...allBalances.map((b) => b.net));
-        if (minNet < -0.01) {
-          const debtor = allBalances.find((b) => Math.abs(b.net - minNet) < 0.001);
-          if (debtor) {
-            whoShouldPay = {
-              email: debtor.email,
-              name: debtor.name,
-              netDebt: Math.round(Math.abs(minNet) * 100) / 100
-            };
-          }
-        }
-      }
+      // Recommendation banner removed per user preference
+      const whoShouldPay = null;
 
       // Dictionary of net balances for quick lookup (balances[email])
       const balances = {};
@@ -617,7 +603,7 @@
       renderTopLevelView();
       populateGroupFilterDropdown();
 
-      const { balanceList, simplified, filteredExpenses, filteredSettlements, totalSpend, whoShouldPay } =
+      const { balanceList, simplified, filteredExpenses, filteredSettlements, totalSpend } =
         computeBalancesAndSimplifications(selectedGroupId);
 
       const myEmail = (appState.currentUser?.email || '').toLowerCase();
@@ -696,25 +682,6 @@
         : (activeGroups[0]?.minimizeDebts !== false);
       document.getElementById('kpiSimplifiedCount').textContent = `${simplified.length} ${isMinimizedMode ? 'simplified transfer(s)' : 'direct debt(s)'}`;
 
-      // Update Settle Up "Who Should Pay Next?" recommendation banner
-      const whoBanner = document.getElementById('whoPaysNextBanner');
-      const whoText = document.getElementById('whoPaysNextText');
-      const whoBtnName = document.getElementById('whoPaysNextBtnName');
-      if (whoBanner) {
-        if (whoShouldPay) {
-          appState.suggestedPayer = whoShouldPay;
-          whoBanner.classList.remove('hidden');
-          if (whoText) {
-            whoText.innerHTML = `<span class="font-bold text-amber-300">${escapeHtml(whoShouldPay.name)}</span> owes the most (<span class="font-mono-code font-bold text-rose-300">-${formatINR(whoShouldPay.netDebt)}</span>) and should pay the next bill to balance the group.`;
-          }
-          if (whoBtnName) {
-            whoBtnName.textContent = whoShouldPay.name.split(' ')[0];
-          }
-        } else {
-          appState.suggestedPayer = null;
-          whoBanner.classList.add('hidden');
-        }
-      }
 
       renderDashboardWidgets(filteredExpenses, simplified, balanceList);
       renderExpensesList();
