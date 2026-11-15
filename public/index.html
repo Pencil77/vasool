@@ -328,49 +328,81 @@
 
 
     <!-- 4 Elevated Bento KPI Cards: 2x2 on Mobile, 4-col on Large Screens -->
-    <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-      <div class="glass-panel glass-card-hover rounded-3xl p-4 sm:p-5 relative overflow-hidden group">
+    <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 items-stretch">
+      <!-- 1. Net Balance Card -->
+      <div class="glass-panel glass-card-hover rounded-2xl sm:rounded-3xl p-3 sm:p-4.5 relative overflow-hidden group flex flex-col justify-between h-full min-w-0">
         <div class="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-emerald-500/10 blur-2xl pointer-events-none group-hover:bg-emerald-500/20 transition"></div>
-        <div class="h-1 bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-500 rounded-t-3xl -mt-4 sm:-mt-5 -mx-4 sm:-mx-5 mb-3.5 sm:mb-4"></div>
-        <div class="flex items-center justify-between text-[11px] sm:text-xs text-slate-400 mb-1.5">
-          <span class="font-semibold tracking-wide uppercase text-[10px] text-slate-400">Your Net Balance</span>
-          <span class="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider">💎 NET</span>
+        <div class="h-1 bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-500 rounded-t-2xl sm:rounded-t-3xl -mt-3 sm:-mt-4.5 -mx-3 sm:-mx-4.5 mb-2.5 sm:mb-3"></div>
+        <div class="flex items-center justify-between text-[11px] sm:text-xs text-slate-400 mb-1.5 min-h-[22px] gap-1">
+          <span class="font-bold tracking-wider uppercase text-[10px] text-slate-400 truncate">Your Net Balance</span>
+          <span class="px-1.5 sm:px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider flex-shrink-0">💎 NET</span>
         </div>
-        <div id="kpiNetBalance" data-testid="kpi-net-balance" class="font-display text-xl sm:text-3xl font-extrabold text-emerald-400 tracking-tight truncate">+₹0.00</div>
-        <p id="kpiNetSubtext" class="text-[11px] sm:text-xs text-slate-400 mt-1 truncate">Across active groups</p>
+        <div class="my-auto py-1 flex flex-col justify-center min-h-[58px] sm:min-h-[66px]">
+          <div id="kpiNetBalance" data-testid="kpi-net-balance" class="font-display text-lg sm:text-2xl lg:text-3xl font-extrabold text-emerald-400 tracking-tight tabular-nums break-words leading-tight">+₹0.00</div>
+          <div id="kpiNetPendingRow" class="min-h-[22px] mt-1 flex items-center">
+            <span class="text-[10px] sm:text-xs text-slate-400 font-medium">Across active groups</span>
+          </div>
+        </div>
+        <div class="mt-auto pt-2 border-t border-slate-800/60 flex items-center justify-between text-[10px] sm:text-xs text-slate-400 min-h-[20px] leading-tight break-words">
+          <p id="kpiNetSubtext" class="text-[10px] sm:text-xs text-slate-400 leading-normal break-words">100% Settled</p>
+        </div>
       </div>
 
-      <div class="glass-panel glass-card-hover rounded-3xl p-4 sm:p-5 relative overflow-hidden group">
+      <!-- 2. You Are Owed Card -->
+      <div class="glass-panel glass-card-hover rounded-2xl sm:rounded-3xl p-3 sm:p-4.5 relative overflow-hidden group flex flex-col justify-between h-full min-w-0">
         <div class="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-teal-500/10 blur-2xl pointer-events-none group-hover:bg-teal-500/20 transition"></div>
-        <div class="h-1 bg-gradient-to-r from-teal-400 via-emerald-400 to-cyan-400 rounded-t-3xl -mt-4 sm:-mt-5 -mx-4 sm:-mx-5 mb-3.5 sm:mb-4"></div>
-        <div class="flex items-center justify-between text-[11px] sm:text-xs text-slate-400 mb-1.5">
-          <span class="font-semibold tracking-wide uppercase text-[10px] text-slate-400">You Are Owed</span>
-          <span class="px-2 py-0.5 rounded-full bg-teal-500/15 text-teal-300 border border-teal-500/30 text-[9px] sm:text-[10px] font-bold">📈 INFLOW</span>
+        <div class="h-1 bg-gradient-to-r from-teal-400 via-emerald-400 to-cyan-400 rounded-t-2xl sm:rounded-t-3xl -mt-3 sm:-mt-4.5 -mx-3 sm:-mx-4.5 mb-2.5 sm:mb-3"></div>
+        <div class="flex items-center justify-between text-[11px] sm:text-xs text-slate-400 mb-1.5 min-h-[22px] gap-1">
+          <span class="font-bold tracking-wider uppercase text-[10px] text-slate-400 truncate">You Are Owed</span>
+          <span class="px-1.5 sm:px-2 py-0.5 rounded-full bg-teal-500/15 text-teal-300 border border-teal-500/30 text-[9px] sm:text-[10px] font-bold flex-shrink-0">📈 INFLOW</span>
         </div>
-        <div id="kpiYouAreOwed" data-testid="kpi-you-are-owed" class="font-display text-xl sm:text-3xl font-extrabold text-emerald-400 tracking-tight truncate">₹0.00</div>
-        <p id="kpiOwedByCount" class="text-[11px] sm:text-xs text-slate-400 mt-1 truncate">Incoming receivables</p>
+        <div class="my-auto py-1 flex flex-col justify-center min-h-[58px] sm:min-h-[66px]">
+          <div id="kpiYouAreOwed" data-testid="kpi-you-are-owed" class="font-display text-lg sm:text-2xl lg:text-3xl font-extrabold text-emerald-400 tracking-tight tabular-nums break-words leading-tight">₹0.00</div>
+          <div id="kpiOwedPendingRow" class="min-h-[22px] mt-1 flex items-center">
+            <span class="text-[10px] sm:text-xs text-slate-400 font-medium">All receivables confirmed</span>
+          </div>
+        </div>
+        <div class="mt-auto pt-2 border-t border-slate-800/60 flex items-center justify-between text-[10px] sm:text-xs text-slate-400 min-h-[20px] leading-tight break-words">
+          <p id="kpiOwedByCount" class="text-[10px] sm:text-xs text-slate-400 leading-normal break-words">Incoming receivables</p>
+        </div>
       </div>
 
-      <div class="glass-panel glass-card-hover rounded-3xl p-4 sm:p-5 relative overflow-hidden group">
+      <!-- 3. You Owe Card -->
+      <div class="glass-panel glass-card-hover rounded-2xl sm:rounded-3xl p-3 sm:p-4.5 relative overflow-hidden group flex flex-col justify-between h-full min-w-0">
         <div class="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-rose-500/10 blur-2xl pointer-events-none group-hover:bg-rose-500/20 transition"></div>
-        <div class="h-1 bg-gradient-to-r from-rose-500 via-pink-500 to-amber-500 rounded-t-3xl -mt-4 sm:-mt-5 -mx-4 sm:-mx-5 mb-3.5 sm:mb-4"></div>
-        <div class="flex items-center justify-between text-[11px] sm:text-xs text-slate-400 mb-1.5">
-          <span class="font-semibold tracking-wide uppercase text-[10px] text-slate-400">You Owe</span>
-          <span class="px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-300 border border-rose-500/30 text-[9px] sm:text-[10px] font-bold">📉 OUTFLOW</span>
+        <div class="h-1 bg-gradient-to-r from-rose-500 via-pink-500 to-amber-500 rounded-t-2xl sm:rounded-t-3xl -mt-3 sm:-mt-4.5 -mx-3 sm:-mx-4.5 mb-2.5 sm:mb-3"></div>
+        <div class="flex items-center justify-between text-[11px] sm:text-xs text-slate-400 mb-1.5 min-h-[22px] gap-1">
+          <span class="font-bold tracking-wider uppercase text-[10px] text-slate-400 truncate">You Owe</span>
+          <span class="px-1.5 sm:px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-300 border border-rose-500/30 text-[9px] sm:text-[10px] font-bold flex-shrink-0">📉 OUTFLOW</span>
         </div>
-        <div id="kpiYouOwe" data-testid="kpi-you-owe" class="font-display text-xl sm:text-3xl font-extrabold text-rose-400 tracking-tight truncate">₹0.00</div>
-        <p id="kpiOweToCount" class="text-[11px] sm:text-xs text-slate-400 mt-1 truncate">Pending splits</p>
+        <div class="my-auto py-1 flex flex-col justify-center min-h-[58px] sm:min-h-[66px]">
+          <div id="kpiYouOwe" data-testid="kpi-you-owe" class="font-display text-lg sm:text-2xl lg:text-3xl font-extrabold text-rose-400 tracking-tight tabular-nums break-words leading-tight">₹0.00</div>
+          <div id="kpiOwePendingRow" class="min-h-[22px] mt-1 flex items-center">
+            <span class="text-[10px] sm:text-xs text-slate-400 font-medium">All splits settled</span>
+          </div>
+        </div>
+        <div class="mt-auto pt-2 border-t border-slate-800/60 flex items-center justify-between text-[10px] sm:text-xs text-slate-400 min-h-[20px] leading-tight break-words">
+          <p id="kpiOweToCount" class="text-[10px] sm:text-xs text-slate-400 leading-normal break-words">Pending splits</p>
+        </div>
       </div>
 
-      <div class="glass-panel glass-card-hover rounded-3xl p-4 sm:p-5 relative overflow-hidden group">
+      <!-- 4. Group Spend Card -->
+      <div class="glass-panel glass-card-hover rounded-2xl sm:rounded-3xl p-3 sm:p-4.5 relative overflow-hidden group flex flex-col justify-between h-full min-w-0">
         <div class="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-cyan-500/10 blur-2xl pointer-events-none group-hover:bg-cyan-500/20 transition"></div>
-        <div class="h-1 bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-400 rounded-t-3xl -mt-4 sm:-mt-5 -mx-4 sm:-mx-5 mb-3.5 sm:mb-4"></div>
-        <div class="flex items-center justify-between text-[11px] sm:text-xs text-slate-400 mb-1.5">
-          <span class="font-semibold tracking-wide uppercase text-[10px] text-slate-400 truncate">Group Spend</span>
-          <span id="kpiExpenseCountBadge" data-testid="kpi-expense-count-badge" class="px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 text-[9px] sm:text-[10px] font-bold flex-shrink-0">0 bills</span>
+        <div class="h-1 bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-400 rounded-t-2xl sm:rounded-t-3xl -mt-3 sm:-mt-4.5 -mx-3 sm:-mx-4.5 mb-2.5 sm:mb-3"></div>
+        <div class="flex items-center justify-between text-[11px] sm:text-xs text-slate-400 mb-1.5 min-h-[22px] gap-1">
+          <span class="font-bold tracking-wider uppercase text-[10px] text-slate-400 truncate">Group Spend</span>
+          <span id="kpiExpenseCountBadge" data-testid="kpi-expense-count-badge" class="px-1.5 sm:px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 text-[9px] sm:text-[10px] font-bold flex-shrink-0">0 bills</span>
         </div>
-        <div id="kpiTotalSpend" data-testid="kpi-total-spend" class="font-display text-xl sm:text-3xl font-extrabold text-white tracking-tight truncate">₹0.00</div>
-        <p id="kpiSimplifiedCount" data-testid="kpi-simplified-count" class="text-[11px] sm:text-xs text-slate-400 mt-1 truncate">0 transfers needed</p>
+        <div class="my-auto py-1 flex flex-col justify-center min-h-[58px] sm:min-h-[66px]">
+          <div id="kpiTotalSpend" data-testid="kpi-total-spend" class="font-display text-lg sm:text-2xl lg:text-3xl font-extrabold text-white tracking-tight tabular-nums break-words leading-tight">₹0.00</div>
+          <div id="kpiSpendPendingRow" class="min-h-[22px] mt-1 flex items-center">
+            <span class="text-[10px] sm:text-xs text-cyan-300/80 font-medium">Total volume</span>
+          </div>
+        </div>
+        <div class="mt-auto pt-2 border-t border-slate-800/60 flex items-center justify-between text-[10px] sm:text-xs text-slate-400 min-h-[20px] leading-tight break-words">
+          <p id="kpiSimplifiedCount" data-testid="kpi-simplified-count" class="text-[10px] sm:text-xs text-slate-400 leading-normal break-words">0 transfers needed</p>
+        </div>
       </div>
     </div>
     </div><!-- /#homeDashboardTopSection -->

@@ -629,58 +629,103 @@
       const remOwe = Math.max(0, Math.round((iOwe - myPendingPaid) * 100) / 100);
       const remOwed = Math.max(0, Math.round((owedToMe - myPendingReceived) * 100) / 100);
 
+      // 1. Your Net Balance
       const netEl = document.getElementById('kpiNetBalance');
+      const netPendingRow = document.getElementById('kpiNetPendingRow');
       const netSub = document.getElementById('kpiNetSubtext');
       if (netEl) {
-        if (myPendingPaid > 0 || myPendingReceived > 0) {
-          netEl.innerHTML = `${(myEntry.net >= 0 ? '+' : '') + formatINR(myEntry.net)} <span class="text-xs sm:text-sm font-semibold text-amber-300 ml-1">(${myUnconfirmedNet >= 0 ? '+' : ''}${formatINR(myUnconfirmedNet)} after pending)</span>`;
-          if (netSub) {
-            netSub.innerHTML = `Confirmed: <strong class="text-slate-300">${(myEntry.net >= 0 ? '+' : '') + formatINR(myEntry.net)}</strong> · ⏳ <strong class="text-amber-300">${(myUnconfirmedNet >= 0 ? '+' : '') + formatINR(myUnconfirmedNet)} unconfirmed</strong> (${formatINR(myPendingPaid)} sent)`;
+        const netSign = myEntry.net > 0 ? '+' : '';
+        netEl.textContent = `${netSign}${formatINR(myEntry.net)}`;
+        netEl.className = `font-display text-lg sm:text-2xl lg:text-3xl font-extrabold tracking-tight tabular-nums break-words leading-tight ${myEntry.net > 0 ? 'text-emerald-400' : (myEntry.net < 0 ? 'text-rose-400' : 'text-slate-200')}`;
+
+        if (netPendingRow) {
+          if (myPendingPaid > 0 || myPendingReceived > 0) {
+            const unconfirmedSign = myUnconfirmedNet > 0 ? '+' : '';
+            netPendingRow.innerHTML = `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-500/15 border border-amber-500/30 text-[10px] sm:text-xs font-semibold text-amber-300">⏳ Pending: <strong class="text-amber-200 font-bold">${unconfirmedSign}${formatINR(myUnconfirmedNet)}</strong></span>`;
+          } else {
+            netPendingRow.innerHTML = `<span class="text-[10px] sm:text-xs text-slate-400 font-medium">Across active groups</span>`;
           }
-        } else {
-          netEl.textContent = (myEntry.net >= 0 ? '+' : '') + formatINR(myEntry.net);
-          if (netSub) netSub.textContent = 'Across active groups';
         }
-        netEl.className = `text-2xl font-extrabold ${myEntry.net >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+        if (netSub) {
+          if (myPendingPaid > 0 || myPendingReceived > 0) {
+            netSub.innerHTML = `<span>⏳ ${formatINR(myPendingPaid > 0 ? myPendingPaid : myPendingReceived)} in verification</span>`;
+          } else {
+            netSub.textContent = myEntry.net === 0 ? 'All settled up' : '100% Confirmed';
+          }
+        }
       }
 
+      // 2. You Are Owed
       const owedEl = document.getElementById('kpiYouAreOwed');
+      const owedPendingRow = document.getElementById('kpiOwedPendingRow');
       const owedSub = document.getElementById('kpiOwedByCount');
       if (owedEl) {
-        if (myPendingReceived > 0) {
-          owedEl.innerHTML = `${formatINR(owedToMe)} <span class="text-xs sm:text-sm font-semibold text-amber-300 ml-1">(${formatINR(remOwed)} after pending)</span>`;
-          if (owedSub) {
-            owedSub.innerHTML = `Confirmed: <strong class="text-slate-300">${formatINR(owedToMe)}</strong> · ⏳ <strong class="text-amber-300">${formatINR(myPendingReceived)} unconfirmed</strong>`;
+        owedEl.textContent = formatINR(owedToMe);
+        owedEl.className = 'font-display text-lg sm:text-2xl lg:text-3xl font-extrabold tracking-tight tabular-nums break-words leading-tight text-emerald-400';
+        if (owedPendingRow) {
+          if (myPendingReceived > 0) {
+            owedPendingRow.innerHTML = `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-500/15 border border-amber-500/30 text-[10px] sm:text-xs font-semibold text-amber-300">⏳ Due after pending: <strong class="text-amber-200 font-bold">${formatINR(remOwed)}</strong></span>`;
+          } else {
+            owedPendingRow.innerHTML = `<span class="text-[10px] sm:text-xs text-slate-400 font-medium">${owedToMe > 0 ? 'Receivables confirmed' : 'No receivables'}</span>`;
           }
-        } else {
-          owedEl.textContent = formatINR(owedToMe);
-          if (owedSub) owedSub.textContent = 'Incoming receivables';
+        }
+        if (owedSub) {
+          if (myPendingReceived > 0) {
+            owedSub.innerHTML = `<span>⏳ ${formatINR(myPendingReceived)} pending confirmation</span>`;
+          } else {
+            owedSub.textContent = 'Incoming receivables';
+          }
         }
       }
 
+      // 3. You Owe
       const oweEl = document.getElementById('kpiYouOwe');
+      const owePendingRow = document.getElementById('kpiOwePendingRow');
       const oweSub = document.getElementById('kpiOweToCount');
       if (oweEl) {
-        if (myPendingPaid > 0) {
-          oweEl.innerHTML = `${formatINR(iOwe)} <span class="text-xs sm:text-sm font-semibold text-amber-300 ml-1">(${formatINR(remOwe)} due)</span>`;
-          if (oweSub) {
-            oweSub.innerHTML = `Confirmed: <strong class="text-slate-300">${formatINR(iOwe)}</strong> · ⏳ <strong class="text-amber-300">${formatINR(myPendingPaid)} unconfirmed</strong>`;
+        oweEl.textContent = formatINR(iOwe);
+        oweEl.className = 'font-display text-lg sm:text-2xl lg:text-3xl font-extrabold tracking-tight tabular-nums break-words leading-tight text-rose-400';
+        if (owePendingRow) {
+          if (myPendingPaid > 0) {
+            owePendingRow.innerHTML = `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-500/15 border border-amber-500/30 text-[10px] sm:text-xs font-semibold text-amber-300">⏳ Due after pending: <strong class="text-amber-200 font-bold">${formatINR(remOwe)}</strong></span>`;
+          } else {
+            owePendingRow.innerHTML = `<span class="text-[10px] sm:text-xs text-slate-400 font-medium">${iOwe > 0 ? 'Splits pending payment' : 'No debts'}</span>`;
           }
-        } else {
-          oweEl.textContent = formatINR(iOwe);
-          if (oweSub) oweSub.textContent = 'Pending splits';
+        }
+        if (oweSub) {
+          if (myPendingPaid > 0) {
+            oweSub.innerHTML = `<span>⏳ ${formatINR(myPendingPaid)} paid, awaiting approval</span>`;
+          } else {
+            oweSub.textContent = 'Pending splits';
+          }
         }
       }
-      document.getElementById('kpiTotalSpend').textContent = formatINR(totalSpend);
+
+      // 4. Group Spend
+      const spendEl = document.getElementById('kpiTotalSpend');
+      const spendPendingRow = document.getElementById('kpiSpendPendingRow');
+      const spendSub = document.getElementById('kpiSimplifiedCount');
+      if (spendEl) {
+        spendEl.textContent = formatINR(totalSpend);
+        spendEl.className = 'font-display text-lg sm:text-2xl lg:text-3xl font-extrabold tracking-tight tabular-nums break-words leading-tight text-white';
+      }
+      if (spendPendingRow) {
+        spendPendingRow.innerHTML = `<span class="text-[10px] sm:text-xs text-cyan-300/80 font-medium">Total volume</span>`;
+      }
       const userInvolvedTotal = filteredExpenses.filter((e) => (typeof isUserInvolvedInExpense === 'function' ? isUserInvolvedInExpense(e, myEmail) : true));
-      document.getElementById('kpiExpenseCountBadge').textContent = `${userInvolvedTotal.length} involved bill(s)`;
+      const countBadge = document.getElementById('kpiExpenseCountBadge');
+      if (countBadge) {
+        countBadge.textContent = `${userInvolvedTotal.length} bill${userInvolvedTotal.length === 1 ? '' : 's'}`;
+      }
       const activeGroups = selectedGroupId === 'ALL'
         ? appState.groups
         : appState.groups.filter((g) => g.id === selectedGroupId);
       const isMinimizedMode = selectedGroupId === 'ALL'
         ? activeGroups.every((g) => g.minimizeDebts !== false)
         : (activeGroups[0]?.minimizeDebts !== false);
-      document.getElementById('kpiSimplifiedCount').textContent = `${simplified.length} ${isMinimizedMode ? 'simplified transfer(s)' : 'direct debt(s)'}`;
+      if (spendSub) {
+        spendSub.textContent = `${simplified.length} ${isMinimizedMode ? 'simplified transfer(s)' : 'direct debt(s)'}`;
+      }
 
 
       renderDashboardWidgets(filteredExpenses, simplified, balanceList);
