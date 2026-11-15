@@ -22,6 +22,7 @@ const SettlementSchema = new mongoose.Schema(
     },
     confirmedAt: { type: Date, default: null },
     confirmedByEmail: { type: String, lowercase: true, default: null },
+    confirmationToken: { type: String, default: null, index: true },
     rejectedReason: { type: String, default: '' },
     settledAt: { type: Date, default: Date.now }
   },

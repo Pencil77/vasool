@@ -769,8 +769,10 @@
         return adm && adm.email.toLowerCase().trim() === currentEmail;
       });
 
+      const isHubActive = activeGroups.length > 0 && activeGroups.some((g) => g.adminHubSettlement === true);
+
       const pendingApprovalList = filteredSettlements.filter(
-        (s) => s.status === 'pending_admin_approval'
+        (s) => s.status === 'pending_admin_approval' || s.status === 'pending_confirmation' || s.status === 'pending'
       );
 
       const hasRemainingDebts = simplified.some((t) => {
@@ -789,7 +791,7 @@
             <span class="text-2xl">🎉</span>
             <div>
               <div class="text-sm font-bold text-emerald-300">All Group Debts Fully Settled & Closed!</div>
-              <div class="text-xs text-slate-400 mt-0.5">Every member transaction has been fully verified and confirmed by the Admin. No pending dues or owing balances remain.</div>
+              <div class="text-xs text-slate-400 mt-0.5">Every member transaction has been fully verified and confirmed. No pending dues or owing balances remain.</div>
             </div>
           </div>
         `;
@@ -803,21 +805,27 @@
               <span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
               <div>
                 <div class="text-xs font-bold text-amber-300 uppercase tracking-wide">Status: Pending Due or Owing</div>
-                <div class="text-[11px] text-slate-400 mt-0.5">Event remains open until payees mark paid and the group Admin confirms receipt.</div>
+                <div class="text-[11px] text-slate-400 mt-0.5">Event remains open until payees mark paid and ${isHubActive ? 'the group Admin' : 'the receiving recipient'} confirms receipt.</div>
               </div>
             </div>
             <div class="flex items-center gap-2 text-xs">
               <span class="px-2.5 py-1 rounded-lg bg-rose-500/15 text-rose-300 border border-rose-500/30 font-semibold">Remaining Due: ${formatINR(totalPendingDue)}</span>
-              ${totalPendingApproval > 0 ? `<span class="px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-300 border border-amber-500/30 font-semibold">Awaiting Admin: ${formatINR(totalPendingApproval)}</span>` : ''}
+              ${totalPendingApproval > 0 ? `<span class="px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-300 border border-amber-500/30 font-semibold">${isHubActive ? 'Awaiting Admin' : 'Awaiting Recipient'}: ${formatINR(totalPendingApproval)}</span>` : ''}
             </div>
           </div>
         `;
       }
 
-      // 2. Actionable Pending Confirmation Action Inbox (for Admin OR receiving Creditor)
+      // 2. Actionable Pending Confirmation Action Inbox (for Admin in Hub mode OR receiving Creditor in P2P)
       const actionablePendingList = pendingApprovalList.filter((s) => {
         const isCreditor = s.toEmail && s.toEmail.toLowerCase().trim() === currentEmail;
-        return isViewerAdminOfAny || isCreditor;
+        const grp = appState.groups.find((g) => String(g.id) === String(s.groupId));
+        const isHub = grp ? Boolean(grp.adminHubSettlement) : false;
+        if (isHub) {
+          return isViewerAdminOfAny || isCreditor;
+        }
+        // In Direct P2P mode, ONLY the recipient/creditor can approve!
+        return isCreditor;
       });
 
       if (actionablePendingList.length > 0) {
@@ -831,7 +839,7 @@
               <span class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-amber-400/25 text-amber-300 border border-amber-400/40">Dual Confirmation Handshake</span>
             </div>
             <p class="text-xs text-slate-300">
-              Payments awaiting verification. If you are the receiving creditor or group admin, verify your bank/UPI account and confirm receipt to permanently close the debt:
+              Payments awaiting verification. Please verify your bank/UPI account and confirm receipt to permanently close the debt:
             </p>
             <div class="space-y-2">
               ${actionablePendingList.map((s) => {
@@ -842,7 +850,7 @@
                     <div class="text-xs text-white flex items-center gap-1.5 flex-wrap">
                       <strong class="text-rose-300">${escapeHtml(s.fromName)}</strong> claims paid <strong class="text-emerald-300 text-sm">${formatINR(s.amount)}</strong> via <span class="text-teal-300 font-semibold">${escapeHtml(s.method)}</span>
                       <span class="px-2 py-0.5 rounded text-[10px] font-bold ${isCreditor ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'}">
-                        ${isCreditor ? 'You are Creditor 💰' : 'Group Admin 👑'}
+                        ${isCreditor ? 'Recipient / Creditor 💰' : 'Group Admin (Hub) 👑'}
                       </span>
                     </div>
                     <div class="text-[11px] text-slate-400 mt-1">
@@ -870,7 +878,6 @@
       }
 
       // 3. Routing Mode Banner
-      const isHubActive = activeGroups.length > 0 && activeGroups.some((g) => g.adminHubSettlement === true);
       const isDirectPairwise = activeGroups.length > 0 && (selectedGroupId === 'ALL' ? activeGroups.some((g) => g.minimizeDebts === false) : activeGroups[0]?.minimizeDebts === false);
       if (isHubActive) {
         html += `
@@ -969,7 +976,7 @@
         histEl.innerHTML = filteredSettlements
           .map((s) => {
             const isConfirmed = s.status === 'confirmed';
-            const isPending = s.status === 'pending_admin_approval';
+            const isPending = s.status === 'pending_admin_approval' || s.status === 'pending_confirmation' || s.status === 'pending';
             const isRejected = s.status === 'rejected';
 
             const isPartial = Boolean(s.originalClaimedAmount && Number(s.originalClaimedAmount) > Number(s.amount));
@@ -2957,10 +2964,12 @@
 
       const currentEmail = (appState.currentUser?.email || '').toLowerCase().trim();
       const grp = appState.groups.find((g) => g.id === groupId) || appState.groups[0];
+      const isHub = grp ? Boolean(grp.adminHubSettlement) : false;
       const adminMember = grp ? (grp.members?.find((m) => m.role === 'admin' || (grp.adminEmail && grp.adminEmail.toLowerCase() === m.email.toLowerCase())) || grp.members?.[0]) : null;
       const isViewerAdmin = adminMember && adminMember.email.toLowerCase().trim() === currentEmail;
       const isTargetCreditor = toEmail.toLowerCase().trim() === currentEmail;
-      const isDirectlyConfirmed = isViewerAdmin || isTargetCreditor;
+      // In Direct P2P mode, ONLY the recipient (isTargetCreditor) can auto-confirm upon recording
+      const isDirectlyConfirmed = isTargetCreditor || (isHub && isViewerAdmin && toEmail.toLowerCase().trim() === currentEmail);
 
       isSubmittingSettlement = true;
       const btnEl = document.getElementById('btnConfirmSettleSubmit');
@@ -2972,7 +2981,7 @@
 
       try {
         let stlId = 'stl_' + Date.now();
-        let status = isDirectlyConfirmed ? 'confirmed' : 'pending_admin_approval';
+        let status = isDirectlyConfirmed ? 'confirmed' : (isHub ? 'pending_admin_approval' : 'pending_confirmation');
         let confirmedAt = isDirectlyConfirmed ? new Date().toISOString() : null;
         let confirmedByEmail = isDirectlyConfirmed ? currentEmail : null;
         let confirmedRole = isTargetCreditor ? 'creditor' : (isViewerAdmin ? 'admin' : '');
@@ -3037,7 +3046,7 @@
         if (status === 'confirmed') {
           showToast(`✅ Payment of ${formatINR(amount)} confirmed and settled.`);
         } else {
-          showToast(`⏳ Payment of ${formatINR(amount)} marked as paid. Awaiting creditor or admin confirmation.`);
+          showToast(`⏳ Payment of ${formatINR(amount)} marked as paid. Confirmation email sent to ${toName || toEmail}.`);
         }
       } catch (err) {
         console.error('[Settlement Error]', err);
