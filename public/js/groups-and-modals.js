@@ -139,7 +139,7 @@
       const currentAdmin = grp.members.find((m) => m.role === 'admin' || (grp.adminEmail && grp.adminEmail.toLowerCase() === m.email.toLowerCase())) || grp.members[0];
       const isCurrentUserAdmin = currentAdmin && currentAdmin.email.toLowerCase().trim() === currentEmail;
 
-      const { totalSpend, simplified, filteredExpenses, filteredSettlements, balanceList, balanceMap } =
+      const { totalSpend, simplified, filteredExpenses, filteredSettlements, balanceList, balanceMap, pendingSettlements, isFullyClosed } =
         serverData && serverData.simplifiedTransactions
           ? {
               totalSpend: serverData.totalSpend,
@@ -147,7 +147,9 @@
               filteredExpenses: serverData.expenses,
               filteredSettlements: serverData.settlements,
               balanceList: serverData.members,
-              balanceMap: (serverData.members || []).reduce((acc, m) => { acc[(m.email || '').toLowerCase().trim()] = m; return acc; }, {})
+              balanceMap: (serverData.members || []).reduce((acc, m) => { acc[(m.email || '').toLowerCase().trim()] = m; return acc; }, {}),
+              pendingSettlements: (serverData.settlements || []).filter((s) => s.status === 'pending_admin_approval' || s.status === 'pending_confirmation' || s.status === 'pending'),
+              isFullyClosed: (!serverData.simplifiedTransactions || serverData.simplifiedTransactions.length === 0)
             }
           : computeBalancesAndSimplifications(grp.id);
 
@@ -370,34 +372,35 @@
                 ).map((p) => String(p.memberEmail || '').toLowerCase().trim())
               );
 
+              const isGroupMinimized = grp.minimizeDebts !== false;
+
               const splitChips = splitsList
                 .map((s) => {
                   const sEmail = (s.memberEmail || '').toLowerCase().trim();
                   const isThisMe = sEmail === currentEmail;
-                  const isPayer = payerEmails.has(sEmail);
-                  const b = balanceMap ? balanceMap[sEmail] : null;
-                  const isSettled = isPayer || (b && b.net >= -0.01);
-                  const isUnconfirmedSettled = !isSettled && b && b.unconfirmedNet >= -0.01;
-                  const hasUnconfirmed = !isSettled && b && (b.pendingPaid || 0) > 0;
-                  const statusTag = isPayer
-                    ? '<span class="text-[8px] font-bold text-teal-300 uppercase ml-1">(Payer)</span>'
-                    : isSettled
-                      ? '<span class="text-[8px] font-bold text-emerald-400 uppercase ml-1">✓ Settled</span>'
-                      : isUnconfirmedSettled
-                        ? `<span class="text-[8px] font-bold text-amber-300 uppercase ml-1">⏳ Unconfirmed (⏳ ${formatINR(b.pendingPaid)} paid)</span>`
-                        : hasUnconfirmed
-                          ? `<span class="text-[8px] font-bold text-rose-300 uppercase ml-1">⏳ Left to Pay (⏳ ${formatINR(b.pendingPaid)} unconfirmed)</span>`
-                          : '<span class="text-[8px] font-bold text-rose-300 uppercase ml-1">⏳ Left to Pay</span>';
-                  const chipBorder = isSettled
-                    ? 'border-emerald-500/30 bg-emerald-950/30 text-emerald-200'
-                    : isUnconfirmedSettled
-                      ? 'border-amber-500/40 bg-amber-950/30 text-amber-200'
-                      : 'border-slate-700 bg-slate-800 text-slate-300';
+                  const sStatus = (typeof window !== 'undefined' && typeof window.getSplitSettlementStatus === 'function')
+                    ? window.getSplitSettlementStatus({
+                        expense: exp,
+                        split: s,
+                        payerEmails,
+                        simplified,
+                        pendingSettlements,
+                        isFullyClosed,
+                        isMinimizedMode: isGroupMinimized
+                      })
+                    : {
+                        isPayer: payerEmails.has(sEmail),
+                        isSettled: false,
+                        hasPending: false,
+                        tagSmall: '',
+                        pillClass: 'border-slate-700 bg-slate-800 text-slate-300'
+                      };
+
                   return `
-                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] ${isThisMe ? 'ring-1 ring-teal-400/50' : ''} ${chipBorder}">
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] ${isThisMe ? 'ring-1 ring-teal-400/50' : ''} ${sStatus.pillClass}">
                       <span>${escapeHtml(s.memberName || s.memberEmail.split('@')[0])}:</span>
                       <span>${formatINR(s.amount)}</span>
-                      ${statusTag}
+                      ${sStatus.tagSmall}
                     </span>
                   `;
                 })
@@ -405,26 +408,37 @@
 
               let billSettlementBadge = '';
               if (exp.type !== 'income') {
-                const leftToPayList = splitsList.filter((s) => {
-                  const sEmail = (s.memberEmail || '').toLowerCase().trim();
-                  if (payerEmails.has(sEmail)) return false;
-                  const b = balanceMap ? balanceMap[sEmail] : null;
-                  return b && b.net < -0.01;
-                });
-                if (leftToPayList.length === 0) {
+                const allSplits = splitsList;
+                const nonPayerSplits = allSplits.filter((s) => !payerEmails.has(String(s.memberEmail || '').toLowerCase().trim()));
+                if (nonPayerSplits.length === 0) {
                   billSettlementBadge = '<span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">✓ All Settled</span>';
                 } else {
-                  const allCoveredByPending = leftToPayList.every((s) => {
-                    const sEmail = (s.memberEmail || '').toLowerCase().trim();
-                    const b = balanceMap ? balanceMap[sEmail] : null;
-                    return b && b.unconfirmedNet >= -0.01;
-                  });
-                  if (allCoveredByPending) {
-                    const pendingNames = leftToPayList.map((s) => escapeHtml((s.memberName || s.memberEmail).split(' ')[0])).join(', ');
-                    billSettlementBadge = `<span class="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/40">⏳ Paid · Awaiting Confirmation (${pendingNames})</span>`;
+                  const splitStatuses = nonPayerSplits.map((s) => ({
+                    split: s,
+                    status: (typeof window !== 'undefined' && typeof window.getSplitSettlementStatus === 'function')
+                      ? window.getSplitSettlementStatus({
+                          expense: exp,
+                          split: s,
+                          payerEmails,
+                          simplified,
+                          pendingSettlements,
+                          isFullyClosed,
+                          isMinimizedMode: isGroupMinimized
+                        })
+                      : { isSettled: false, hasPending: false }
+                  }));
+                  const unsettled = splitStatuses.filter((x) => !x.status.isSettled);
+                  if (unsettled.length === 0) {
+                    billSettlementBadge = '<span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">✓ All Settled</span>';
                   } else {
-                    const leftNames = leftToPayList.map((s) => escapeHtml((s.memberName || s.memberEmail).split(' ')[0])).join(', ');
-                    billSettlementBadge = `<span class="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">⏳ Pending (${leftNames})</span>`;
+                    const allPending = unsettled.every((x) => x.status.hasPending);
+                    if (allPending) {
+                      const pendingNames = unsettled.map((x) => escapeHtml((x.split.memberName || x.split.memberEmail).split(' ')[0])).join(', ');
+                      billSettlementBadge = `<span class="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/40">⏳ Paid · Awaiting Confirmation (${pendingNames})</span>`;
+                    } else {
+                      const leftNames = unsettled.map((x) => escapeHtml((x.split.memberName || x.split.memberEmail).split(' ')[0])).join(', ');
+                      billSettlementBadge = `<span class="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">⏳ Pending (${leftNames})</span>`;
+                    }
                   }
                 }
               }
