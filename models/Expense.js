@@ -40,6 +40,8 @@ const ExpenseSchema = new mongoose.Schema(
     paidByEmail: { type: String, required: true, lowercase: true, trim: true },
     paidByName: { type: String, required: true, trim: true },
     paidByAllocations: { type: [PayerAllocationSchema], default: [] },
+    createdByEmail: { type: String, lowercase: true, trim: true, default: '' },
+    createdByName: { type: String, trim: true, default: '' },
     splitType: { type: String, enum: ['equal', 'exact', 'percentage', 'shares'], default: 'equal' },
     splits: { type: [SplitAllocationSchema], required: true },
     roundingRemainder: { type: Number, default: 0 },

@@ -129,14 +129,15 @@
       const currentAdmin = grp.members.find((m) => m.role === 'admin' || (grp.adminEmail && grp.adminEmail.toLowerCase() === m.email.toLowerCase())) || grp.members[0];
       const isCurrentUserAdmin = currentAdmin && currentAdmin.email.toLowerCase().trim() === currentEmail;
 
-      const { totalSpend, simplified, filteredExpenses, filteredSettlements, balanceList } =
+      const { totalSpend, simplified, filteredExpenses, filteredSettlements, balanceList, balanceMap } =
         serverData && serverData.simplifiedTransactions
           ? {
               totalSpend: serverData.totalSpend,
               simplified: serverData.simplifiedTransactions,
               filteredExpenses: serverData.expenses,
               filteredSettlements: serverData.settlements,
-              balanceList: serverData.members
+              balanceList: serverData.members,
+              balanceMap: (serverData.members || []).reduce((acc, m) => { acc[(m.email || '').toLowerCase().trim()] = m; return acc; }, {})
             }
           : computeBalancesAndSimplifications(grp.id);
 
@@ -309,20 +310,68 @@
               const splitsList = Array.isArray(exp.splits) ? exp.splits : [];
               const mySplit = splitsList.find((s) => (s.memberEmail || '').toLowerCase().trim() === currentEmail);
 
+              const payerEmails = new Set(
+                (Array.isArray(exp.paidByAllocations) && exp.paidByAllocations.length > 0
+                  ? exp.paidByAllocations
+                  : [{ memberEmail: exp.paidByEmail }]
+                ).map((p) => String(p.memberEmail || '').toLowerCase().trim())
+              );
+
               const splitChips = splitsList
                 .map((s) => {
                   const sEmail = (s.memberEmail || '').toLowerCase().trim();
                   const isThisMe = sEmail === currentEmail;
+                  const isPayer = payerEmails.has(sEmail);
+                  const b = balanceMap ? balanceMap[sEmail] : null;
+                  const isSettled = isPayer || (b && b.net >= -0.01);
+                  const statusTag = isPayer
+                    ? '<span class="text-[8px] font-bold text-teal-300 uppercase ml-1">(Payer)</span>'
+                    : isSettled
+                      ? '<span class="text-[8px] font-bold text-emerald-400 uppercase ml-1">✓ Settled</span>'
+                      : '<span class="text-[8px] font-bold text-rose-300 uppercase ml-1">⏳ Left to Pay</span>';
+                  const chipBorder = isSettled
+                    ? 'border-emerald-500/30 bg-emerald-950/30 text-emerald-200'
+                    : 'border-slate-700 bg-slate-800 text-slate-300';
                   return `
-                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] ${isThisMe ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30 font-bold' : 'bg-slate-800 text-slate-300 border border-slate-700'}">
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] ${isThisMe ? 'ring-1 ring-teal-400/50' : ''} ${chipBorder}">
                       <span>${escapeHtml(s.memberName || s.memberEmail.split('@')[0])}:</span>
                       <span>${formatINR(s.amount)}</span>
+                      ${statusTag}
                     </span>
                   `;
                 })
                 .join('');
 
-              const canDelete = isCurrentUserAdmin || isPayerMe;
+              let billSettlementBadge = '';
+              if (exp.type !== 'income') {
+                const leftToPayList = splitsList.filter((s) => {
+                  const sEmail = (s.memberEmail || '').toLowerCase().trim();
+                  if (payerEmails.has(sEmail)) return false;
+                  const b = balanceMap ? balanceMap[sEmail] : null;
+                  return b && b.net < -0.01;
+                });
+                if (leftToPayList.length === 0) {
+                  billSettlementBadge = '<span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">✓ All Settled</span>';
+                } else {
+                  const leftNames = leftToPayList.map((s) => escapeHtml((s.memberName || s.memberEmail).split(' ')[0])).join(', ');
+                  billSettlementBadge = `<span class="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">⏳ Pending (${leftNames})</span>`;
+                }
+              }
+
+              const creatorEmail = (exp.createdByEmail || exp.paidByEmail || '').toLowerCase().trim();
+              const isCreator = Boolean(currentEmail && creatorEmail === currentEmail);
+              const canModify = isCurrentUserAdmin || isCreator || Boolean(appState.currentUser?.isSuperAdmin);
+
+              const actionButtons = canModify
+                ? `
+                  <button onclick="closeModal('groupDetailsModal'); openEditExpenseModal('${escapeHtml(exp.id || exp._id)}')" class="text-[10px] text-emerald-300 hover:text-emerald-200 font-semibold px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/25">
+                    Edit
+                  </button>
+                  <button onclick="deleteExpenseById('${escapeHtml(exp.id || exp._id)}')" class="text-[10px] text-rose-400 hover:text-rose-300 font-semibold px-2 py-0.5 rounded bg-rose-500/10 border border-rose-500/20">
+                    Delete
+                  </button>
+                `
+                : '';
 
               return `
                 <div class="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2">
@@ -330,7 +379,10 @@
                     <div class="flex items-start gap-2.5 min-w-0">
                       <span class="text-xl p-2 rounded-xl bg-slate-800/80 border border-slate-700/80 flex-shrink-0">${escapeHtml(exp.category?.slice(0, 2) || '🧾')}</span>
                       <div class="min-w-0">
-                        <h4 class="text-xs font-bold text-white truncate">${escapeHtml(exp.description)}</h4>
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                          <h4 class="text-xs font-bold text-white truncate">${escapeHtml(exp.description)}</h4>
+                          ${billSettlementBadge}
+                        </div>
                         <div class="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
                           <span>Paid by <strong class="${isPayerMe ? 'text-teal-300' : 'text-slate-200'}">${escapeHtml(exp.paidByName || exp.paidByEmail)}</strong></span>
                           <span>·</span>
@@ -348,14 +400,7 @@
                   <div class="pt-2 border-t border-slate-800/60 flex items-center justify-between gap-2 flex-wrap">
                     <div class="flex flex-wrap gap-1">${splitChips}</div>
                     <div class="flex items-center gap-1.5">
-                      <button onclick="closeModal('groupDetailsModal'); openEditExpenseModal('${escapeHtml(exp.id || exp._id)}')" class="text-[10px] text-emerald-300 hover:text-emerald-200 font-semibold px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/25">
-                        Edit
-                      </button>
-                      ${canDelete ? `
-                        <button onclick="deleteExpenseById('${escapeHtml(exp.id || exp._id)}')" class="text-[10px] text-rose-400 hover:text-rose-300 font-semibold px-2 py-0.5 rounded bg-rose-500/10 border border-rose-500/20">
-                          Delete
-                        </button>
-                      ` : ''}
+                      ${actionButtons}
                     </div>
                   </div>
                 </div>
@@ -924,7 +969,7 @@
         groupSel.value = selectedGroupId;
       }
       document.getElementById('expDescInput').value = '';
-      document.getElementById('expAmountInput').value = '1200';
+      document.getElementById('expAmountInput').value = '';
       if (document.getElementById('expBillCurrencySelect')) {
         document.getElementById('expBillCurrencySelect').value = 'INR';
         handleBillCurrencyChange();

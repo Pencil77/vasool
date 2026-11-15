@@ -167,6 +167,8 @@ router.post('/expenses', requireAuth, async (req, res) => {
       paidByEmail: resolvedPaidByEmail,
       paidByName: resolvedPaidByName,
       paidByAllocations: normalizedPayers,
+      createdByEmail: (req.user.email || '').toLowerCase().trim(),
+      createdByName: (req.user.name || '').trim(),
       splitType,
       splits,
       roundingRemainder: Number(roundingRemainder) || 0,
@@ -220,10 +222,23 @@ router.put('/expenses/:id', requireAuth, async (req, res) => {
 
     const group = await Group.findById(existing.groupId);
     const requesterEmail = (req.user.email || '').toLowerCase().trim();
+    const isSuperAdmin = isSuperAdminUser(req.user);
     if (group) {
       const isMember = group.members.some((m) => m.email.toLowerCase().trim() === requesterEmail);
-      if (!isMember && !isSuperAdminUser(req.user)) {
+      if (!isMember && !isSuperAdmin) {
         return res.status(403).json({ error: 'Only group members can edit expenses in this group.' });
+      }
+
+      const isGroupAdmin = (
+        (group.adminEmail && group.adminEmail.toLowerCase() === requesterEmail) ||
+        (group.createdByEmail && group.createdByEmail.toLowerCase() === requesterEmail) ||
+        group.members.some((m) => m.email.toLowerCase().trim() === requesterEmail && (m.role === 'admin' || m.role === 'owner'))
+      );
+      const creatorEmail = (existing.createdByEmail || existing.paidByEmail || '').toLowerCase().trim();
+      const isCreator = creatorEmail === requesterEmail;
+
+      if (!isCreator && !isGroupAdmin && !isSuperAdmin) {
+        return res.status(403).json({ error: 'Permission denied. Only the person who created this bill or a group admin can edit it.' });
       }
     }
 
@@ -324,10 +339,23 @@ router.delete('/expenses/:id', requireAuth, async (req, res) => {
 
     const group = await Group.findById(existing.groupId);
     const requesterEmail = (req.user.email || '').toLowerCase().trim();
+    const isSuperAdmin = isSuperAdminUser(req.user);
     if (group) {
       const isMember = group.members.some((m) => m.email.toLowerCase().trim() === requesterEmail);
-      if (!isMember && !isSuperAdminUser(req.user)) {
+      if (!isMember && !isSuperAdmin) {
         return res.status(403).json({ error: 'Access denied. Only group members can delete bills.' });
+      }
+
+      const isGroupAdmin = (
+        (group.adminEmail && group.adminEmail.toLowerCase() === requesterEmail) ||
+        (group.createdByEmail && group.createdByEmail.toLowerCase() === requesterEmail) ||
+        group.members.some((m) => m.email.toLowerCase().trim() === requesterEmail && (m.role === 'admin' || m.role === 'owner'))
+      );
+      const creatorEmail = (existing.createdByEmail || existing.paidByEmail || '').toLowerCase().trim();
+      const isCreator = creatorEmail === requesterEmail;
+
+      if (!isCreator && !isGroupAdmin && !isSuperAdmin) {
+        return res.status(403).json({ error: 'Permission denied. Only the person who created this bill or a group admin can delete it.' });
       }
     }
 

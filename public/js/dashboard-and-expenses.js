@@ -807,6 +807,8 @@
         return;
       }
 
+      const { balanceMap } = computeBalancesAndSimplifications(selectedGroupId);
+
       container.innerHTML = list
         .map((e) => {
           const grp = appState.groups.find((g) => g.id === e.groupId);
@@ -814,6 +816,13 @@
           const adminMember = grp ? (grp.members?.find((m) => m.role === 'admin' || (grp.adminEmail && grp.adminEmail.toLowerCase() === m.email.toLowerCase())) || grp.members?.[0]) : null;
           const isUserAdmin = adminMember && adminMember.email.toLowerCase().trim() === currentEmail;
           const isPersonalOnly = grp && (grp.splitsVisibility || 'personal_only') === 'personal_only' && !isUserAdmin;
+
+          const payerEmails = new Set(
+            (Array.isArray(e.paidByAllocations) && e.paidByAllocations.length > 0
+              ? e.paidByAllocations
+              : [{ memberEmail: e.paidByEmail }]
+            ).map((p) => String(p.memberEmail || '').toLowerCase().trim())
+          );
 
           let visibleSplits = e.splits || [];
           if (isPersonalOnly) {
@@ -824,28 +833,90 @@
           if (isPersonalOnly) {
             if (visibleSplits.length > 0) {
               splitsPills = visibleSplits
-                .map(
-                  (s) =>
-                    `<span class="px-2 py-0.5 rounded bg-purple-900/40 text-purple-200 border border-purple-500/30 font-semibold text-[11px]">Your Share: ${formatINR(s.amount)}</span>`
-                )
+                .map((s) => {
+                  const sEmail = String(s.memberEmail || '').toLowerCase().trim();
+                  const isPayer = payerEmails.has(sEmail);
+                  const b = balanceMap ? balanceMap[sEmail] : null;
+                  const isSettled = isPayer || (b && b.net >= -0.01);
+                  const statusTag = isPayer
+                    ? '<span class="text-[9px] font-bold text-teal-300 ml-1.5 uppercase">(Payer)</span>'
+                    : isSettled
+                      ? '<span class="text-[9px] font-bold text-emerald-300 ml-1.5 uppercase">✓ Settled</span>'
+                      : '<span class="text-[9px] font-bold text-rose-300 ml-1.5 uppercase">⏳ Left to Pay</span>';
+                  return `<span class="px-2 py-0.5 rounded bg-purple-900/40 text-purple-200 border border-purple-500/30 font-semibold text-[11px] inline-flex items-center">Your Share: ${formatINR(s.amount)} ${statusTag}</span>`;
+                })
                 .join(' ') + ` <span class="px-2 py-0.5 rounded bg-slate-800/80 text-slate-400 text-[10px] italic border border-slate-700/50">🔒 Other member shares kept private by Admin</span>`;
             } else {
               splitsPills = `<span class="px-2 py-0.5 rounded bg-slate-800/80 text-slate-400 text-[10px] italic">No share assigned to you · 🔒 Other member shares private</span>`;
             }
           } else {
             splitsPills = visibleSplits
-              .map(
-                (s) =>
-                  `<span class="px-2 py-0.5 rounded bg-slate-800 text-[11px] text-slate-300">${escapeHtml(s.memberName.split(' ')[0])}: ${formatINR(s.amount)}</span>`
-              )
+              .map((s) => {
+                const sEmail = String(s.memberEmail || '').toLowerCase().trim();
+                const isPayer = payerEmails.has(sEmail);
+                const b = balanceMap ? balanceMap[sEmail] : null;
+                const isSettled = isPayer || (b && b.net >= -0.01);
+                const statusTag = isPayer
+                  ? '<span class="text-[9px] font-bold text-teal-300 uppercase">(Payer)</span>'
+                  : isSettled
+                    ? '<span class="text-[9px] font-bold text-emerald-400 uppercase">✓ Settled</span>'
+                    : '<span class="text-[9px] font-bold text-rose-300 uppercase">⏳ Left to Pay</span>';
+                const pillBorder = isSettled
+                  ? 'border-emerald-500/30 bg-emerald-950/30 text-emerald-200'
+                  : 'border-slate-700/80 bg-slate-800 text-slate-300';
+                return `<span class="px-2 py-0.5 rounded text-[11px] border ${pillBorder} inline-flex items-center gap-1.5">${escapeHtml((s.memberName || s.memberEmail).split(' ')[0])}: ${formatINR(s.amount)} ${statusTag}</span>`;
+              })
               .join(' ');
           }
+
+          let billSettlementBadge = '';
+          if (e.type !== 'income') {
+            const allSplits = e.splits || [];
+            const leftToPayList = allSplits.filter((s) => {
+              const sEmail = String(s.memberEmail || '').toLowerCase().trim();
+              if (payerEmails.has(sEmail)) return false;
+              const b = balanceMap ? balanceMap[sEmail] : null;
+              return b && b.net < -0.01;
+            });
+            if (leftToPayList.length === 0) {
+              billSettlementBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">✓ All Settled</span>';
+            } else {
+              const leftNames = leftToPayList.map((s) => escapeHtml((s.memberName || s.memberEmail).split(' ')[0])).join(', ');
+              billSettlementBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">⏳ Left to Pay: ${leftNames}</span>`;
+            }
+          }
+
           const fxBadge = (e.originalCurrency && e.originalCurrency !== 'INR' && e.originalAmount)
             ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-mono-code font-semibold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">🌐 ${e.originalAmount} ${escapeHtml(e.originalCurrency)} @ ₹${e.exchangeRate || 1}</span>`
             : '';
           const parentRefundBadge = e.parentExpenseDesc
             ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-cyan-500/15 text-cyan-200 border border-cyan-500/30">🔗 Refund for: ${escapeHtml(e.parentExpenseDesc)}</span>`
             : '';
+
+          // Authorization check: Only creator or group admin / super admin can edit/delete
+          const isSuperAdmin = Boolean(appState.currentUser?.isSuperAdmin || appState.currentUser?.role === 'super_admin');
+          const isGroupAdmin = Boolean(
+            grp && (
+              (grp.adminEmail && grp.adminEmail.toLowerCase() === currentEmail) ||
+              (grp.createdByEmail && grp.createdByEmail.toLowerCase() === currentEmail) ||
+              (grp.members || []).some((m) => (m.email || '').toLowerCase().trim() === currentEmail && (m.role === 'admin' || m.role === 'owner'))
+            )
+          );
+          const creatorEmail = String(e.createdByEmail || e.paidByEmail || '').toLowerCase().trim();
+          const isCreator = Boolean(currentEmail && creatorEmail === currentEmail);
+          const canModify = isCreator || isGroupAdmin || isSuperAdmin;
+
+          const actionButtons = canModify
+            ? `
+              <button data-testid="btn-edit-expense-${escapeHtml(e.id)}" onclick="openEditExpenseModal('${escapeHtml(e.id)}')" class="text-xs text-emerald-300 hover:text-emerald-200 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/25 transition">
+                Edit
+              </button>
+              <button data-testid="btn-delete-expense-${escapeHtml(e.id)}" onclick="deleteExpenseById('${escapeHtml(e.id)}')" class="text-xs text-rose-400 hover:text-rose-300 px-2.5 py-1 rounded-lg bg-rose-500/10 border border-rose-500/20 transition">
+                Delete
+              </button>
+            `
+            : '';
+
           return `
             <div data-testid="expense-card-${escapeHtml(e.id)}" class="glass-panel glass-card-hover rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div class="space-y-1">
@@ -854,6 +925,7 @@
                   ${e.type === 'income' ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">💵 Income / Refund</span>' : ''}
                   <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">${escapeHtml(e.category)}</span>
                   <span class="px-2 py-0.5 rounded text-[10px] uppercase bg-slate-800 text-slate-300">${escapeHtml(e.splitType)} split</span>
+                  ${billSettlementBadge}
                   ${fxBadge}
                   ${parentRefundBadge}
                 </div>
@@ -870,12 +942,7 @@
               <div class="flex sm:flex-col items-center sm:items-end justify-between gap-2">
                 <div class="text-lg font-extrabold ${e.type === 'income' ? 'text-cyan-400' : 'text-white'}">${e.type === 'income' ? '+' : ''}${formatINR(e.amount)}</div>
                 <div class="flex items-center gap-1.5">
-                  <button data-testid="btn-edit-expense-${escapeHtml(e.id)}" onclick="openEditExpenseModal('${escapeHtml(e.id)}')" class="text-xs text-emerald-300 hover:text-emerald-200 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/25 transition">
-                    Edit
-                  </button>
-                  <button data-testid="btn-delete-expense-${escapeHtml(e.id)}" onclick="deleteExpenseById('${escapeHtml(e.id)}')" class="text-xs text-rose-400 hover:text-rose-300 px-2.5 py-1 rounded-lg bg-rose-500/10 border border-rose-500/20 transition">
-                    Delete
-                  </button>
+                  ${actionButtons}
                 </div>
               </div>
             </div>
