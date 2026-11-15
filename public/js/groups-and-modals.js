@@ -2694,6 +2694,13 @@
       `;
 
       updateSettlementUpiData();
+      isSubmittingSettlement = false;
+      const btnEl = document.getElementById('btnConfirmSettleSubmit');
+      if (btnEl) {
+        btnEl.disabled = false;
+        btnEl.classList.remove('opacity-75', 'cursor-not-allowed', 'pointer-events-none');
+        btnEl.innerHTML = 'Record &amp; Submit Settlement';
+      }
       openModal('settleConfirmModal');
 
       // Live check against backend User record to ensure we have the recipient's latest UPI ID
@@ -2720,17 +2727,38 @@
       }
     }
 
+    let isSubmittingSettlement = false;
+
     async function confirmSettlementSubmit(e) {
-      e.preventDefault();
-      const fromEmail = document.getElementById('settleFromEmail').value;
-      const fromName = document.getElementById('settleFromName').value;
-      const toEmail = document.getElementById('settleToEmail').value;
-      const toName = document.getElementById('settleToName').value;
-      const groupId = document.getElementById('settleGroupId').value;
-      const amount = Number(document.getElementById('settleAmountInput').value) || 0;
-      const method = document.getElementById('settleMethodSelect').value;
+      if (e && e.preventDefault) e.preventDefault();
+
+      if (isSubmittingSettlement) {
+        console.warn('[Settlement] Submission already in flight. Ignoring duplicate click.');
+        return;
+      }
+
+      const fromEmail = document.getElementById('settleFromEmail')?.value || '';
+      const fromName = document.getElementById('settleFromName')?.value || '';
+      const toEmail = document.getElementById('settleToEmail')?.value || '';
+      const toName = document.getElementById('settleToName')?.value || '';
+      const groupId = document.getElementById('settleGroupId')?.value || '';
+      const amount = Number(document.getElementById('settleAmountInput')?.value) || 0;
+      const method = document.getElementById('settleMethodSelect')?.value || 'UPI';
       const utrNumber = document.getElementById('settleUtrInput') ? document.getElementById('settleUtrInput').value.trim() : '';
-      const referenceNote = document.getElementById('settleNoteInput').value.trim();
+      const referenceNote = document.getElementById('settleNoteInput')?.value.trim() || '';
+
+      if (!groupId) {
+        showToast('Please select a valid group for this settlement.', 'error');
+        return;
+      }
+      if (!fromEmail || !toEmail) {
+        showToast('Payer and recipient are required.', 'error');
+        return;
+      }
+      if (amount <= 0 || isNaN(amount)) {
+        showToast('Please enter a valid settlement amount greater than ₹0.', 'error');
+        return;
+      }
 
       const currentEmail = (appState.currentUser?.email || '').toLowerCase().trim();
       const grp = appState.groups.find((g) => g.id === groupId) || appState.groups[0];
@@ -2739,67 +2767,93 @@
       const isTargetCreditor = toEmail.toLowerCase().trim() === currentEmail;
       const isDirectlyConfirmed = isViewerAdmin || isTargetCreditor;
 
-      let stlId = 'stl_' + Date.now();
-      let status = isDirectlyConfirmed ? 'confirmed' : 'pending_admin_approval';
-      let confirmedAt = isDirectlyConfirmed ? new Date().toISOString() : null;
-      let confirmedByEmail = isDirectlyConfirmed ? currentEmail : null;
-      let confirmedRole = isTargetCreditor ? 'creditor' : (isViewerAdmin ? 'admin' : '');
-
-      if (localStorage.getItem(AUTH_TOKEN_KEY)) {
-        try {
-          const res = await apiFetch('/api/settlements', {
-            method: 'POST',
-            body: JSON.stringify({
-              groupId,
-              fromEmail,
-              fromName,
-              toEmail,
-              toName,
-              amount,
-              method,
-              referenceNote,
-              utrNumber
-            })
-          });
-          if (res && res.settlement && res.settlement._id) {
-            stlId = res.settlement._id.toString();
-            status = res.settlement.status || status;
-            confirmedAt = res.settlement.confirmedAt || confirmedAt;
-            confirmedByEmail = res.settlement.confirmedByEmail || confirmedByEmail;
-            confirmedRole = res.settlement.confirmedRole || confirmedRole;
-          }
-        } catch (err) {
-          console.warn('[Settlement] Server notice:', err.message);
-        }
+      isSubmittingSettlement = true;
+      const btnEl = document.getElementById('btnConfirmSettleSubmit');
+      if (btnEl) {
+        btnEl.disabled = true;
+        btnEl.classList.add('opacity-75', 'cursor-not-allowed', 'pointer-events-none');
+        btnEl.innerHTML = '<span class="inline-flex items-center gap-1.5"><svg class="animate-spin -ml-1 mr-1 h-3.5 w-3.5 text-slate-950" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg><span>Recording...</span></span>';
       }
 
-      appState.settlements.unshift({
-        id: stlId,
-        groupId,
-        fromEmail,
-        fromName,
-        toEmail,
-        toName,
-        amount,
-        currency: 'INR',
-        method,
-        referenceNote,
-        utrNumber,
-        status,
-        confirmedAt,
-        confirmedByEmail,
-        confirmedRole,
-        settledAt: new Date().toISOString().slice(0, 10)
-      });
+      try {
+        let stlId = 'stl_' + Date.now();
+        let status = isDirectlyConfirmed ? 'confirmed' : 'pending_admin_approval';
+        let confirmedAt = isDirectlyConfirmed ? new Date().toISOString() : null;
+        let confirmedByEmail = isDirectlyConfirmed ? currentEmail : null;
+        let confirmedRole = isTargetCreditor ? 'creditor' : (isViewerAdmin ? 'admin' : '');
 
-      closeModal('settleConfirmModal');
-      saveState();
-      refreshAllViews();
+        if (localStorage.getItem(AUTH_TOKEN_KEY)) {
+          try {
+            const res = await apiFetch('/api/settlements', {
+              method: 'POST',
+              body: JSON.stringify({
+                groupId,
+                fromEmail,
+                fromName,
+                toEmail,
+                toName,
+                amount,
+                method,
+                referenceNote,
+                utrNumber
+              })
+            });
+            if (res && res.settlement && res.settlement._id) {
+              stlId = res.settlement._id.toString();
+              status = res.settlement.status || status;
+              confirmedAt = res.settlement.confirmedAt || confirmedAt;
+              confirmedByEmail = res.settlement.confirmedByEmail || confirmedByEmail;
+              confirmedRole = res.settlement.confirmedRole || confirmedRole;
+            }
+            if (res && res.isDuplicatePrevented) {
+              console.info('[Settlement] Duplicate submission prevented by server deduplication.');
+            }
+          } catch (err) {
+            console.warn('[Settlement] Server notice:', err.message);
+          }
+        }
 
-      if (status === 'confirmed') {
-        showToast(`✅ Payment of ${formatINR(amount)} confirmed and settled.`);
-      } else {
-        showToast(`⏳ Payment of ${formatINR(amount)} marked as paid. Awaiting creditor or admin confirmation.`);
+        const alreadyExists = appState.settlements.some((s) => String(s.id || s._id) === String(stlId));
+        if (!alreadyExists) {
+          appState.settlements.unshift({
+            id: stlId,
+            groupId,
+            fromEmail,
+            fromName,
+            toEmail,
+            toName,
+            amount,
+            currency: 'INR',
+            method,
+            referenceNote,
+            utrNumber,
+            status,
+            confirmedAt,
+            confirmedByEmail,
+            confirmedRole,
+            settledAt: new Date().toISOString().slice(0, 10)
+          });
+        }
+
+        closeModal('settleConfirmModal');
+        saveState();
+        refreshAllViews();
+
+        if (status === 'confirmed') {
+          showToast(`✅ Payment of ${formatINR(amount)} confirmed and settled.`);
+        } else {
+          showToast(`⏳ Payment of ${formatINR(amount)} marked as paid. Awaiting creditor or admin confirmation.`);
+        }
+      } catch (err) {
+        console.error('[Settlement Error]', err);
+        showToast(err.message || 'Failed to record settlement. Please try again.', 'error');
+      } finally {
+        isSubmittingSettlement = false;
+        if (btnEl) {
+          btnEl.disabled = false;
+          btnEl.classList.remove('opacity-75', 'cursor-not-allowed', 'pointer-events-none');
+          btnEl.innerHTML = 'Record &amp; Submit Settlement';
+        }
       }
     }
 

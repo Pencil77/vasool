@@ -164,13 +164,53 @@ router.post('/settlements', requireAuth, async (req, res) => {
     const confirmedByEmail = isDirectlyConfirmed ? requesterEmail : null;
     const confirmedRole = isTargetCreditor ? 'creditor' : (isAdmin ? 'admin' : '');
 
+    const cleanFromEmail = String(fromEmail).toLowerCase().trim();
+    const cleanToEmail = String(toEmail).toLowerCase().trim();
+    const roundedAmount = Math.round(Number(amount) * 100) / 100;
+
+    // Rapid duplicate submission prevention (10-second window):
+    // Guards against rapid multi-clicks, touch unresponsiveness, or network re-transmissions.
+    const deduplicationWindow = new Date(Date.now() - 10000);
+    const existingRecent = await Settlement.findOne({
+      groupId,
+      fromEmail: cleanFromEmail,
+      toEmail: cleanToEmail,
+      amount: roundedAmount,
+      createdAt: { $gte: deduplicationWindow }
+    }).lean();
+
+    if (existingRecent) {
+      return res.status(200).json({
+        settlement: existingRecent,
+        message: 'Settlement already recorded (rapid duplicate prevented).',
+        isDuplicatePrevented: true
+      });
+    }
+
+    // Check for existing pending settlement awaiting confirmation between the same parties for the same amount
+    const existingPending = await Settlement.findOne({
+      groupId,
+      fromEmail: cleanFromEmail,
+      toEmail: cleanToEmail,
+      amount: roundedAmount,
+      status: 'pending_admin_approval'
+    }).lean();
+
+    if (existingPending && (!req.body.utrNumber || req.body.utrNumber === existingPending.utrNumber)) {
+      return res.status(200).json({
+        settlement: existingPending,
+        message: 'An identical settlement is already pending confirmation.',
+        isDuplicatePrevented: true
+      });
+    }
+
     const settlement = await Settlement.create({
       groupId,
-      fromEmail: String(fromEmail).toLowerCase().trim(),
+      fromEmail: cleanFromEmail,
       fromName: String(fromName || fromEmail).trim(),
-      toEmail: String(toEmail).toLowerCase().trim(),
+      toEmail: cleanToEmail,
       toName: String(toName || toEmail).trim(),
-      amount: Math.round(Number(amount) * 100) / 100,
+      amount: roundedAmount,
       currency: currency || 'INR',
       method: method || 'UPI',
       referenceNote: referenceNote || '',
@@ -223,6 +263,14 @@ router.post('/settlements/:id/confirm', requireAuth, async (req, res) => {
 
     if (!isAdmin && !isTargetCreditor) {
       return res.status(403).json({ error: 'Only the receiving creditor or group admin can confirm payment receipt.' });
+    }
+
+    if (settlement.status === 'confirmed') {
+      return res.status(200).json({
+        settlement,
+        message: 'Settlement was already confirmed.',
+        alreadyConfirmed: true
+      });
     }
 
     const { receivedAmount, adminNote } = req.body || {};
@@ -297,6 +345,14 @@ router.post('/settlements/:id/reject', requireAuth, async (req, res) => {
 
     if (!isAdmin && !isTargetCreditor) {
       return res.status(403).json({ error: 'Only the receiving creditor or group admin can reject payment claims.' });
+    }
+
+    if (settlement.status === 'rejected') {
+      return res.status(200).json({
+        settlement,
+        message: 'Settlement was already rejected.',
+        alreadyRejected: true
+      });
     }
 
     settlement.status = 'rejected';

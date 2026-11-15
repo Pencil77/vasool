@@ -745,6 +745,8 @@
       window.setSplitMode = setSplitMode;
       window.handleSaveExpense = handleSaveExpense;
       window.getIsSavingExpense = () => (typeof isSavingExpense !== 'undefined' ? isSavingExpense : false);
+      window.confirmSettlementSubmit = confirmSettlementSubmit;
+      window.getIsSubmittingSettlement = () => (typeof isSubmittingSettlement !== 'undefined' ? isSubmittingSettlement : false);
       window.promptTransferAdmin = promptTransferAdmin;
       window.handleTransferAdmin = handleTransferAdmin;
       window.toggleGroupSplitVisibility = toggleGroupSplitVisibility;

@@ -1655,7 +1655,14 @@
       }
     }
 
+    const activeSettlementActionSet = new Set();
+
     async function handleConfirmSettlement(settlementId, customReceivedAmount = null, customAdminNote = '') {
+      if (activeSettlementActionSet.has(settlementId)) {
+        console.warn(`[Settlement] Action on ${settlementId} already in progress. Ignoring duplicate click.`);
+        return;
+      }
+      activeSettlementActionSet.add(settlementId);
       try {
         const payload = {};
         if (customReceivedAmount !== null && Number(customReceivedAmount) > 0) {
@@ -1703,6 +1710,8 @@
         );
       } catch (err) {
         showToast('Error confirming settlement: ' + err.message, 'error');
+      } finally {
+        activeSettlementActionSet.delete(settlementId);
       }
     }
 
@@ -1748,6 +1757,12 @@
     async function submitRejectSettleModal(e) {
       e.preventDefault();
       const settlementId = document.getElementById('rejectSettleIdInput')?.value;
+      if (!settlementId) return;
+      if (activeSettlementActionSet.has(settlementId)) {
+        console.warn(`[Settlement] Action on ${settlementId} already in progress. Ignoring duplicate click.`);
+        return;
+      }
+      activeSettlementActionSet.add(settlementId);
       const reason = (document.getElementById('rejectSettleReasonInput')?.value || 'Payment not received').trim();
       closeModal('rejectSettleModal');
       try {
@@ -1772,6 +1787,8 @@
         showToast('❌ Settlement claim rejected.');
       } catch (err) {
         showToast('Error rejecting settlement: ' + err.message, 'error');
+      } finally {
+        activeSettlementActionSet.delete(settlementId);
       }
     }
 
