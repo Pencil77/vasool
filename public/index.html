@@ -56,14 +56,6 @@
           <option value="priya.settler@vasool.test">💵 Priya Das (Settler)</option>
         </select>
 
-        <!-- Currency Selector -->
-        <select id="currencySelector" data-testid="currency-selector" onchange="handleCurrencyChange(this.value)" aria-label="Select Currency" class="px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-semibold bg-slate-900/90 text-slate-200 border border-slate-700/80 hover:border-slate-600 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 cursor-pointer shadow-sm transition">
-          <option value="INR">₹ INR</option>
-          <option value="USD">$ USD</option>
-          <option value="EUR">€ EUR</option>
-          <option value="GBP">£ GBP</option>
-        </select>
-
         <!-- Feedback Button in Header (Desktop / Tablet; mobile has persistent FAB) -->
         <button
           id="btnHeaderFeedback"
@@ -130,7 +122,7 @@
       <div class="lg:col-span-7 space-y-6">
         <div class="relative rounded-2xl overflow-hidden border border-slate-800 shadow-2xl bg-slate-900">
           <img
-            src="data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%201200%20540%22%20width%3D%221200%22%20height%3D%22540%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22bg%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%22100%25%22%3E%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23020617%22/%3E%3Cstop%20offset%3D%2245%25%22%20stop-color%3D%22%23062c28%22/%3E%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%230f172a%22/%3E%3C/linearGradient%3E%3CradialGradient%20id%3D%22orb1%22%20cx%3D%2225%25%22%20cy%3D%2230%25%22%20r%3D%2250%25%22%3E%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%2310b981%22%20stop-opacity%3D%220.45%22/%3E%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%2310b981%22%20stop-opacity%3D%220%22/%3E%3C/radialGradient%3E%3CradialGradient%20id%3D%22orb2%22%20cx%3D%2280%25%22%20cy%3D%2225%25%22%20r%3D%2245%25%22%3E%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%2306b6d4%22%20stop-opacity%3D%220.38%22/%3E%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%2306b6d4%22%20stop-opacity%3D%220%22/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect%20width%3D%221200%22%20height%3D%22540%22%20fill%3D%22url%28%23bg%29%22/%3E%3Ccircle%20cx%3D%22300%22%20cy%3D%22160%22%20r%3D%22280%22%20fill%3D%22url%28%23orb1%29%22/%3E%3Ccircle%20cx%3D%22920%22%20cy%3D%22140%22%20r%3D%22260%22%20fill%3D%22url%28%23orb2%29%22/%3E%3Cg%20stroke%3D%22rgba%28255%2C255%2C255%2C0.06%29%22%20stroke-width%3D%221%22%3E%3Cline%20x1%3D%220%22%20y1%3D%22120%22%20x2%3D%221200%22%20y2%3D%22120%22/%3E%3Cline%20x1%3D%220%22%20y1%3D%22240%22%20x2%3D%221200%22%20y2%3D%22240%22/%3E%3Cline%20x1%3D%220%22%20y1%3D%22360%22%20x2%3D%221200%22%20y2%3D%22360%22/%3E%3Cline%20x1%3D%22300%22%20y1%3D%220%22%20x2%3D%22300%22%20y2%3D%22540%22/%3E%3Cline%20x1%3D%22600%22%20y1%3D%220%22%20x2%3D%22600%22%20y2%3D%22540%22/%3E%3Cline%20x1%3D%22900%22%20y1%3D%220%22%20x2%3D%22900%22%20y2%3D%22540%22/%3E%3C/g%3E%3Crect%20x%3D%2270%22%20y%3D%2255%22%20width%3D%22320%22%20height%3D%22175%22%20rx%3D%2224%22%20fill%3D%22rgba%2815%2C23%2C42%2C0.82%29%22%20stroke%3D%22rgba%2852%2C211%2C153%2C0.4%29%22%20stroke-width%3D%222%22/%3E%3Ctext%20x%3D%22100%22%20y%3D%22102%22%20fill%3D%22%2334d399%22%20font-family%3D%22sans-serif%22%20font-size%3D%2215%22%20font-weight%3D%22bold%22%3E%E2%9A%A1%20MIN-CASH-FLOW%20ENGINE%3C/text%3E%3Ctext%20x%3D%22100%22%20y%3D%22148%22%20fill%3D%22%23ffffff%22%20font-family%3D%22sans-serif%22%20font-size%3D%2234%22%20font-weight%3D%22800%22%3E%E2%82%B928%2C000.00%3C/text%3E%3Ctext%20x%3D%22100%22%20y%3D%22182%22%20fill%3D%22%2394a3b8%22%20font-family%3D%22sans-serif%22%20font-size%3D%2214%22%3E12%20IOUs%20simplified%20%E2%86%92%203%20Transfers%3C/text%3E%3Crect%20x%3D%22440%22%20y%3D%2245%22%20width%3D%22320%22%20height%3D%22190%22%20rx%3D%2224%22%20fill%3D%22rgba%2815%2C23%2C42%2C0.86%29%22%20stroke%3D%22rgba%2820%2C184%2C166%2C0.45%29%22%20stroke-width%3D%222%22/%3E%3Ctext%20x%3D%22470%22%20y%3D%2292%22%20fill%3D%22%232dd4bf%22%20font-family%3D%22sans-serif%22%20font-size%3D%2215%22%20font-weight%3D%22bold%22%3E%F0%9F%8C%90%207-CURRENCY%20LIVE%20FX%3C/text%3E%3Ctext%20x%3D%22470%22%20y%3D%22138%22%20fill%3D%22%23ffffff%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20font-weight%3D%22800%22%3EINR%20%C2%B7%20USD%20%C2%B7%20EUR%20%C2%B7%20GBP%3C/text%3E%3Ctext%20x%3D%22470%22%20y%3D%22175%22%20fill%3D%22%23cbd5e1%22%20font-family%3D%22sans-serif%22%20font-size%3D%2214%22%3E4%20Split%20Modes%20%C2%B7%202x%20Couple%20Weight%3C/text%3E%3Crect%20x%3D%22810%22%20y%3D%2255%22%20width%3D%22320%22%20height%3D%22175%22%20rx%3D%2224%22%20fill%3D%22rgba%2815%2C23%2C42%2C0.82%29%22%20stroke%3D%22rgba%2856%2C189%2C248%2C0.4%29%22%20stroke-width%3D%222%22/%3E%3Ctext%20x%3D%22840%22%20y%3D%22102%22%20fill%3D%22%2338bdf8%22%20font-family%3D%22sans-serif%22%20font-size%3D%2215%22%20font-weight%3D%22bold%22%3E%F0%9F%A4%9D%20DUAL%20UPI%20HANDSHAKE%3C/text%3E%3Ctext%20x%3D%22840%22%20y%3D%22148%22%20fill%3D%22%23ffffff%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20font-weight%3D%22800%22%3EQR%20%2B%2012-Digit%20UTR%3C/text%3E%3Ctext%20x%3D%22840%22%20y%3D%22182%22%20fill%3D%22%2394a3b8%22%20font-family%3D%22sans-serif%22%20font-size%3D%2214%22%3ECreditor%20%26amp%3B%20Admin%20Verification%3C/text%3E%3C/svg%3E"
+            src="data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%201200%20540%22%20width%3D%221200%22%20height%3D%22540%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22bg%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%22100%25%22%3E%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23020617%22/%3E%3Cstop%20offset%3D%2245%25%22%20stop-color%3D%22%23062c28%22/%3E%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%230f172a%22/%3E%3C/linearGradient%3E%3CradialGradient%20id%3D%22orb1%22%20cx%3D%2225%25%22%20cy%3D%2230%25%22%20r%3D%2250%25%22%3E%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%2310b981%22%20stop-opacity%3D%220.45%22/%3E%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%2310b981%22%20stop-opacity%3D%220%22/%3E%3C/radialGradient%3E%3CradialGradient%20id%3D%22orb2%22%20cx%3D%2280%25%22%20cy%3D%2225%25%22%20r%3D%2245%25%22%3E%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%2306b6d4%22%20stop-opacity%3D%220.38%22/%3E%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%2306b6d4%22%20stop-opacity%3D%220%22/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect%20width%3D%221200%22%20height%3D%22540%22%20fill%3D%22url%28%23bg%29%22/%3E%3Ccircle%20cx%3D%22300%22%20cy%3D%22160%22%20r%3D%22280%22%20fill%3D%22url%28%23orb1%29%22/%3E%3Ccircle%20cx%3D%22920%22%20cy%3D%22140%22%20r%3D%22260%22%20fill%3D%22url%28%23orb2%29%22/%3E%3Cg%20stroke%3D%22rgba%28255%2C255%2C255%2C0.06%29%22%20stroke-width%3D%221%22%3E%3Cline%20x1%3D%220%22%20y1%3D%22120%22%20x2%3D%221200%22%20y2%3D%22120%22/%3E%3Cline%20x1%3D%220%22%20y1%3D%22240%22%20x2%3D%221200%22%20y2%3D%22240%22/%3E%3Cline%20x1%3D%220%22%20y1%3D%22360%22%20x2%3D%221200%22%20y2%3D%22360%22/%3E%3Cline%20x1%3D%22300%22%20y1%3D%220%22%20x2%3D%22300%22%20y2%3D%22540%22/%3E%3Cline%20x1%3D%22600%22%20y1%3D%220%22%20x2%3D%22600%22%20y2%3D%22540%22/%3E%3Cline%20x1%3D%22900%22%20y1%3D%220%22%20x2%3D%22900%22%20y2%3D%22540%22/%3E%3C/g%3E%3Crect%20x%3D%2270%22%20y%3D%2255%22%20width%3D%22320%22%20height%3D%22175%22%20rx%3D%2224%22%20fill%3D%22rgba%2815%2C23%2C42%2C0.82%29%22%20stroke%3D%22rgba%2852%2C211%2C153%2C0.4%29%22%20stroke-width%3D%222%22/%3E%3Ctext%20x%3D%22100%22%20y%3D%22102%22%20fill%3D%22%2334d399%22%20font-family%3D%22sans-serif%22%20font-size%3D%2215%22%20font-weight%3D%22bold%22%3E%E2%9A%A1%20MIN-CASH-FLOW%20ENGINE%3C/text%3E%3Ctext%20x%3D%22100%22%20y%3D%22148%22%20fill%3D%22%23ffffff%22%20font-family%3D%22sans-serif%22%20font-size%3D%2234%22%20font-weight%3D%22800%22%3E%E2%82%B928%2C000.00%3C/text%3E%3Ctext%20x%3D%22100%22%20y%3D%22182%22%20fill%3D%22%2394a3b8%22%20font-family%3D%22sans-serif%22%20font-size%3D%2214%22%3E12%20IOUs%20simplified%20%E2%86%92%203%20Transfers%3C/text%3E%3Crect%20x%3D%22440%22%20y%3D%2245%22%20width%3D%22320%22%20height%3D%22190%22%20rx%3D%2224%22%20fill%3D%22rgba%2815%2C23%2C42%2C0.86%29%22%20stroke%3D%22rgba%2820%2C184%2C166%2C0.45%29%22%20stroke-width%3D%222%22/%3E%3Ctext%20x%3D%22470%22%20y%3D%2292%22%20fill%3D%22%232dd4bf%22%20font-family%3D%22sans-serif%22%20font-size%3D%2215%22%20font-weight%3D%22bold%22%3E%F0%9F%8C%90%20SINGLE-CURRENCY%20INR%3C/text%3E%3Ctext%20x%3D%22470%22%20y%3D%22138%22%20fill%3D%22%23ffffff%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20font-weight%3D%22800%22%3EINR%20%C2%B7%204%20SPLIT%20MODES%3C/text%3E%3Ctext%20x%3D%22470%22%20y%3D%22175%22%20fill%3D%22%23cbd5e1%22%20font-family%3D%22sans-serif%22%20font-size%3D%2214%22%3E4%20Split%20Modes%20%C2%B7%202x%20Couple%20Weight%3C/text%3E%3Crect%20x%3D%22810%22%20y%3D%2255%22%20width%3D%22320%22%20height%3D%22175%22%20rx%3D%2224%22%20fill%3D%22rgba%2815%2C23%2C42%2C0.82%29%22%20stroke%3D%22rgba%2856%2C189%2C248%2C0.4%29%22%20stroke-width%3D%222%22/%3E%3Ctext%20x%3D%22840%22%20y%3D%22102%22%20fill%3D%22%2338bdf8%22%20font-family%3D%22sans-serif%22%20font-size%3D%2215%22%20font-weight%3D%22bold%22%3E%F0%9F%A4%9D%20DUAL%20UPI%20HANDSHAKE%3C/text%3E%3Ctext%20x%3D%22840%22%20y%3D%22148%22%20fill%3D%22%23ffffff%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20font-weight%3D%22800%22%3EQR%20%2B%2012-Digit%20UTR%3C/text%3E%3Ctext%20x%3D%22840%22%20y%3D%22182%22%20fill%3D%22%2394a3b8%22%20font-family%3D%22sans-serif%22%20font-size%3D%2214%22%3ECreditor%20%26amp%3B%20Admin%20Verification%3C/text%3E%3C/svg%3E"
             alt="Vasool Shared Expense Platform Illustration"
             class="w-full max-w-full h-auto object-cover max-h-72 sm:max-h-80 opacity-90"
           />
@@ -161,9 +153,9 @@
             <div class="h-0.5 bg-gradient-to-r from-teal-400 to-cyan-500 -mx-4 -mt-4 mb-3"></div>
             <div class="flex items-center gap-2 text-teal-400 font-bold text-xs uppercase tracking-wider mb-1.5">
               <span class="px-1.5 py-0.5 rounded-md bg-teal-500/15 border border-teal-500/30">⚖️</span>
-              <span>4 Modes + Multi-FX</span>
+              <span>4 Split Modes</span>
             </div>
-            <p class="text-xs text-slate-300 leading-relaxed">Split bills Equally, by Exact Amounts, Percentages, or Couple Weights across 7 currencies.</p>
+            <p class="text-xs text-slate-300 leading-relaxed">Split bills Equally, by Exact Amounts, Percentages, or Couple Weights in INR (₹).</p>
           </div>
           <div class="glass-panel glass-card-hover rounded-2xl p-4 relative overflow-hidden">
             <div class="h-0.5 bg-gradient-to-r from-cyan-400 to-indigo-500 -mx-4 -mt-4 mb-3"></div>
@@ -1107,7 +1099,7 @@
       <div class="flex items-center justify-between pb-3 border-b border-slate-800">
         <div>
           <h3 id="addExpenseModalTitle" class="text-base font-bold text-white">Add Shared Expense</h3>
-          <p id="addExpenseModalSubtitle" class="text-[11px] text-slate-400">Supports multi-currency FX &amp; 4-way splits</p>
+          <p id="addExpenseModalSubtitle" class="text-[11px] text-slate-400">Supports 4-way splits &amp; flexible sharing</p>
         </div>
         <button type="button" data-testid="btn-close-add-expense" onclick="closeModal('addExpenseModal')" class="text-slate-400 hover:text-white text-sm px-2 py-1 rounded">✕</button>
       </div>
@@ -1139,43 +1131,13 @@
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-12 gap-3">
-          <div class="sm:col-span-6">
+          <div class="sm:col-span-8">
             <label for="expDescInput" class="block text-xs font-medium text-slate-300 mb-1">Description</label>
             <input id="expDescInput" data-testid="input-expense-desc" type="text" required placeholder="e.g. Paradise Biryani Dinner, ACT Broadband" class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs sm:text-sm text-white focus:outline-none focus:border-emerald-500" />
           </div>
-          <div class="sm:col-span-3">
-            <label for="expBillCurrencySelect" class="block text-xs font-medium text-slate-300 mb-1">Bill Currency</label>
-            <select id="expBillCurrencySelect" data-testid="select-expense-currency" onchange="handleBillCurrencyChange()" class="w-full px-2.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs sm:text-sm text-white focus:outline-none focus:border-emerald-500">
-              <option value="INR">🇮🇳 INR (₹)</option>
-              <option value="USD">🇺🇸 USD ($)</option>
-              <option value="EUR">🇪🇺 EUR (€)</option>
-              <option value="GBP">🇬🇧 GBP (£)</option>
-              <option value="AED">🇦🇪 AED (د.إ)</option>
-              <option value="SGD">🇸🇬 SGD (S$)</option>
-              <option value="THB">🇹🇭 THB (฿)</option>
-            </select>
-          </div>
-          <div class="sm:col-span-3">
-            <label for="expAmountInput" class="block text-xs font-medium text-slate-300 mb-1">Base Total (₹)</label>
+          <div class="sm:col-span-4">
+            <label for="expAmountInput" class="block text-xs font-medium text-slate-300 mb-1">Total (₹)</label>
             <input id="expAmountInput" data-testid="input-expense-amount" type="number" step="0.01" min="0.01" inputmode="decimal" required oninput="recalculateSplitPreview()" placeholder="0.00" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs sm:text-sm text-white focus:outline-none focus:border-emerald-500" />
-          </div>
-        </div>
-
-        <!-- Foreign Currency FX Conversion Bar (Shown when Bill Currency != INR) -->
-        <div id="expFxRateContainer" data-testid="exp-fx-rate-container" class="hidden p-3 rounded-xl bg-indigo-950/30 border border-indigo-500/30 space-y-2">
-          <div class="flex items-center justify-between">
-            <span class="text-[11px] font-bold text-indigo-300">🌐 Multi-Currency FX Converter</span>
-            <span id="expFxConvertedBadge" class="text-[11px] font-mono-code font-bold text-emerald-300">1 USD = ₹84.00</span>
-          </div>
-          <div class="grid grid-cols-2 gap-2.5">
-            <div>
-              <label for="expOriginalAmountInput" class="block text-[10px] font-semibold text-slate-300 mb-1">Foreign Bill Amount</label>
-              <input id="expOriginalAmountInput" data-testid="input-expense-original-amount" type="number" step="0.01" min="0.01" oninput="recalculateFxToBase()" placeholder="50.00" class="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white" />
-            </div>
-            <div>
-              <label for="expExchangeRateInput" class="block text-[10px] font-semibold text-slate-300 mb-1">FX Rate (to ₹ INR)</label>
-              <input id="expExchangeRateInput" data-testid="input-expense-fx-rate" type="number" step="0.01" min="0.01" oninput="recalculateFxToBase()" value="84.00" class="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white font-mono-code" />
-            </div>
           </div>
         </div>
 
@@ -1434,10 +1396,10 @@
           </label>
           <select id="settingSplitVisibility" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white focus:outline-none focus:border-emerald-500">
             <option value="personal_only">Personal Only (Members only see their own split share)</option>
-            <option value="show_all">Show All (Members can view everyone's shares)</option>
+            <option value="show_all">Show All (Members can view everyone's shares on bills/events)</option>
           </select>
           <p class="text-[11px] text-slate-400">
-            In Personal Only mode, non-admin members only see their individual breakdown.
+            In Personal Only mode, non-admin members only see their individual breakdown. Show All reveals everyone's shares on bills/events only — the settlement plan and simplified split list always show just your own transactions to non-admin members.
           </p>
         </div>
 

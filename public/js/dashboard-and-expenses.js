@@ -375,7 +375,6 @@
       });
 
       const currentEmail = (stateRef.currentUser?.email || '').toLowerCase().trim();
-      const hasPersonalOnly = activeGroups.some((g) => (g.splitsVisibility || 'personal_only') === 'personal_only');
       const isViewerAdmin = Boolean(
         stateRef.currentUser?.isSuperAdmin ||
         stateRef.currentUser?.role === 'super_admin' ||
@@ -391,7 +390,10 @@
       let finalSimplified = simplified;
       let finalBalanceList = Object.values(balanceMap);
 
-      if (hasPersonalOnly && !isViewerAdmin && currentEmail) {
+      // Privacy rule: the settlement plan / simplified split list only shows the
+      // viewer's own transactions to non-admins. Others' amounts remain visible
+      // on bills/events (controlled by group Split Visibility).
+      if (!isViewerAdmin && currentEmail) {
         finalSimplified = simplified.filter(
           (t) => t.fromEmail.toLowerCase() === currentEmail || t.toEmail.toLowerCase() === currentEmail
         );
@@ -1337,7 +1339,7 @@
       report += `Group Name:       ${targetGroup.name}\n`;
       report += `Invite Code:      ${targetGroup.inviteCode}\n`;
       report += `Category:         ${targetGroup.category}\n`;
-      report += `Active Currency:  ${activeCurrency}\n`;
+      report += `Active Currency:  INR (₹)\n`;
       report += `Generated On:     ${new Date().toISOString()}\n`;
       report += `Total Spend:      ${formatINR(totalSpend)}\n`;
       report += `Debt Algorithm:   ${targetGroup.minimizeDebts !== false ? 'Fewest Transfers (Min-Cash-Flow)' : 'Direct Debts'}\n\n`;
@@ -2059,6 +2061,46 @@
         showToast('❌ Settlement claim rejected.');
       } catch (err) {
         showToast('Error rejecting settlement: ' + err.message, 'error');
+      } finally {
+        activeSettlementActionSet.delete(settlementId);
+      }
+    }
+
+    async function handleRevertSettlement(settlementId) {
+      if (activeSettlementActionSet.has(settlementId)) {
+        console.warn(`[Settlement] Action on ${settlementId} already in progress. Ignoring duplicate click.`);
+        return;
+      }
+      const stlPreview = appState.settlements.find((s) => String(s.id || s._id) === String(settlementId));
+      const amountLabel = stlPreview ? formatINR(stlPreview.amount) : 'this settlement';
+      if (typeof window !== 'undefined' && typeof window.confirm === 'function' &&
+        !window.confirm(`Revert ${amountLabel} settlement? The amount will become due again.`)) {
+        return;
+      }
+      activeSettlementActionSet.add(settlementId);
+      try {
+        if (localStorage.getItem(AUTH_TOKEN_KEY)) {
+          const res = await apiFetch(`/api/settlements/${settlementId}/revert`, {
+            method: 'POST',
+            body: JSON.stringify({})
+          });
+          if (res && res.error) {
+            showToast('Failed to revert settlement: ' + res.error, 'error');
+            return;
+          }
+        }
+        const stl = appState.settlements.find((s) => String(s.id || s._id) === String(settlementId));
+        if (stl) {
+          stl.status = 'reverted';
+          stl.revertedAt = new Date().toISOString();
+          stl.revertedByEmail = appState.currentUser?.email || '';
+          recordLocalGroupAudit(stl.groupId, 'settlement_reverted', `Reverted ${formatINR(stl.amount)} settlement from ${stl.fromName} to ${stl.toName}`, stl.method);
+        }
+        saveState();
+        refreshAllViews();
+        showToast('↩️ Settlement reverted. The amount is due again.');
+      } catch (err) {
+        showToast('Error reverting settlement: ' + err.message, 'error');
       } finally {
         activeSettlementActionSet.delete(settlementId);
       }
