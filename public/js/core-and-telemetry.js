@@ -140,7 +140,7 @@ const STORAGE_KEY = 'vasool_clean_state_v1';
       };
       const origin = (typeof window !== 'undefined' && window.location && window.location.origin && window.location.origin !== 'null')
         ? window.location.origin
-        : 'https://vasool-ecru.vercel.app';
+        : 'https://vasool.duckdns.org';
       const fullUrl = path.startsWith('http') ? path : origin + (path.startsWith('/') ? path : '/' + path);
       const res = await fetch(fullUrl, { ...options, headers });
       const text = await res.text();

@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs');
 
 const CHROME_PATH = '/tmp/puppeteer/chrome/linux-131.0.6778.204/chrome-linux64/chrome';
-const BASE_URL = 'https://vasool-ecru.vercel.app';
+const BASE_URL = 'https://vasool.duckdns.org';
 const ARTIFACT_DIR = '/home/mrzoromit3/.gemini/antigravity-cli/brain/50ffe334-de09-43df-a82a-537577ea13e4';
 
 async function capture() {

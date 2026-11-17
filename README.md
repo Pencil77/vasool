@@ -3,7 +3,7 @@
 Full-stack expense splitting, multi-currency bill tracking, and verifiable debt settlement platform built with **Node.js, Express, MongoDB (Mongoose), Tailwind CSS, Chart.js**, **OpenTelemetry RUM / Grafana Loki**, and **Infisical Agent Vault** secret management.
 
 - **Repository**: [https://github.com/Pencil77/vasool.git](https://github.com/Pencil77/vasool.git)
-- **Live Deployment**: [https://vasool-ecru.vercel.app](https://vasool-ecru.vercel.app)
+- **Live Deployment**: [https://vasool.duckdns.org](https://vasool.duckdns.org)
 
 ## What's New in Vasool v2.8
 1. **In-Place Expense Editing (`PUT /api/expenses/:id`) & 1-Click Undo Delete**:

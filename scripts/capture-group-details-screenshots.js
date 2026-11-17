@@ -9,7 +9,7 @@ const Expense = require('../models/Expense');
 const { signAuthToken } = require('../routes/auth');
 
 const ARTIFACT_DIR = '/home/mrzoromit3/.gemini/antigravity-cli/brain/50ffe334-de09-43df-a82a-537577ea13e4';
-const BASE_URL = 'https://vasool-ecru.vercel.app';
+const BASE_URL = 'https://vasool.duckdns.org';
 
 function waitPort(port, timeoutMs = 10000) {
   const start = Date.now();

@@ -634,7 +634,7 @@ router.post('/verify-otp', async (req, res) => {
  * Magic Link verification endpoint: verifies token from email and redirects to web app
  */
 router.get('/verify', async (req, res) => {
-  const baseUrl = (process.env.APP_URL || 'https://vasool-ecru.vercel.app').replace(/\/+$/, '');
+  const baseUrl = (process.env.APP_URL || 'https://vasool.duckdns.org').replace(/\/+$/, '');
   try {
     await connectToDatabase();
     const { token, email } = req.query;
