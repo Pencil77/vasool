@@ -2,13 +2,15 @@ const fs = require('fs');
 const path = require('path');
 const { JSDOM } = require('jsdom');
 
+const BASE_URL = process.env.TEST_BASE_URL || 'https://vasool-ecru.vercel.app';
+
 async function testLocalHtml() {
   const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
 
   const dom = new JSDOM(html, {
     runScripts: 'dangerously',
     resources: 'usable',
-    url: 'https://vasool-ecru.vercel.app/'
+    url: BASE_URL + '/'
   });
 
   const window = dom.window;

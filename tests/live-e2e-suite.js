@@ -1,9 +1,9 @@
 /**
  * Comprehensive Live E2E Production Test Suite
- * Target: https://vasool-ecru.vercel.app
+ * Target: https://vasool.duckdns.org
  */
 
-const BASE_URL = 'https://vasool-ecru.vercel.app';
+const BASE_URL = 'https://vasool.duckdns.org';
 
 let passed = 0;
 let failed = 0;
@@ -46,7 +46,7 @@ async function request(path, options = {}) {
 
 async function runAllTests() {
   console.log(`\n======================================================`);
-  console.log(`  VASOOL LIVE PRODUCTION SUITE - https://vasool-ecru.vercel.app`);
+  console.log(`  VASOOL LIVE PRODUCTION SUITE - https://vasool.duckdns.org`);
   console.log(`======================================================\n`);
 
   const uniqueId = Date.now();
