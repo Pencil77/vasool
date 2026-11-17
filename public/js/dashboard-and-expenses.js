@@ -756,7 +756,7 @@
                 <div class="min-w-0">
                   <div class="text-xs sm:text-sm font-semibold text-white truncate">${escapeHtml(e.description)}</div>
                   <div class="text-[11px] text-slate-400 mt-0.5">
-                    Paid by <span class="text-emerald-300 font-medium">${escapeHtml(e.paidByName)}</span> · ${escapeHtml(grp ? grp.name : 'Group')} · <span class="uppercase text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">${escapeHtml(e.splitType)}</span>
+                    Paid by <span class="text-emerald-300 font-medium">${escapeHtml(e.paidByName)}</span> · ${escapeHtml(grp ? grp.name : 'Group')} · <span class="uppercase text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">${escapeHtml(e.splitType)}</span> · 👤 Added by <span class="text-slate-300 font-medium">${escapeHtml(e.createdByName || e.createdByEmail || e.paidByName)}</span>
                   </div>
                 </div>
                 <div class="text-right flex-shrink-0">
@@ -1270,7 +1270,7 @@
                     Array.isArray(e.paidByAllocations) && e.paidByAllocations.length > 1
                       ? e.paidByAllocations.map((p) => `${escapeHtml(p.memberName.split(' ')[0])} (${formatINR(p.amount)})`).join(' + ')
                       : escapeHtml(e.paidByName)
-                  }</strong> in <span class="text-teal-300">${escapeHtml(grp ? grp.name : 'Group')}</span> · 📅 ${escapeHtml(formatEventDisplayDate(e.date || e.expenseDate))}</span>
+                  }</strong> in <span class="text-teal-300">${escapeHtml(grp ? grp.name : 'Group')}</span> · 📅 ${escapeHtml(formatEventDisplayDate(e.date || e.expenseDate))} · 👤 Added by <strong class="text-slate-200">${escapeHtml(e.createdByName || e.createdByEmail || e.paidByName)}</strong></span>
                   ${Array.isArray(e.paidByAllocations) && e.paidByAllocations.length > 1 ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/15 text-teal-300 border border-teal-500/30">👥 ${e.paidByAllocations.length} Payers</span>` : ''}
                 </div>
                 <div class="flex flex-wrap gap-1.5 pt-1">${splitsPills}</div>
@@ -1298,7 +1298,7 @@
     }
 
     function exportExpensesCsv() {
-      const rows = [['ID', 'Date', 'Group', 'Description', 'Category', 'Type', 'Amount (INR)', 'Paid By', 'Split Mode']];
+      const rows = [['ID', 'Date', 'Group', 'Description', 'Category', 'Type', 'Amount (INR)', 'Paid By', 'Created By', 'Split Mode']];
       appState.expenses.forEach((e) => {
         const grp = appState.groups.find((g) => g.id === e.groupId);
         rows.push([
@@ -1310,6 +1310,7 @@
           e.type || 'expense',
           e.amount,
           e.paidByName,
+          e.createdByName || e.createdByEmail || e.paidByName,
           e.splitType
         ]);
       });
@@ -1362,7 +1363,7 @@
       report += `--------------------------------------------------------------------------------\n`;
       groupExpenses.forEach((e, idx) => {
         report += `#${idx + 1} [${e.date || 'Recent'}] ${e.description} (${e.category})\n`;
-        report += `   Amount: ${e.type === 'income' ? '+' : ''}${formatINR(e.amount)} | Paid By: ${e.paidByName} | Split: ${e.splitType.toUpperCase()}\n`;
+        report += `   Amount: ${e.type === 'income' ? '+' : ''}${formatINR(e.amount)} | Paid By: ${e.paidByName} | Created By: ${e.createdByName || e.createdByEmail || e.paidByName} | Split: ${e.splitType.toUpperCase()}\n`;
         if (e.splits && e.splits.length) {
           const splitsStr = e.splits.map((s) => `${s.memberName}: ${formatINR(s.amount)}`).join(', ');
           report += `   Shares: ${splitsStr}\n`;
@@ -1590,7 +1591,7 @@
                   <div>
                     <div class="font-semibold text-white">#${i + 1} ${escapeHtml(e.description)} <span class="text-[10px] text-emerald-300">(${escapeHtml(e.category)})</span></div>
                     <div class="text-[11px] text-slate-400">
-                      ${e.type === 'income' ? 'Refund received by' : 'Paid by'} <strong>${escapeHtml(e.paidByName)}</strong> · ${escapeHtml(e.splitType.toUpperCase())} split
+                      ${e.type === 'income' ? 'Refund received by' : 'Paid by'} <strong>${escapeHtml(e.paidByName)}</strong> · ${escapeHtml(e.splitType.toUpperCase())} split · 👤 Added by <strong>${escapeHtml(e.createdByName || e.createdByEmail || e.paidByName)}</strong>
                       ${e.originalCurrency && e.originalCurrency !== 'INR' ? ` · FX: ${e.originalAmount} ${escapeHtml(e.originalCurrency)} @ ₹${e.exchangeRate}` : ''}
                       ${e.parentExpenseDesc ? ` · Linked to: ${escapeHtml(e.parentExpenseDesc)}` : ''}
                     </div>
