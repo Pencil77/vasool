@@ -1,8 +1,9 @@
 const fs = require('fs');
+const path = require('path');
 const { JSDOM } = require('jsdom');
 
 async function testLocalHtml() {
-  const html = fs.readFileSync('/tmp/workspace/vasool/public/index.html', 'utf8');
+  const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
 
   const dom = new JSDOM(html, {
     runScripts: 'dangerously',
@@ -69,7 +70,9 @@ async function testLocalHtml() {
   console.log('\nAll in-browser user actions (including adminship transfer & calibration) executed and persisted successfully to MongoDB Atlas!');
 }
 
-testLocalHtml().catch((err) => {
-  console.error('Test error:', err);
-  process.exit(1);
-});
+testLocalHtml()
+  .then(() => process.exit(0))
+  .catch((err) => {
+    console.error('Test error:', err);
+    process.exit(1);
+  });
