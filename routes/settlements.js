@@ -76,9 +76,9 @@ router.get('/balances', requireAuth, async (req, res) => {
     const requesterEmail = req.user.email.toLowerCase().trim();
     let balances = Object.values(balanceMap);
 
-    // Privacy rule: If group is personal_only and user is not admin,
-    // they only see their own part of the share, not others
-    const hasPersonalOnly = groups.some((g) => (g.splitsVisibility || 'personal_only') === 'personal_only');
+    // Privacy rule: Settlement plan and simplified split list only expose the
+    // requester's own transactions. Other members' amounts are visible on
+    // bills/events (subject to group Split Visibility), never in this plan.
     const isRequesterAdmin = isSuperAdminUser(req.user) || groups.some((g) => {
       const isGrpAdmin = (g.adminEmail && g.adminEmail.toLowerCase() === requesterEmail) ||
         (g.createdByEmail && g.createdByEmail.toLowerCase() === requesterEmail) ||
@@ -87,7 +87,7 @@ router.get('/balances', requireAuth, async (req, res) => {
       return Boolean(isGrpAdmin);
     });
 
-    if (hasPersonalOnly && !isRequesterAdmin) {
+    if (!isRequesterAdmin) {
       simplifiedTransactions = simplifiedTransactions.filter(
         (t) => t.fromEmail.toLowerCase() === requesterEmail || t.toEmail.toLowerCase() === requesterEmail
       );
@@ -215,6 +215,7 @@ router.post('/settlements', requireAuth, async (req, res) => {
       referenceNote: referenceNote || '',
       utrNumber: req.body.utrNumber ? String(req.body.utrNumber).trim() : '',
       confirmedRole,
+      recordedByEmail: requesterEmail,
       status,
       confirmedAt,
       confirmedByEmail,
@@ -422,6 +423,76 @@ router.post('/settlements/:id/reject', requireAuth, async (req, res) => {
 
     return res.status(200).json({
       message: 'Settlement payment claim rejected.',
+      settlement
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/settlements/:id/revert
+ * Reverts a recorded/acknowledged settlement back to an open debt.
+ * Allowed for the payer, the recipient, or the person who recorded it.
+ * The record is kept for audit purposes with status "reverted" and is
+ * excluded from balance and settlement calculations.
+ */
+router.post('/settlements/:id/revert', requireAuth, async (req, res) => {
+  try {
+    await connectToDatabase();
+    const settlement = await Settlement.findById(req.params.id);
+    if (!settlement) {
+      return res.status(404).json({ error: 'Settlement not found.' });
+    }
+
+    const requesterEmail = req.user.email.toLowerCase().trim();
+    const isPayer = settlement.fromEmail && settlement.fromEmail.toLowerCase().trim() === requesterEmail;
+    const isRecipient = settlement.toEmail && settlement.toEmail.toLowerCase().trim() === requesterEmail;
+    const isRecorder = settlement.recordedByEmail && settlement.recordedByEmail.toLowerCase().trim() === requesterEmail;
+    const isSuperAdmin = isSuperAdminUser(req.user);
+
+    if (!isPayer && !isRecipient && !isRecorder && !isSuperAdmin) {
+      return res.status(403).json({
+        error: 'Only the payer, the recipient, or the person who recorded this settlement can revert it.'
+      });
+    }
+
+    if (settlement.status === 'reverted') {
+      return res.status(200).json({
+        settlement,
+        message: 'Settlement was already reverted.',
+        alreadyReverted: true
+      });
+    }
+
+    if (settlement.status === 'rejected') {
+      return res.status(400).json({
+        error: 'Rejected settlement claims do not affect balances and cannot be reverted.'
+      });
+    }
+
+    settlement.status = 'reverted';
+    settlement.revertedAt = new Date();
+    settlement.revertedByEmail = requesterEmail;
+    settlement.confirmationToken = null; // Invalidate any pending confirmation link
+    await settlement.save();
+
+    const group = await Group.findById(settlement.groupId);
+    if (group) {
+      appendGroupAuditLog(group, {
+        action: 'settlement_reverted',
+        actorEmail: requesterEmail,
+        actorName: req.user.name || requesterEmail,
+        summary: `${req.user.name || requesterEmail} reverted ₹${settlement.amount} settlement from ${settlement.fromName} to ${settlement.toName}`,
+        details: `${settlement.method}${settlement.utrNumber ? ' · UTR: ' + settlement.utrNumber : ''}`
+      });
+      await group.save();
+    }
+
+    otel.metrics.counter('vasool_settlements_reverted_total', 1);
+
+    return res.status(200).json({
+      message: `Settlement of ₹${settlement.amount} reverted. The amount is due again.`,
       settlement
     });
   } catch (err) {

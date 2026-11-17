@@ -1,6 +1,6 @@
 # Vasool v2.8 — Full-Stack Smart Expense Splitting & Debt Simplification Platform
 
-Full-stack expense splitting, multi-currency bill tracking, and verifiable debt settlement platform built with **Node.js, Express, MongoDB (Mongoose), Tailwind CSS, Chart.js**, **OpenTelemetry RUM / Grafana Loki**, and **Infisical Agent Vault** secret management.
+Full-stack expense splitting and verifiable debt settlement platform built with **Node.js, Express, MongoDB (Mongoose), Tailwind CSS, Chart.js**, **OpenTelemetry RUM / Grafana Loki**, and **Infisical Agent Vault** secret management.
 
 - **Repository**: [https://github.com/Pencil77/vasool.git](https://github.com/Pencil77/vasool.git)
 - **Live Deployment**: [https://vasool.duckdns.org](https://vasool.duckdns.org)
@@ -9,8 +9,8 @@ Full-stack expense splitting, multi-currency bill tracking, and verifiable debt 
 1. **In-Place Expense Editing (`PUT /api/expenses/:id`) & 1-Click Undo Delete**:
    - Edit any existing bill or refund directly from the **Expenses & Splits** view or **Group Details** modal.
    - Authorized deletion (`DELETE /api/expenses/:id`) returns a snapshot of the removed expense and surfaces a **1-Click Undo Delete** banner so accidental deletions can be restored immediately.
-2. **Per-Bill Multi-Currency FX Conversion**:
-   - Log expenses in `INR (₹)`, `USD ($)`, `EUR (€)`, `GBP (£)`, `AED (د.إ)`, `SGD (S$)`, or `THB (฿)` with live/custom FX exchange rates (`originalAmount`, `originalCurrency`, `exchangeRate`) automatically converted into the group's base currency.
+2. **Single-Currency INR Bills**:
+   - All bills are recorded in `INR (₹)` only. Legacy multi-currency fields (`originalAmount`, `originalCurrency`, `exchangeRate`) remain in the schema for backward compatibility but the FX selector UI has been removed.
 3. **Linked Refund Accounting (`parentExpenseId`)**:
    - Link positive inflows (*Income & Refunds*, such as security deposit refunds) directly to their original parent expense so group statements show exact refund lineage.
 4. **Explicit Rounding Remainder (`±₹0.01`) Attribution**:

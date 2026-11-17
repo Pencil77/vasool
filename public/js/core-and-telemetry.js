@@ -267,18 +267,10 @@ const STORAGE_KEY = 'vasool_clean_state_v1';
     let activeMainTab = 'dashboard';
     let selectedGroupId = 'ALL';
     let showingAuthPortal = typeof localStorage !== 'undefined' ? !localStorage.getItem(AUTH_TOKEN_KEY) : true;
-    let activeCurrency = 'INR';
     let activePipelineTab = 'github';
     let categoryChartInstance = null;
     let balancesChartInstance = null;
     let lastTestResults = [];
-
-    const CURRENCY_META = {
-      INR: { symbol: '₹', rate: 1, locale: 'en-IN' },
-      USD: { symbol: '$', rate: 0.012, locale: 'en-US' },
-      EUR: { symbol: '€', rate: 0.011, locale: 'de-DE' },
-      GBP: { symbol: '£', rate: 0.0095, locale: 'en-GB' }
-    };
 
     const PIPELINE_SNIPPETS = {
       github: `# .github/workflows/ci-cd.yml — GitHub Actions CI/CD Pipeline
@@ -665,19 +657,10 @@ exec node server.js`
         .replace(/"/g, '&quot;');
     }
 
-    function handleCurrencyChange(curr) {
-      if (CURRENCY_META[curr]) {
-        activeCurrency = curr;
-        refreshAllViews();
-        showToast(`Display currency switched to ${curr}`);
-      }
-    }
-
     function formatINR(val) {
-      const meta = CURRENCY_META[activeCurrency] || CURRENCY_META.INR;
-      const num = (Number(val) || 0) * meta.rate;
+      const num = Number(val) || 0;
       const sign = num < 0 ? '-' : '';
-      return sign + meta.symbol + Math.abs(num).toLocaleString(meta.locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      return sign + '₹' + Math.abs(num).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
     // Pure helper functions exposed for Unit & Integration Testing

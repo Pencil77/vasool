@@ -15,15 +15,18 @@ const SettlementSchema = new mongoose.Schema(
     utrNumber: { type: String, default: '' },
     adminNote: { type: String, default: '' },
     confirmedRole: { type: String, default: '' },
+    recordedByEmail: { type: String, lowercase: true, trim: true, default: null },
     status: {
       type: String,
-      enum: ['pending_admin_approval', 'pending_confirmation', 'confirmed', 'rejected'],
+      enum: ['pending_admin_approval', 'pending_confirmation', 'confirmed', 'rejected', 'reverted'],
       default: 'pending_admin_approval'
     },
     confirmedAt: { type: Date, default: null },
     confirmedByEmail: { type: String, lowercase: true, default: null },
     confirmationToken: { type: String, default: null, index: true },
     rejectedReason: { type: String, default: '' },
+    revertedAt: { type: Date, default: null },
+    revertedByEmail: { type: String, lowercase: true, default: null },
     settledAt: { type: Date, default: Date.now }
   },
   { timestamps: true }

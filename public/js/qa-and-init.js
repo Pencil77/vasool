@@ -238,13 +238,10 @@
         return 'Anshuman net balance: -₹2,900.00';
       });
 
-      runCase('Integration', 'IT-06: Multi-Currency Converter formats INR, USD, EUR, GBP accurately', () => {
-        const prev = activeCurrency;
-        activeCurrency = 'USD';
-        const usdStr = formatINR(1000);
-        activeCurrency = prev;
-        if (!usdStr.startsWith('$')) throw new Error('USD symbol missing');
-        return `1,000 INR -> ${usdStr} USD`;
+      runCase('Integration', 'IT-06: INR Single-Currency Formatting', () => {
+        if (formatINR(1000) !== '₹1,000.00') throw new Error('INR formatting mismatch');
+        if (formatINR(-1234.5) !== '-₹1,234.50') throw new Error('Negative INR formatting mismatch');
+        return 'INR-only formatting verified (₹1,000.00)';
       });
 
       runCase('Integration', 'IT-07: MongoDB Inspector JSON state is valid', () => {
@@ -368,12 +365,12 @@
         return 'Verified: Empty UPI returns "" (UPI redirect hidden when unset)';
       });
 
-      runCase('Integration', 'IT-08: Per-Bill Multi-Currency FX Rate Conversion to Base INR', () => {
-        const usdAmt = 50;
-        const fxRate = DEFAULT_FX_RATES_TO_INR.USD;
-        const inrTotal = Math.round(usdAmt * fxRate * 100) / 100;
-        if (inrTotal !== 4200) throw new Error(`Expected ₹4200, got ${inrTotal}`);
-        return `$${usdAmt} USD @ ₹${fxRate} = ₹${inrTotal} INR`;
+      runCase('Integration', 'IT-08: Single-Currency INR Enforcement (FX Controls Removed)', () => {
+        const stale = ['currency-selector', 'select-expense-currency', 'exp-fx-rate-container', 'input-expense-original-amount', 'input-expense-fx-rate']
+          .map((id) => document.querySelector(`[data-testid="${id}"]`))
+          .filter(Boolean);
+        if (stale.length) throw new Error('Legacy currency/FX controls still present in DOM');
+        return 'INR-only enforced: all currency selectors and FX controls removed';
       });
 
       runCase('Integration', 'IT-09: Immutable Group Audit Log Recording & Retrieval', () => {
@@ -398,11 +395,10 @@
         return 'Activity Audit Tab mounted';
       });
 
-      runCase('UI E2E', 'UI-09: Printable PDF Statement Modal & Multi-Currency FX Controls mounted', () => {
+      runCase('UI E2E', 'UI-09: Printable PDF Statement Modal mounted', () => {
         const pdfModal = document.querySelector('[data-testid="pdf-statement-preview-modal"]');
-        const fxSelect = document.querySelector('[data-testid="select-expense-currency"]');
-        if (!pdfModal || !fxSelect) throw new Error('PDF modal or FX currency selector missing');
-        return 'PDF Statement Preview & 7-Currency FX Selector ready';
+        if (!pdfModal) throw new Error('PDF statement preview modal missing');
+        return 'PDF Statement Preview ready';
       });
 
       lastTestResults = results;
@@ -756,6 +752,7 @@
       window.toggleGroupSplitVisibility = toggleGroupSplitVisibility;
       window.handleConfirmSettlement = handleConfirmSettlement;
       window.handleRejectSettlement = handleRejectSettlement;
+      window.handleRevertSettlement = handleRevertSettlement;
       window.switchMainTab = switchMainTab;
       window.openAddExpenseModal = openAddExpenseModal;
       window.openNewGroupModal = openNewGroupModal;

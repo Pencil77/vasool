@@ -138,9 +138,13 @@
       const currentEmail = (appState.currentUser?.email || '').toLowerCase().trim();
       const currentAdmin = grp.members.find((m) => m.role === 'admin' || (grp.adminEmail && grp.adminEmail.toLowerCase() === m.email.toLowerCase())) || grp.members[0];
       const isCurrentUserAdmin = currentAdmin && currentAdmin.email.toLowerCase().trim() === currentEmail;
+      const isSuperAdminViewer = Boolean(appState.currentUser?.isSuperAdmin || appState.currentUser?.role === 'super_admin');
+      const canViewEveryone = isCurrentUserAdmin || isSuperAdminViewer;
 
+      // Non-admins always use the client-side privacy-filtered computation so the
+      // Group Details settle tab never exposes other members' amounts.
       const { totalSpend, simplified, filteredExpenses, filteredSettlements, balanceList, balanceMap, pendingSettlements, isFullyClosed } =
-        serverData && serverData.simplifiedTransactions
+        serverData && serverData.simplifiedTransactions && canViewEveryone
           ? {
               totalSpend: serverData.totalSpend,
               simplified: serverData.simplifiedTransactions,
@@ -770,8 +774,19 @@
       });
 
       const isHubActive = activeGroups.length > 0 && activeGroups.some((g) => g.adminHubSettlement === true);
+      const isSuperAdminViewer = Boolean(appState.currentUser?.isSuperAdmin || appState.currentUser?.role === 'super_admin');
 
-      const pendingApprovalList = filteredSettlements.filter(
+      // Non-admin members only see settlements they are part of, so other
+      // members' amounts never appear in the settlement plan/history.
+      const visibleSettlements = (isViewerAdminOfAny || isSuperAdminViewer)
+        ? filteredSettlements
+        : filteredSettlements.filter((s) =>
+            String(s.fromEmail || '').toLowerCase().trim() === currentEmail ||
+            String(s.toEmail || '').toLowerCase().trim() === currentEmail ||
+            String(s.recordedByEmail || '').toLowerCase().trim() === currentEmail
+          );
+
+      const pendingApprovalList = visibleSettlements.filter(
         (s) => s.status === 'pending_admin_approval' || s.status === 'pending_confirmation' || s.status === 'pending'
       );
 
@@ -970,14 +985,21 @@
       simpEl.innerHTML = html;
 
       // 5. Settlement History List
-      if (!filteredSettlements.length) {
+      if (!visibleSettlements.length) {
         histEl.innerHTML = `<div class="text-xs text-slate-500 py-6 text-center">No settlements recorded yet.</div>`;
       } else {
-        histEl.innerHTML = filteredSettlements
+        histEl.innerHTML = visibleSettlements
           .map((s) => {
             const isConfirmed = s.status === 'confirmed';
             const isPending = s.status === 'pending_admin_approval' || s.status === 'pending_confirmation' || s.status === 'pending';
             const isRejected = s.status === 'rejected';
+            const isReverted = s.status === 'reverted';
+            const canRevert = !isReverted && (
+              isSuperAdminViewer ||
+              String(s.fromEmail || '').toLowerCase().trim() === currentEmail ||
+              String(s.toEmail || '').toLowerCase().trim() === currentEmail ||
+              String(s.recordedByEmail || '').toLowerCase().trim() === currentEmail
+            );
 
             const isPartial = Boolean(s.originalClaimedAmount && Number(s.originalClaimedAmount) > Number(s.amount));
             let statusBadge = '';
@@ -990,6 +1012,8 @@
               statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">⏳ Awaiting Confirmation</span>`;
             } else if (isRejected) {
               statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">❌ Rejected: ${escapeHtml(s.rejectedReason || 'Unverified')}</span>`;
+            } else if (isReverted) {
+              statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-700/40 text-slate-300 border border-slate-600/60">↩️ Reverted</span>`;
             }
 
             return `
@@ -1006,9 +1030,16 @@
                     ${s.confirmedByEmail ? `· Confirmed by ${escapeHtml(s.confirmedByEmail)}` : ''}
                   </div>
                 </div>
-                <div class="text-sm font-bold ${isConfirmed ? 'text-emerald-400' : isRejected ? 'text-rose-400 line-through' : 'text-amber-300'}">
-                  ${formatINR(s.amount)}
-                  ${isPartial ? `<span class="text-[10px] text-slate-400 font-normal block sm:inline"> (of ${formatINR(s.originalClaimedAmount)} claimed)</span>` : ''}
+                <div class="flex items-center gap-2 sm:gap-3 flex-wrap justify-end">
+                  <div class="text-sm font-bold ${isConfirmed ? 'text-emerald-400' : isRejected || isReverted ? 'text-rose-400 line-through' : 'text-amber-300'}">
+                    ${formatINR(s.amount)}
+                    ${isPartial ? `<span class="text-[10px] text-slate-400 font-normal block sm:inline"> (of ${formatINR(s.originalClaimedAmount)} claimed)</span>` : ''}
+                  </div>
+                  ${canRevert ? `
+                    <button data-testid="btn-revert-settle-${escapeHtml(s.id)}" onclick="handleRevertSettlement('${escapeHtml(s.id)}')" title="Revert this settlement and make the amount due again" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600/70 font-semibold text-[11px] transition">
+                      ↩️ Revert
+                    </button>
+                  ` : ''}
                 </div>
               </div>
             `;
@@ -1022,51 +1053,6 @@
     // =========================================================================
     let editingExpenseId = null;
     let isSavingExpense = false;
-    const DEFAULT_FX_RATES_TO_INR = {
-      INR: 1,
-      USD: 84.0,
-      EUR: 91.5,
-      GBP: 108.0,
-      AED: 22.9,
-      SGD: 63.0,
-      THB: 2.45
-    };
-
-    function handleBillCurrencyChange() {
-      const curr = document.getElementById('expBillCurrencySelect')?.value || 'INR';
-      const fxBox = document.getElementById('expFxRateContainer');
-      const rateInp = document.getElementById('expExchangeRateInput');
-      const origInp = document.getElementById('expOriginalAmountInput');
-      const baseInp = document.getElementById('expAmountInput');
-      if (curr === 'INR') {
-        if (fxBox) fxBox.classList.add('hidden');
-      } else {
-        if (fxBox) fxBox.classList.remove('hidden');
-        const rate = DEFAULT_FX_RATES_TO_INR[curr] || 84.0;
-        if (rateInp) rateInp.value = String(rate);
-        if (origInp && (!origInp.value || Number(origInp.value) <= 0)) {
-          origInp.value = '50.00';
-        }
-        recalculateFxToBase();
-      }
-    }
-
-    function recalculateFxToBase() {
-      const curr = document.getElementById('expBillCurrencySelect')?.value || 'INR';
-      if (curr === 'INR') return;
-      const origAmt = Number(document.getElementById('expOriginalAmountInput')?.value) || 0;
-      const rate = Number(document.getElementById('expExchangeRateInput')?.value) || 1;
-      const converted = Math.round(origAmt * rate * 100) / 100;
-      const badge = document.getElementById('expFxConvertedBadge');
-      if (badge) {
-        badge.textContent = `${origAmt.toFixed(2)} ${curr} × ₹${rate} = ₹${converted.toFixed(2)}`;
-      }
-      const baseInp = document.getElementById('expAmountInput');
-      if (baseInp && converted > 0) {
-        baseInp.value = String(converted);
-        recalculateSplitPreview();
-      }
-    }
 
     function populateParentExpenseDropdown(groupId, selectedParentId = '') {
       const parentSel = document.getElementById('expParentBillSelect');
@@ -1107,10 +1093,6 @@
         dateInp.value = todayLocal;
       }
 
-      if (document.getElementById('expBillCurrencySelect')) {
-        document.getElementById('expBillCurrencySelect').value = 'INR';
-        handleBillCurrencyChange();
-      }
       setExpenseType('expense');
       currentSplitMode = 'equal';
       populateExpenseModalMembers();
@@ -1162,20 +1144,6 @@
           dStr = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
         }
         editDateInp.value = dStr;
-      }
-
-      if (document.getElementById('expBillCurrencySelect')) {
-        const origCurr = exp.originalCurrency || 'INR';
-        document.getElementById('expBillCurrencySelect').value = origCurr;
-        handleBillCurrencyChange();
-        if (origCurr !== 'INR') {
-          if (document.getElementById('expOriginalAmountInput')) {
-            document.getElementById('expOriginalAmountInput').value = String(exp.originalAmount || exp.amount);
-          }
-          if (document.getElementById('expExchangeRateInput')) {
-            document.getElementById('expExchangeRateInput').value = String(exp.exchangeRate || 1);
-          }
-        }
       }
 
       const existingPayers = Array.isArray(exp.paidByAllocations) && exp.paidByAllocations.length > 0
@@ -1874,14 +1842,6 @@
         return;
       }
 
-      const originalCurrency = document.getElementById('expBillCurrencySelect')?.value || 'INR';
-      const originalAmount = originalCurrency !== 'INR'
-        ? (Number(document.getElementById('expOriginalAmountInput')?.value) || amount)
-        : amount;
-      const exchangeRate = originalCurrency !== 'INR'
-        ? (Number(document.getElementById('expExchangeRateInput')?.value) || 1)
-        : 1;
-
       const parentExpenseId = currentExpenseType === 'income'
         ? (document.getElementById('expParentBillSelect')?.value || null)
         : null;
@@ -1898,9 +1858,10 @@
         groupId,
         description,
         amount,
-        originalAmount,
-        originalCurrency,
-        exchangeRate,
+        currency: 'INR',
+        originalAmount: amount,
+        originalCurrency: 'INR',
+        exchangeRate: 1,
         category,
         parentExpenseId,
         parentExpenseDesc,
@@ -3035,6 +2996,7 @@
             confirmedAt,
             confirmedByEmail,
             confirmedRole,
+            recordedByEmail: currentEmail,
             settledAt: new Date().toISOString().slice(0, 10)
           });
         }
