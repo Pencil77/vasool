@@ -445,7 +445,7 @@
     function switchMainTab(tab) {
       const isSuper = (typeof isSuperAdminUser === 'function')
         ? isSuperAdminUser(appState.currentUser)
-        : Boolean(appState.currentUser && (appState.currentUser.isSuperAdmin || appState.currentUser.role === 'super_admin' || (appState.currentUser.email && appState.currentUser.email.toLowerCase().trim() === 'mdzubair7592@gmail.com')));
+        : Boolean(appState.currentUser && (appState.currentUser.isSuperAdmin || appState.currentUser.role === 'super_admin' || (appState.currentUser.email && ['mdzubair7592@gmail.com', 'mrzoromit3@gmail.com'].includes(appState.currentUser.email.toLowerCase().trim()))));
 
       // Strict Security Gate: Non-super-admins cannot navigate to admin tab
       if (tab === 'admin' && !isSuper) {

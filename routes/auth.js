@@ -5,12 +5,13 @@ const jwt = require('jsonwebtoken');
 const { connectToDatabase } = require('../lib/mongodb');
 const { sendVerificationEmail, sendPasswordResetEmail } = require('../lib/mailer');
 const otel = require('../lib/otel');
+const logger = require('../lib/logger');
 const User = require('../models/User');
 const SystemConfig = require('../models/SystemConfig');
+const { SUPER_ADMIN_EMAIL, isSuperAdminEmail } = require('../lib/super-admins');
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-fallback-secret-override-in-infisical';
-const SUPER_ADMIN_EMAIL = 'mdzubair7592@gmail.com';
 
 // In-memory cache for dynamically configurable session duration
 let cachedSessionConfig = {
@@ -54,11 +55,6 @@ function updateCachedSessionDuration(value, unit, string) {
 
 function getCachedSessionDuration() {
   return cachedSessionConfig.string || '7d';
-}
-
-function isSuperAdminEmail(email) {
-  if (!email) return false;
-  return String(email).trim().toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
 }
 
 function generateOtp() {

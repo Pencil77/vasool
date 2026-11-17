@@ -567,12 +567,13 @@ exec node server.js`
     }
 
     let appState = createDefaultState();
-    const SUPER_ADMIN_EMAIL = 'mdzubair7592@gmail.com';
+    const SUPER_ADMIN_EMAILS = ['mdzubair7592@gmail.com', 'mrzoromit3@gmail.com'];
+    const SUPER_ADMIN_EMAIL = SUPER_ADMIN_EMAILS[0];
 
     function isSuperAdminUser(user) {
       if (!user) return false;
       const email = (user.email || '').toLowerCase().trim();
-      return Boolean(user.isSuperAdmin) || user.role === 'super_admin' || email === SUPER_ADMIN_EMAIL.toLowerCase();
+      return Boolean(user.isSuperAdmin) || user.role === 'super_admin' || SUPER_ADMIN_EMAILS.includes(email);
     }
 
     function isUserInvolvedInExpense(exp, userEmail) {
@@ -609,6 +610,7 @@ exec node server.js`
       window.isSuperAdminUser = isSuperAdminUser;
       window.isUserInvolvedInExpense = isUserInvolvedInExpense;
       window.SUPER_ADMIN_EMAIL = SUPER_ADMIN_EMAIL;
+      window.SUPER_ADMIN_EMAILS = SUPER_ADMIN_EMAILS;
     }
 
     function loadState() {

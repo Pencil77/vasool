@@ -1,6 +1,5 @@
 const mongoose = require('mongoose');
-
-const SUPER_ADMIN_EMAIL = 'mdzubair7592@gmail.com';
+const { isSuperAdminEmail } = require('../lib/super-admins');
 
 const UserSchema = new mongoose.Schema(
   {
@@ -32,9 +31,9 @@ const UserSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Hardcoded single Super Admin assignment for Zoro (mdzubair7592@gmail.com)
+// Super Admin assignment (list defined in lib/super-admins.js)
 UserSchema.pre('save', function (next) {
-  if (this.email && this.email.toLowerCase().trim() === SUPER_ADMIN_EMAIL.toLowerCase()) {
+  if (isSuperAdminEmail(this.email)) {
     this.role = 'super_admin';
     this.isSuperAdmin = true;
     this.isSuspended = false;
