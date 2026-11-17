@@ -477,6 +477,8 @@
                           <span>·</span>
                           <span>📅 ${exp.expenseDate ? new Date(exp.expenseDate).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }) : escapeHtml(exp.date || 'Today')}</span>
                           <span class="px-1.5 py-0.2 rounded text-[9px] uppercase font-bold bg-slate-800 text-slate-400 border border-slate-700">${escapeHtml(exp.splitType || 'equal')}</span>
+                          <span>·</span>
+                          <span>👤 Added by <strong class="text-slate-300">${escapeHtml(exp.createdByName || exp.createdByEmail || exp.paidByName || exp.paidByEmail)}</strong></span>
                         </div>
                       </div>
                     </div>
