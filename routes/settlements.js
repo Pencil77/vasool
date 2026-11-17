@@ -87,6 +87,10 @@ router.get('/balances', requireAuth, async (req, res) => {
       return Boolean(isGrpAdmin);
     });
 
+    // Closure status is derived from the full group picture, before the
+    // privacy filter below removes other members' transfers from the response.
+    const isFullyClosed = simplifiedTransactions.length === 0 && pendingSettlements.length === 0;
+
     if (!isRequesterAdmin) {
       simplifiedTransactions = simplifiedTransactions.filter(
         (t) => t.fromEmail.toLowerCase() === requesterEmail || t.toEmail.toLowerCase() === requesterEmail
@@ -103,8 +107,6 @@ router.get('/balances', requireAuth, async (req, res) => {
         (b) => b.email.toLowerCase() === requesterEmail || adminEmails.has(b.email.toLowerCase())
       );
     }
-
-    const isFullyClosed = simplifiedTransactions.length === 0 && pendingSettlements.length === 0;
 
     // Payer recommendation suggestion removed per user preference
     const whoShouldPay = null;

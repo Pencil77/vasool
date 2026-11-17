@@ -143,7 +143,7 @@
 
       // Non-admins always use the client-side privacy-filtered computation so the
       // Group Details settle tab never exposes other members' amounts.
-      const { totalSpend, simplified, filteredExpenses, filteredSettlements, balanceList, balanceMap, pendingSettlements, isFullyClosed } =
+      const { totalSpend, simplified, filteredExpenses, filteredSettlements, balanceList, balanceMap } =
         serverData && serverData.simplifiedTransactions && canViewEveryone
           ? {
               totalSpend: serverData.totalSpend,
@@ -151,11 +151,13 @@
               filteredExpenses: serverData.expenses,
               filteredSettlements: serverData.settlements,
               balanceList: serverData.members,
-              balanceMap: (serverData.members || []).reduce((acc, m) => { acc[(m.email || '').toLowerCase().trim()] = m; return acc; }, {}),
-              pendingSettlements: (serverData.settlements || []).filter((s) => s.status === 'pending_admin_approval' || s.status === 'pending_confirmation' || s.status === 'pending'),
-              isFullyClosed: (!serverData.simplifiedTransactions || serverData.simplifiedTransactions.length === 0)
+              balanceMap: (serverData.members || []).reduce((acc, m) => { acc[(m.email || '').toLowerCase().trim()] = m; return acc; }, {})
             }
           : computeBalancesAndSimplifications(grp.id);
+
+      const groupSettlementLedger = (typeof window !== 'undefined' && typeof window.buildGroupSplitSettlementLedger === 'function')
+        ? window.buildGroupSplitSettlementLedger(grp.id, filteredExpenses, filteredSettlements)
+        : {};
 
       const myInvolvedBills = filteredExpenses.filter((exp) => (typeof isUserInvolvedInExpense === 'function' ? isUserInvolvedInExpense(exp, currentEmail) : true));
       const visibleBills = (!isCurrentUserAdmin || groupBillsScopeFilter === 'involved') ? myInvolvedBills : filteredExpenses;
@@ -376,7 +378,6 @@
                 ).map((p) => String(p.memberEmail || '').toLowerCase().trim())
               );
 
-              const isGroupMinimized = grp.minimizeDebts !== false;
 
               const splitChips = splitsList
                 .map((s) => {
@@ -387,10 +388,7 @@
                         expense: exp,
                         split: s,
                         payerEmails,
-                        simplified,
-                        pendingSettlements,
-                        isFullyClosed,
-                        isMinimizedMode: isGroupMinimized
+                        ledger: groupSettlementLedger
                       })
                     : {
                         isPayer: payerEmails.has(sEmail),
@@ -424,10 +422,7 @@
                           expense: exp,
                           split: s,
                           payerEmails,
-                          simplified,
-                          pendingSettlements,
-                          isFullyClosed,
-                          isMinimizedMode: isGroupMinimized
+                          ledger: groupSettlementLedger
                         })
                       : { isSettled: false, hasPending: false }
                   }));

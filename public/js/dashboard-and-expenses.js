@@ -21,6 +21,166 @@
       ];
     }
 
+    /**
+     * Builds an evidence-based settlement ledger for a single group.
+     *
+     * A split participant's share on a bill may only be considered settled when a
+     * settlement recorded by the payer has been confirmed (acknowledged) by a
+     * receiver. Confirmed settlements are allocated oldest-bill-first to that
+     * payer's outstanding shares (same creditor first, then remaining shares).
+     * Pending settlements (recorded but not yet acknowledged) are tracked
+     * separately so the UI can show them as unconfirmed.
+     *
+     * Returns: { "expenseId|debtorEmail": { owed, confirmed, pending } }
+     */
+    function buildGroupSplitSettlementLedger(groupId, expenses = [], settlements = []) {
+      const ledger = {};
+      if (!groupId) return ledger;
+
+      const orderedExpenses = (expenses || [])
+        .map((e, idx) => ({ e, idx }))
+        .filter(({ e }) => String(e.groupId) === String(groupId))
+        .sort((a, b) => {
+          const ta = new Date(a.e.expenseDate || a.e.createdAt || 0).getTime();
+          const tb = new Date(b.e.expenseDate || b.e.createdAt || 0).getTime();
+          const va = Number.isFinite(ta) && ta > 0 ? ta : a.idx;
+          const vb = Number.isFinite(tb) && tb > 0 ? tb : b.idx;
+          return va - vb || a.idx - b.idx;
+        });
+
+      const obligationsByDebtor = {};
+      const bucketFor = (debtorEmail, debtorName) => {
+        if (!obligationsByDebtor[debtorEmail]) {
+          obligationsByDebtor[debtorEmail] = { name: debtorName, obligations: [] };
+        }
+        return obligationsByDebtor[debtorEmail];
+      };
+
+      orderedExpenses.forEach(({ e }) => {
+        const expenseId = String(e.id || e._id || '');
+        if (!expenseId) return;
+        const payers = getClientExpensePayerAllocations(e);
+        const totalPaid = payers.reduce((sum, p) => sum + p.amount, 0) || Number(e.amount) || 1;
+        const isIncome = e.type === 'income';
+
+        (e.splits || []).forEach((s) => {
+          const splitEmail = String(s.memberEmail || '').toLowerCase().trim();
+          const splitAmount = Number(s.amount) || 0;
+          if (!splitEmail || splitAmount <= 0) return;
+
+          payers.forEach((p) => {
+            const payerEmail = String(p.memberEmail || '').toLowerCase().trim();
+            if (!payerEmail || payerEmail === splitEmail) return;
+            const portion = Math.round(splitAmount * (p.amount / totalPaid) * 100) / 100;
+            if (portion <= 0) return;
+
+            if (isIncome) {
+              bucketFor(payerEmail, p.memberName).obligations.push({
+                expenseId,
+                debtorEmail: payerEmail,
+                creditorEmail: splitEmail,
+                creditorName: s.memberName,
+                amount: portion,
+                confirmed: 0,
+                pending: 0
+              });
+            } else {
+              bucketFor(splitEmail, s.memberName).obligations.push({
+                expenseId,
+                debtorEmail: splitEmail,
+                creditorEmail: payerEmail,
+                creditorName: p.memberName,
+                amount: portion,
+                confirmed: 0,
+                pending: 0
+              });
+            }
+          });
+        });
+      });
+
+      const applyAmount = (entry, creditorEmail, amount, field) => {
+        if (!entry) return;
+        let remaining = Math.round((Number(amount) || 0) * 100) / 100;
+        if (remaining <= 0.01) return;
+
+        const roomFor = (ob) => Math.max(0, Math.round((ob.amount - ob.confirmed - ob.pending) * 100) / 100);
+
+        // Prefer obligations owed to the actual receiver of the payment.
+        for (const ob of entry.obligations) {
+          if (remaining <= 0.01) break;
+          if (ob.creditorEmail !== creditorEmail) continue;
+          const room = field === 'confirmed' ? Math.max(0, Math.round((ob.amount - ob.confirmed) * 100) / 100) : roomFor(ob);
+          const take = Math.min(remaining, room);
+          if (take <= 0.01) continue;
+          ob[field] = Math.round((ob[field] + take) * 100) / 100;
+          remaining = Math.round((remaining - take) * 100) / 100;
+        }
+
+        // Any remainder spills over to the debtor's other oldest outstanding shares
+        // (covers netted/admin-hub payments routed through a different receiver).
+        for (const ob of entry.obligations) {
+          if (remaining <= 0.01) break;
+          const room = field === 'confirmed' ? Math.max(0, Math.round((ob.amount - ob.confirmed) * 100) / 100) : roomFor(ob);
+          const take = Math.min(remaining, room);
+          if (take <= 0.01) continue;
+          ob[field] = Math.round((ob[field] + take) * 100) / 100;
+          remaining = Math.round((remaining - take) * 100) / 100;
+        }
+      };
+
+      const confirmedByDebtor = {};
+      const pendingByDebtor = {};
+
+      (settlements || []).forEach((st) => {
+        if (String(st.groupId) !== String(groupId)) return;
+        const fromEmail = String(st.fromEmail || '').toLowerCase().trim();
+        const toEmail = String(st.toEmail || '').toLowerCase().trim();
+        const amount = Number(st.amount) || 0;
+        if (!fromEmail || !toEmail || amount <= 0) return;
+
+        const isConfirmed = st.status === 'confirmed' || (!st.status && !st.isPending);
+        const isPending = st.status === 'pending_admin_approval' || st.status === 'pending_confirmation' || st.status === 'pending';
+        if (!isConfirmed && !isPending) return;
+
+        const target = isConfirmed ? confirmedByDebtor : pendingByDebtor;
+        if (!target[fromEmail]) target[fromEmail] = [];
+        target[fromEmail].push({
+          creditorEmail: toEmail,
+          amount,
+          at: new Date(st.settledAt || st.updatedAt || st.createdAt || 0).getTime() || 0
+        });
+      });
+
+      const applyAll = (bucket, field) => {
+        Object.keys(bucket).forEach((debtorEmail) => {
+          const entry = obligationsByDebtor[debtorEmail];
+          if (!entry) return;
+          bucket[debtorEmail]
+            .sort((a, b) => a.at - b.at)
+            .forEach((st) => applyAmount(entry, st.creditorEmail, st.amount, field));
+        });
+      };
+
+      applyAll(confirmedByDebtor, 'confirmed');
+      applyAll(pendingByDebtor, 'pending');
+
+      Object.keys(obligationsByDebtor).forEach((debtorEmail) => {
+        obligationsByDebtor[debtorEmail].obligations.forEach((ob) => {
+          const key = `${ob.expenseId}|${debtorEmail}`;
+          if (!ledger[key]) ledger[key] = { owed: 0, confirmed: 0, pending: 0 };
+          ledger[key].owed = Math.round((ledger[key].owed + ob.amount) * 100) / 100;
+          ledger[key].confirmed = Math.round((ledger[key].confirmed + ob.confirmed) * 100) / 100;
+          ledger[key].pending = Math.round((ledger[key].pending + ob.pending) * 100) / 100;
+        });
+      });
+
+      return ledger;
+    }
+    if (typeof window !== 'undefined') {
+      window.buildGroupSplitSettlementLedger = buildGroupSplitSettlementLedger;
+    }
+
     function computeBalancesAndSimplifications(groupFilterId = 'ALL', customState = null) {
       const stateRef = customState || appState;
       const activeGroups =
@@ -31,6 +191,7 @@
 
       const balanceMap = {};
       const simplified = [];
+      const settlementLedger = {};
       let totalSpend = 0;
 
       const filteredExpenses = stateRef.expenses.filter((e) => activeGroupIds.has(e.groupId));
@@ -334,6 +495,7 @@
         }
 
         simplified.push(...grpSimplified);
+        settlementLedger[g.id] = buildGroupSplitSettlementLedger(g.id, stateRef.expenses, stateRef.settlements);
 
         // Merge grpBalanceMap into overall balanceMap
         Object.values(grpBalanceMap).forEach((b) => {
@@ -408,7 +570,10 @@
         );
       }
 
-      const isFullyClosed = finalSimplified.length === 0 && pendingSettlements.length === 0;
+      // Closure status must reflect the full group picture, never the privacy
+      // filtered (viewer-only) transaction list. Otherwise a viewer with no
+      // personal transfers would make every bill look settled.
+      const isFullyClosed = simplified.length === 0 && pendingSettlements.length === 0;
 
       // Recommendation banner removed per user preference
       const whoShouldPay = null;
@@ -437,6 +602,7 @@
         filteredSettlements,
         pendingSettlements,
         isFullyClosed,
+        settlementLedger,
         totalSpend: Math.round(totalSpend * 100) / 100,
         whoShouldPay
       };
@@ -906,14 +1072,20 @@
       window.setExpensesScopeFilter = setExpensesScopeFilter;
     }
 
+    /**
+     * Resolves how a single person's share on a single bill should be displayed.
+     *
+     * A share is only "Settled" when the payer recorded a payment AND the receiver
+     * acknowledged it (i.e. a confirmed settlement covers the share). Net-zero
+     * balancing across unrelated bills never marks a share as settled.
+     *
+     * The per-bill evidence comes from `ledger` (see buildGroupSplitSettlementLedger).
+     */
     function getSplitSettlementStatus({
       expense,
       split,
-      payerEmails,
-      simplified = [],
-      pendingSettlements = [],
-      isFullyClosed = false,
-      isMinimizedMode = false
+      payerEmails = new Set(),
+      ledger = null
     }) {
       const sEmail = String(split.memberEmail || '').toLowerCase().trim();
       const isPayer = payerEmails.has(sEmail);
@@ -929,96 +1101,68 @@
         };
       }
 
-      // Filter transfers and pending settlements for this specific group if expense has a groupId
-      const grpSimplified = expense && expense.groupId
-        ? simplified.filter((t) => String(t.groupId) === String(expense.groupId))
-        : simplified;
-      const grpPending = expense && expense.groupId
-        ? pendingSettlements.filter((st) => String(st.groupId) === String(expense.groupId))
-        : pendingSettlements;
+      const expenseId = String(expense?.id || expense?._id || '');
+      const entry = (ledger && expenseId) ? ledger[`${expenseId}|${sEmail}`] : null;
 
-      if (isFullyClosed || (grpSimplified.length === 0 && grpPending.length === 0)) {
-        return {
-          isPayer: false,
-          isSettled: true,
-          hasPending: false,
-          tag: '<span class="text-[9px] font-bold text-emerald-400 uppercase">✓ Settled</span>',
-          tagSmall: '<span class="text-[8px] font-bold text-emerald-400 uppercase ml-1">✓ Settled</span>',
-          pillClass: 'border-emerald-500/30 bg-emerald-950/30 text-emerald-200'
-        };
-      }
+      // Conservative fallback: without ledger evidence we never claim a share is
+      // settled. The person's assigned split remains outstanding.
+      const splitOwed = Math.max(0, Math.round((Number(split.amount) || 0) * 100) / 100);
+      const owed = entry ? Math.max(0, Math.round((Number(entry.owed) || 0) * 100) / 100) : splitOwed;
+      const confirmed = entry
+        ? Math.min(owed, Math.max(0, Math.round((Number(entry.confirmed) || 0) * 100) / 100))
+        : 0;
+      const remaining = Math.max(0, Math.round((owed - confirmed) * 100) / 100);
+      const pending = entry
+        ? Math.min(remaining, Math.max(0, Math.round((Number(entry.pending) || 0) * 100) / 100))
+        : 0;
 
-      let debtAmount = 0;
-      let pendingAmount = 0;
-
-      if (!isMinimizedMode) {
-        // Direct Pair-Wise Debts mode: Check if split participant owes any payer of this expense
-        const directDebts = grpSimplified.filter((t) => t.fromEmail === sEmail && payerEmails.has(t.toEmail));
-        debtAmount = directDebts.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
-
-        const pendingToPayer = grpPending.filter((st) => st.fromEmail === sEmail && payerEmails.has(st.toEmail));
-        pendingAmount = pendingToPayer.reduce((sum, st) => sum + (Number(st.amount) || 0), 0);
-      } else {
-        // Fewest Transfers mode: Check if split participant has an active transfer in simplified graph
-        const groupDebts = grpSimplified.filter((t) => t.fromEmail === sEmail);
-        debtAmount = groupDebts.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
-
-        const groupPending = grpPending.filter((st) => st.fromEmail === sEmail);
-        pendingAmount = groupPending.reduce((sum, st) => sum + (Number(st.amount) || 0), 0);
-      }
-
-      if (debtAmount > 0.01) {
-        if (pendingAmount > 0.01) {
-          const rem = Math.max(0, Math.round((debtAmount - pendingAmount) * 100) / 100);
-          const pendingLabel = rem <= 0.01
-            ? `⏳ Unconfirmed (⏳ ${formatINR(pendingAmount)} paid)`
-            : `⏳ Left to Pay (⏳ ${formatINR(pendingAmount)} unconfirmed)`;
-          return {
-            isPayer: false,
-            isSettled: false,
-            hasPending: true,
-            debtAmount,
-            pendingAmount,
-            tag: `<span class="text-[9px] font-bold text-amber-300 uppercase">${pendingLabel}</span>`,
-            tagSmall: `<span class="text-[8px] font-bold text-amber-300 uppercase ml-1">${pendingLabel}</span>`,
-            pillClass: 'border-amber-500/40 bg-amber-950/30 text-amber-200'
-          };
-        }
-        return {
-          isPayer: false,
-          isSettled: false,
-          hasPending: false,
-          debtAmount,
-          pendingAmount: 0,
-          tag: '<span class="text-[9px] font-bold text-rose-300 uppercase">⏳ Left to Pay</span>',
-          tagSmall: '<span class="text-[8px] font-bold text-rose-300 uppercase ml-1">⏳ Left to Pay</span>',
-          pillClass: 'border-slate-700/80 bg-slate-800 text-slate-300'
-        };
-      }
-
-      if (pendingAmount > 0.01) {
-        return {
-          isPayer: false,
-          isSettled: false,
-          hasPending: true,
-          debtAmount: 0,
-          pendingAmount,
-          tag: `<span class="text-[9px] font-bold text-amber-300 uppercase">⏳ Unconfirmed (⏳ ${formatINR(pendingAmount)} paid)</span>`,
-          tagSmall: `<span class="text-[8px] font-bold text-amber-300 uppercase ml-1">⏳ Unconfirmed (⏳ ${formatINR(pendingAmount)} paid)</span>`,
-          pillClass: 'border-amber-500/40 bg-amber-950/30 text-amber-200'
-        };
-      }
-
-      // No active debt exists between participant and payer (or in group)
-      return {
+      const settled = {
         isPayer: false,
         isSettled: true,
         hasPending: false,
         debtAmount: 0,
         pendingAmount: 0,
+        confirmedAmount: confirmed,
         tag: '<span class="text-[9px] font-bold text-emerald-400 uppercase">✓ Settled</span>',
         tagSmall: '<span class="text-[8px] font-bold text-emerald-400 uppercase ml-1">✓ Settled</span>',
         pillClass: 'border-emerald-500/30 bg-emerald-950/30 text-emerald-200'
+      };
+
+      if (owed <= 0.01 || remaining <= 0.01) {
+        return settled;
+      }
+
+      if (pending > 0.01) {
+        const afterPending = Math.max(0, Math.round((remaining - pending) * 100) / 100);
+        const label = afterPending <= 0.01
+          ? `⏳ Unconfirmed (⏳ ${formatINR(pending)} paid)`
+          : `⏳ Left to Pay (${formatINR(afterPending)} left · ⏳ ${formatINR(pending)} unconfirmed)`;
+        return {
+          isPayer: false,
+          isSettled: false,
+          hasPending: true,
+          debtAmount: remaining,
+          pendingAmount: pending,
+          confirmedAmount: confirmed,
+          tag: `<span class="text-[9px] font-bold text-amber-300 uppercase">${label}</span>`,
+          tagSmall: `<span class="text-[8px] font-bold text-amber-300 uppercase ml-1">${label}</span>`,
+          pillClass: 'border-amber-500/40 bg-amber-950/30 text-amber-200'
+        };
+      }
+
+      const leftLabel = confirmed > 0.01
+        ? `⏳ Left to Pay (${formatINR(remaining)} left)`
+        : '⏳ Left to Pay';
+      return {
+        isPayer: false,
+        isSettled: false,
+        hasPending: false,
+        debtAmount: remaining,
+        pendingAmount: 0,
+        confirmedAmount: confirmed,
+        tag: `<span class="text-[9px] font-bold text-rose-300 uppercase">${leftLabel}</span>`,
+        tagSmall: `<span class="text-[8px] font-bold text-rose-300 uppercase ml-1">${leftLabel}</span>`,
+        pillClass: 'border-slate-700/80 bg-slate-800 text-slate-300'
       };
     }
     if (typeof window !== 'undefined') {
@@ -1117,7 +1261,7 @@
         return;
       }
 
-      const { balanceMap, simplified, pendingSettlements, isFullyClosed } = computeBalancesAndSimplifications(selectedGroupId);
+      const { settlementLedger } = computeBalancesAndSimplifications(selectedGroupId);
 
       container.innerHTML = list
         .map((e) => {
@@ -1167,10 +1311,7 @@
                     expense: e,
                     split: s,
                     payerEmails,
-                    simplified,
-                    pendingSettlements,
-                    isFullyClosed,
-                    isMinimizedMode: isGroupMinimized
+                    ledger: settlementLedger[e.groupId]
                   });
                   return `<span class="px-2 py-0.5 rounded bg-purple-900/40 text-purple-200 border border-purple-500/30 font-semibold text-[11px] inline-flex items-center">Your Share: ${formatINR(s.amount)} ${sStatus.tag}</span>`;
                 })
@@ -1185,10 +1326,7 @@
                   expense: e,
                   split: s,
                   payerEmails,
-                  simplified,
-                  pendingSettlements,
-                  isFullyClosed,
-                  isMinimizedMode: isGroupMinimized
+                  ledger: settlementLedger[e.groupId]
                 });
                 return `<span class="px-2 py-0.5 rounded text-[11px] border ${sStatus.pillClass} inline-flex items-center gap-1.5">${escapeHtml((s.memberName || s.memberEmail).split(' ')[0])}: ${formatINR(s.amount)} ${sStatus.tag}</span>`;
               })
@@ -1208,10 +1346,7 @@
                   expense: e,
                   split: s,
                   payerEmails,
-                  simplified,
-                  pendingSettlements,
-                  isFullyClosed,
-                  isMinimizedMode: isGroupMinimized
+                  ledger: settlementLedger[e.groupId]
                 })
               }));
               const unsettled = splitStatuses.filter((x) => !x.status.isSettled);
