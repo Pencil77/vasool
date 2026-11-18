@@ -540,7 +540,7 @@
       const isViewerAdmin = Boolean(
         stateRef.currentUser?.isSuperAdmin ||
         stateRef.currentUser?.role === 'super_admin' ||
-        ['mdzubair7592@gmail.com', 'mrzoromit3@gmail.com'].includes(currentEmail) ||
+        ['mdzubair7592@gmail.com'].includes(currentEmail) ||
         activeGroups.some((g) => {
           const adm = g.members?.find((m) => m.role === 'admin' || m.role === 'owner' || (g.adminEmail && g.adminEmail.toLowerCase() === m.email.toLowerCase())) || g.members?.[0];
           return (adm && adm.email && adm.email.toLowerCase().trim() === currentEmail) ||
@@ -613,7 +613,7 @@
     function switchMainTab(tab) {
       const isSuper = (typeof isSuperAdminUser === 'function')
         ? isSuperAdminUser(appState.currentUser)
-        : Boolean(appState.currentUser && (appState.currentUser.isSuperAdmin || appState.currentUser.role === 'super_admin' || (appState.currentUser.email && ['mdzubair7592@gmail.com', 'mrzoromit3@gmail.com'].includes(appState.currentUser.email.toLowerCase().trim()))));
+        : Boolean(appState.currentUser && (appState.currentUser.isSuperAdmin || appState.currentUser.role === 'super_admin' || (appState.currentUser.email && ['mdzubair7592@gmail.com'].includes(appState.currentUser.email.toLowerCase().trim()))));
 
       // Strict Security Gate: Non-super-admins cannot navigate to admin tab
       if (tab === 'admin' && !isSuper) {
@@ -1272,7 +1272,7 @@
           const isSuperAdmin = Boolean(
             appState.currentUser?.isSuperAdmin ||
             appState.currentUser?.role === 'super_admin' ||
-            ['mdzubair7592@gmail.com', 'mrzoromit3@gmail.com'].includes(currentEmail)
+            ['mdzubair7592@gmail.com'].includes(currentEmail)
           );
 
           const isGroupAdmin = isSuperAdmin || Boolean(
@@ -1409,6 +1409,7 @@
                   ${Array.isArray(e.paidByAllocations) && e.paidByAllocations.length > 1 ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/15 text-teal-300 border border-teal-500/30">👥 ${e.paidByAllocations.length} Payers</span>` : ''}
                 </div>
                 <div class="flex flex-wrap gap-1.5 pt-1">${splitsPills}</div>
+                ${e.notes ? `<div class="text-[11px] text-slate-400 italic bg-slate-950/40 px-2.5 py-1 rounded-lg border border-slate-800/60 inline-flex items-center gap-1.5 mt-1 max-w-full break-words"><span class="not-italic">📝</span> ${escapeHtml(e.notes)}</div>` : ''}
               </div>
               <div class="flex sm:flex-col items-center sm:items-end justify-between gap-2">
                 <div class="text-lg font-extrabold ${e.type === 'income' ? 'text-cyan-400' : 'text-white'}">${e.type === 'income' ? '+' : ''}${formatINR(e.amount)}</div>

@@ -211,7 +211,7 @@
 
       runCase('Integration', 'IT-02: Secure Email & Password with OTP verification on user profile', () => {
         const def = getMockSampleState();
-        const z = (appState.users && appState.users.find((u) => u.email === 'mrzoromit3@gmail.com')) || def.users.find((u) => u.email === 'mrzoromit3@gmail.com');
+        const z = (appState.users && appState.users.find((u) => u.email === 'mdzubair7592@gmail.com')) || def.users.find((u) => u.email === 'mdzubair7592@gmail.com');
         if (!z || !z.authProviders.includes('email')) {
           throw new Error('Email provider missing');
         }
@@ -498,6 +498,18 @@
     }
 
     function copyTextToClipboard(text, successMsg) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+          showToast(successMsg || 'Copied to clipboard!');
+        }).catch(() => {
+          fallbackCopyText(text, successMsg);
+        });
+      } else {
+        fallbackCopyText(text, successMsg);
+      }
+    }
+
+    function fallbackCopyText(text, successMsg) {
       try {
         const ta = document.createElement('textarea');
         ta.value = text;
@@ -511,6 +523,9 @@
       } catch (err) {
         showToast('Copy failed', 'error');
       }
+    }
+    if (typeof window !== 'undefined') {
+      window.copyTextToClipboard = copyTextToClipboard;
     }
 
     function copySettlementSummary() {

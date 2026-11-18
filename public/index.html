@@ -29,14 +29,14 @@
     <div class="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-1.5 sm:gap-3">
       <!-- Brand Logo -->
       <div class="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
-        <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-br from-emerald-400 via-teal-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/25 ring-1 ring-emerald-300/40 flex-shrink-0">
+        <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-2xl bg-emerald-500 flex items-center justify-center shadow-md shadow-emerald-500/20 flex-shrink-0">
           <svg class="w-5 h-5 sm:w-6 sm:h-6 text-slate-950" fill="none" stroke="currentColor" stroke-width="2.3" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         </div>
         <div class="flex items-center gap-1.5 sm:gap-2">
-          <span data-testid="brand-title" class="font-display font-extrabold text-base sm:text-lg tracking-tight bg-gradient-to-r from-white via-emerald-100 to-teal-200 bg-clip-text text-transparent whitespace-nowrap">Vasool</span>
-          <span class="px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] font-bold bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-300 border border-emerald-400/30 shadow-sm shadow-emerald-500/10"><span class="sm:hidden">v3.1</span><span class="hidden sm:inline">v3.1 Aurora</span></span>
+          <span data-testid="brand-title" class="font-display font-extrabold text-base sm:text-lg tracking-tight text-white whitespace-nowrap">Vasool</span>
+          <span class="px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"><span class="sm:hidden">v3.1</span><span class="hidden sm:inline">v3.1</span></span>
           <span id="dbStatusBadge" data-testid="db-status-badge" class="hidden">
             v3.1 Production · Aurora Modular Edition
           </span>
@@ -142,7 +142,6 @@
 
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
           <div class="glass-panel glass-card-hover rounded-2xl p-4 relative overflow-hidden">
-            <div class="h-0.5 bg-gradient-to-r from-emerald-400 to-teal-500 -mx-4 -mt-4 mb-3"></div>
             <div class="flex items-center gap-2 text-emerald-400 font-bold text-xs uppercase tracking-wider mb-1.5">
               <span class="px-1.5 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/30">🔐</span>
               <span>Seamless Sign-In</span>
@@ -150,17 +149,15 @@
             <p class="text-xs text-slate-300 leading-relaxed">Fast, verified access via Email &amp; Password OTP or Google OAuth.</p>
           </div>
           <div class="glass-panel glass-card-hover rounded-2xl p-4 relative overflow-hidden">
-            <div class="h-0.5 bg-gradient-to-r from-teal-400 to-cyan-500 -mx-4 -mt-4 mb-3"></div>
-            <div class="flex items-center gap-2 text-teal-400 font-bold text-xs uppercase tracking-wider mb-1.5">
-              <span class="px-1.5 py-0.5 rounded-md bg-teal-500/15 border border-teal-500/30">⚖️</span>
+            <div class="flex items-center gap-2 text-slate-300 font-bold text-xs uppercase tracking-wider mb-1.5">
+              <span class="px-1.5 py-0.5 rounded-md bg-slate-800 border border-slate-700">⚖️</span>
               <span>4 Split Modes</span>
             </div>
             <p class="text-xs text-slate-300 leading-relaxed">Split bills Equally, by Exact Amounts, Percentages, or Couple Weights in INR (₹).</p>
           </div>
           <div class="glass-panel glass-card-hover rounded-2xl p-4 relative overflow-hidden">
-            <div class="h-0.5 bg-gradient-to-r from-cyan-400 to-indigo-500 -mx-4 -mt-4 mb-3"></div>
-            <div class="flex items-center gap-2 text-cyan-400 font-bold text-xs uppercase tracking-wider mb-1.5">
-              <span class="px-1.5 py-0.5 rounded-md bg-cyan-500/15 border border-cyan-500/30">⚡</span>
+            <div class="flex items-center gap-2 text-slate-300 font-bold text-xs uppercase tracking-wider mb-1.5">
+              <span class="px-1.5 py-0.5 rounded-md bg-slate-800 border border-slate-700">⚡</span>
               <span>Smart Settle &amp; QR</span>
             </div>
             <p class="text-xs text-slate-300 leading-relaxed">Minimum-cash-flow engine with UPI QR codes, UTR proof, partial approvals &amp; PDF statements.</p>
@@ -171,7 +168,6 @@
       <!-- Right Column: Auth Card (Sign In / Create Account with Email & OTP) -->
       <div class="lg:col-span-5">
         <div class="glass-panel rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-700/80 relative overflow-hidden">
-          <div class="h-1 bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 -mx-6 sm:-mx-8 -mt-6 sm:-mt-8 mb-6"></div>
           <!-- Pending Group Invite Banner -->
           <div id="authPendingInviteBanner" class="hidden mb-5 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-200 flex items-start gap-2.5">
             <span class="text-base flex-shrink-0">📩</span>
@@ -284,13 +280,11 @@
     <!-- Home-Only Top Overview Wrapper (Hidden on Bills, Groups, Settle, QA, and Admin tabs to eliminate redundancy) -->
     <div id="homeDashboardTopSection" data-testid="home-dashboard-top-section" class="space-y-4 sm:space-y-5">
     <!-- Top Action & Summary Banner -->
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 bg-gradient-to-r from-slate-900/95 via-slate-900/90 to-teal-950/40 p-4 sm:p-5 rounded-3xl border border-slate-800/80 shadow-2xl relative overflow-hidden">
-      <div class="absolute -top-12 -right-12 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
-      <div class="absolute -bottom-8 -left-8 w-36 h-36 bg-teal-500/10 rounded-full blur-2xl pointer-events-none"></div>
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 bg-slate-900/90 p-4 sm:p-5 rounded-3xl border border-slate-800 shadow-lg relative overflow-hidden">
       <div class="relative z-10">
         <div class="flex flex-wrap items-center gap-2">
           <h2 class="text-lg sm:text-2xl font-extrabold text-white tracking-tight">Welcome back, <span id="welcomeUserName" data-testid="welcome-user-name" class="text-emerald-400">Friend</span></h2>
-          <span id="activeGroupPill" data-testid="active-group-pill" class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+          <span id="activeGroupPill" data-testid="active-group-pill" class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
             All Groups
           </span>
         </div>
@@ -299,19 +293,19 @@
         </p>
       </div>
       <div class="grid grid-cols-3 sm:flex sm:flex-wrap items-center gap-2 relative z-10">
-        <button data-testid="btn-open-add-expense" onclick="openAddExpenseModal()" class="col-span-1 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-emerald-400 via-emerald-500 to-teal-500 hover:from-emerald-300 hover:to-teal-400 text-slate-950 font-bold text-xs sm:text-sm shadow-lg shadow-emerald-500/25 ring-1 ring-emerald-300/30 flex items-center justify-center gap-1.5 transition">
+        <button data-testid="btn-open-add-expense" onclick="openAddExpenseModal()" class="col-span-1 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs sm:text-sm shadow-sm flex items-center justify-center gap-1.5 transition">
           <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
           </svg>
           <span class="truncate">Add Bill</span>
         </button>
-        <button data-testid="btn-open-new-group" onclick="openModal('newGroupModal')" class="col-span-1 px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-100 font-semibold text-xs sm:text-sm border border-slate-700/80 hover:border-slate-600 flex items-center justify-center gap-1.5 shadow-sm transition">
+        <button data-testid="btn-open-new-group" onclick="openModal('newGroupModal')" class="col-span-1 px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 font-semibold text-xs sm:text-sm border border-slate-700/80 hover:border-slate-600 flex items-center justify-center gap-1.5 shadow-sm transition">
           <svg class="w-4 h-4 text-emerald-400 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
           </svg>
           <span class="truncate">New Group</span>
         </button>
-        <button data-testid="btn-quick-onboarding" onclick="openOnboardingWizard(0)" class="col-span-1 px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl bg-teal-500/15 hover:bg-teal-500/25 text-teal-300 font-semibold text-xs sm:text-sm border border-teal-500/30 flex items-center justify-center gap-1 shadow-sm transition truncate">
+        <button data-testid="btn-quick-onboarding" onclick="openOnboardingWizard(0)" class="col-span-1 px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs sm:text-sm border border-slate-700/80 flex items-center justify-center gap-1 shadow-sm transition truncate">
           <span>🧭</span>
           <span class="truncate">App Tour</span>
         </button>
@@ -323,8 +317,6 @@
     <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 items-stretch">
       <!-- 1. Net Balance Card -->
       <div class="glass-panel glass-card-hover rounded-2xl sm:rounded-3xl p-3 sm:p-4.5 relative overflow-hidden group flex flex-col justify-between h-full min-w-0">
-        <div class="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-emerald-500/10 blur-2xl pointer-events-none group-hover:bg-emerald-500/20 transition"></div>
-        <div class="h-1 bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-500 rounded-t-2xl sm:rounded-t-3xl -mt-3 sm:-mt-4.5 -mx-3 sm:-mx-4.5 mb-2.5 sm:mb-3"></div>
         <div class="flex items-center justify-between text-[11px] sm:text-xs text-slate-400 mb-1.5 min-h-[22px] gap-1">
           <span class="font-bold tracking-wider uppercase text-[10px] text-slate-400 truncate">Your Net Balance</span>
           <span class="px-1.5 sm:px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider flex-shrink-0">💎 NET</span>
@@ -342,11 +334,9 @@
 
       <!-- 2. You Are Owed Card -->
       <div class="glass-panel glass-card-hover rounded-2xl sm:rounded-3xl p-3 sm:p-4.5 relative overflow-hidden group flex flex-col justify-between h-full min-w-0">
-        <div class="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-teal-500/10 blur-2xl pointer-events-none group-hover:bg-teal-500/20 transition"></div>
-        <div class="h-1 bg-gradient-to-r from-teal-400 via-emerald-400 to-cyan-400 rounded-t-2xl sm:rounded-t-3xl -mt-3 sm:-mt-4.5 -mx-3 sm:-mx-4.5 mb-2.5 sm:mb-3"></div>
         <div class="flex items-center justify-between text-[11px] sm:text-xs text-slate-400 mb-1.5 min-h-[22px] gap-1">
           <span class="font-bold tracking-wider uppercase text-[10px] text-slate-400 truncate">You Are Owed</span>
-          <span class="px-1.5 sm:px-2 py-0.5 rounded-full bg-teal-500/15 text-teal-300 border border-teal-500/30 text-[9px] sm:text-[10px] font-bold flex-shrink-0">📈 INFLOW</span>
+          <span class="px-1.5 sm:px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[9px] sm:text-[10px] font-bold flex-shrink-0">📈 INFLOW</span>
         </div>
         <div class="my-auto py-1 flex flex-col justify-center min-h-[58px] sm:min-h-[66px]">
           <div id="kpiYouAreOwed" data-testid="kpi-you-are-owed" class="font-display text-lg sm:text-2xl lg:text-3xl font-extrabold text-emerald-400 tracking-tight tabular-nums break-words leading-tight">₹0.00</div>
@@ -361,8 +351,6 @@
 
       <!-- 3. You Owe Card -->
       <div class="glass-panel glass-card-hover rounded-2xl sm:rounded-3xl p-3 sm:p-4.5 relative overflow-hidden group flex flex-col justify-between h-full min-w-0">
-        <div class="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-rose-500/10 blur-2xl pointer-events-none group-hover:bg-rose-500/20 transition"></div>
-        <div class="h-1 bg-gradient-to-r from-rose-500 via-pink-500 to-amber-500 rounded-t-2xl sm:rounded-t-3xl -mt-3 sm:-mt-4.5 -mx-3 sm:-mx-4.5 mb-2.5 sm:mb-3"></div>
         <div class="flex items-center justify-between text-[11px] sm:text-xs text-slate-400 mb-1.5 min-h-[22px] gap-1">
           <span class="font-bold tracking-wider uppercase text-[10px] text-slate-400 truncate">You Owe</span>
           <span class="px-1.5 sm:px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-300 border border-rose-500/30 text-[9px] sm:text-[10px] font-bold flex-shrink-0">📉 OUTFLOW</span>
@@ -380,16 +368,14 @@
 
       <!-- 4. Group Spend Card -->
       <div class="glass-panel glass-card-hover rounded-2xl sm:rounded-3xl p-3 sm:p-4.5 relative overflow-hidden group flex flex-col justify-between h-full min-w-0">
-        <div class="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-cyan-500/10 blur-2xl pointer-events-none group-hover:bg-cyan-500/20 transition"></div>
-        <div class="h-1 bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-400 rounded-t-2xl sm:rounded-t-3xl -mt-3 sm:-mt-4.5 -mx-3 sm:-mx-4.5 mb-2.5 sm:mb-3"></div>
         <div class="flex items-center justify-between text-[11px] sm:text-xs text-slate-400 mb-1.5 min-h-[22px] gap-1">
           <span class="font-bold tracking-wider uppercase text-[10px] text-slate-400 truncate">Group Spend</span>
-          <span id="kpiExpenseCountBadge" data-testid="kpi-expense-count-badge" class="px-1.5 sm:px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 text-[9px] sm:text-[10px] font-bold flex-shrink-0">0 bills</span>
+          <span id="kpiExpenseCountBadge" data-testid="kpi-expense-count-badge" class="px-1.5 sm:px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 text-[9px] sm:text-[10px] font-bold flex-shrink-0">0 bills</span>
         </div>
         <div class="my-auto py-1 flex flex-col justify-center min-h-[58px] sm:min-h-[66px]">
           <div id="kpiTotalSpend" data-testid="kpi-total-spend" class="font-display text-lg sm:text-2xl lg:text-3xl font-extrabold text-white tracking-tight tabular-nums break-words leading-tight">₹0.00</div>
           <div id="kpiSpendPendingRow" class="min-h-[22px] mt-1 flex items-center">
-            <span class="text-[10px] sm:text-xs text-cyan-300/80 font-medium">Total volume</span>
+            <span class="text-[10px] sm:text-xs text-slate-400 font-medium">Total volume</span>
           </div>
         </div>
         <div class="mt-auto pt-2 border-t border-slate-800/60 flex items-center justify-between text-[10px] sm:text-xs text-slate-400 min-h-[20px] leading-tight break-words">
@@ -402,7 +388,7 @@
     <!-- Workspace Navigation Bar & Group Filter (Single Unified Glass Command Bar) -->
     <div id="workspaceCommandBar" class="glass-panel rounded-2xl p-2 sm:p-2.5 flex flex-col md:flex-row md:items-center justify-between gap-2.5">
       <div id="desktopNavTabsContainer" class="hidden md:flex overflow-x-auto no-scrollbar items-center gap-1.5 p-1 bg-slate-950/70 rounded-xl border border-slate-800/80">
-        <button id="navTabDashboard" data-testid="nav-tab-dashboard" onclick="switchMainTab('dashboard')" class="whitespace-nowrap px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-gradient-to-r from-emerald-400 to-teal-500 text-slate-950 shadow-md shadow-emerald-500/20 transition flex items-center gap-1.5">
+        <button id="navTabDashboard" data-testid="nav-tab-dashboard" onclick="switchMainTab('dashboard')" class="whitespace-nowrap px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-emerald-500 text-slate-950 shadow-sm transition flex items-center gap-1.5">
           <span>📊</span>
           <span>Overview &amp; Analytics</span>
         </button>
@@ -647,7 +633,7 @@
             <option value="Integration">Integration Tests (9)</option>
             <option value="UI E2E">UI E2E &amp; DOM Tests (9)</option>
           </select>
-          <button id="btnRunAllUiTests" data-testid="btn-run-all-ui-tests" onclick="runAutomatedTestSuite(true)" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 hover:from-emerald-300 hover:to-teal-400 text-slate-950 font-bold text-xs sm:text-sm shadow-lg shadow-emerald-500/20 flex items-center gap-2 transition">
+          <button id="btnRunAllUiTests" data-testid="btn-run-all-ui-tests" onclick="runAutomatedTestSuite(true)" class="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs sm:text-sm shadow-sm flex items-center gap-2 transition">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
             </svg>
@@ -1037,7 +1023,7 @@
   <!-- ===================================================================== -->
 
   <!-- Mobile Floating Action Button (FAB) for Instant Bill/Expense Entry -->
-  <button id="mobileFabAddExpense" data-testid="mobile-fab-add-expense" onclick="openAddExpenseModal()" aria-label="Add Expense" class="md:hidden fixed bottom-20 right-4 z-40 flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-400 via-emerald-500 to-teal-500 text-slate-950 font-bold px-4 py-3 rounded-full shadow-2xl shadow-emerald-500/40 ring-1 ring-emerald-300/40 hover:scale-105 active:scale-95 transition-all">
+  <button id="mobileFabAddExpense" data-testid="mobile-fab-add-expense" onclick="openAddExpenseModal()" aria-label="Add Expense" class="md:hidden fixed bottom-20 right-4 z-40 flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-4 py-3 rounded-full shadow-lg shadow-black/40 hover:scale-105 active:scale-95 transition-all">
     <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2.6" viewBox="0 0 24 24">
       <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
     </svg>
@@ -2004,9 +1990,12 @@
                 <span>⚡ Pay via UPI App</span>
                 <span class="text-[10px] opacity-80">(GPay, PhonePe, Paytm)</span>
               </a>
-              <div class="text-[10px] text-slate-400 flex items-center justify-center sm:justify-start gap-1">
+              <div class="text-[10px] text-slate-400 flex items-center justify-center sm:justify-start gap-1.5 flex-wrap">
                 <span>Verified Payee VPA:</span>
                 <input id="settleUpiIdInput" type="text" readonly class="bg-slate-900 px-2 py-0.5 rounded border border-slate-700 text-[11px] text-emerald-300 font-mono-code focus:outline-none cursor-default" />
+                <button type="button" onclick="copyTextToClipboard(document.getElementById('settleUpiIdInput').value, 'Payee UPI ID copied!')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-[10px] font-semibold transition" title="Copy UPI ID">
+                  📋 Copy
+                </button>
               </div>
             </div>
           </div>
@@ -2250,7 +2239,7 @@
             type="submit"
             id="btnSubmitOtp"
             data-testid="btn-submit-otp"
-            class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold text-sm shadow-lg shadow-emerald-500/20 transition flex items-center justify-center gap-2"
+            class="w-full py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm shadow-sm transition flex items-center justify-center gap-2"
           >
             <span>Verify &amp; Continue</span>
           </button>
@@ -2624,7 +2613,7 @@
           id="btnSubmitFeedback"
           data-testid="btn-submit-feedback"
           onclick="submitUserFeedback()"
-          class="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold text-xs transition flex items-center gap-1.5 shadow-md shadow-emerald-500/20"
+          class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition flex items-center gap-1.5 shadow-sm"
         >
           <span>Send Feedback 🚀</span>
         </button>
@@ -2770,7 +2759,7 @@
 
       <!-- Progress Bar -->
       <div class="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden my-3 flex-shrink-0">
-        <div id="onboardingProgressBar" class="h-full bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 transition-all duration-300" style="width: 25%"></div>
+        <div id="onboardingProgressBar" class="h-full bg-emerald-500 transition-all duration-300" style="width: 25%"></div>
       </div>
 
       <!-- Dynamic Step Content Body -->
@@ -2801,7 +2790,7 @@
             id="btnOnboardingNext"
             data-testid="btn-onboarding-next"
             onclick="nextOnboardingStep()"
-            class="px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 hover:from-emerald-300 hover:to-teal-400 text-slate-950 font-bold text-xs sm:text-sm shadow-lg shadow-emerald-500/20 transition"
+            class="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs sm:text-sm shadow-sm transition"
           >
             Next &rarr;
           </button>

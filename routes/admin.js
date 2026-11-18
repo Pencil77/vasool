@@ -53,8 +53,22 @@ router.get('/users', async (req, res) => {
 
   try {
     await connectToDatabase();
-    const users = await User.find().sort({ createdAt: -1 });
+    const rawUsers = await User.find().sort({ createdAt: -1 });
     const groups = await Group.find({}, 'members').lean();
+
+    // Filter out automated test accounts from the Super Admin Console
+    const isTestAccount = (email) => {
+      const em = String(email || '').toLowerCase().trim();
+      return (
+        em.endsWith('.test') ||
+        em.includes('@example.com') ||
+        em.includes('@vasool.test') ||
+        em.startsWith('user_feedback_test_') ||
+        em.startsWith('live.browser.') ||
+        em.startsWith('zoro.suite.')
+      );
+    };
+    const users = rawUsers.filter((u) => !isTestAccount(u.email));
 
     // Map group counts per user email
     const groupCountMap = {};

@@ -163,7 +163,12 @@ const STORAGE_KEY = 'vasool_clean_state_v1';
       const token = localStorage.getItem(AUTH_TOKEN_KEY);
       if (!token) return;
       try {
-        const groupsRes = await apiFetch('/api/groups');
+        const [groupsRes, expRes, stlRes] = await Promise.all([
+          apiFetch('/api/groups'),
+          apiFetch('/api/expenses'),
+          apiFetch('/api/settlements')
+        ]);
+
         if (groupsRes && Array.isArray(groupsRes.groups)) {
           appState.groups = groupsRes.groups.map((g) => ({
             id: g._id ? g._id.toString() : g.id,
@@ -190,7 +195,6 @@ const STORAGE_KEY = 'vasool_clean_state_v1';
           }));
         }
 
-        const expRes = await apiFetch('/api/expenses');
         if (expRes && Array.isArray(expRes.expenses)) {
           appState.expenses = expRes.expenses.map((e) => ({
             id: e._id ? e._id.toString() : e.id,
@@ -213,6 +217,7 @@ const STORAGE_KEY = 'vasool_clean_state_v1';
             splitType: e.splitType || 'equal',
             roundingRemainder: e.roundingRemainder || 0,
             remainderAbsorbedBy: e.remainderAbsorbedBy || '',
+            notes: e.notes || '',
             expenseDate: e.expenseDate || e.createdAt,
             date: e.expenseDate
               ? (typeof e.expenseDate === 'string' ? e.expenseDate.slice(0, 10) : new Date(e.expenseDate).toISOString().slice(0, 10))
@@ -229,7 +234,6 @@ const STORAGE_KEY = 'vasool_clean_state_v1';
           }));
         }
 
-        const stlRes = await apiFetch('/api/settlements');
         if (stlRes && Array.isArray(stlRes.settlements)) {
           appState.settlements = stlRes.settlements.map((s) => ({
             id: s._id ? s._id.toString() : s.id,
@@ -386,7 +390,7 @@ exec node server.js`
         currentUser: {
           id: 'usr_zubair_01',
           name: 'Zubair Mohammed',
-          email: 'mrzoromit3@gmail.com',
+          email: 'mdzubair7592@gmail.com',
           authProviders: ['email'],
           upiId: 'zubair@amazonpay'
         },
@@ -394,7 +398,7 @@ exec node server.js`
           {
             id: 'usr_zubair_01',
             name: 'Zubair Mohammed',
-            email: 'mrzoromit3@gmail.com',
+            email: 'mdzubair7592@gmail.com',
             passwordHash: 'Vasool#2026',
             authProviders: ['email'],
             upiId: 'zubair@amazonpay'
@@ -432,9 +436,9 @@ exec node server.js`
             currency: 'INR',
             inviteCode: 'SPL-GOA92',
             splitsVisibility: 'personal_only',
-            adminEmail: 'mrzoromit3@gmail.com',
+            adminEmail: 'mdzubair7592@gmail.com',
             members: [
-              { name: 'Zubair Mohammed', email: 'mrzoromit3@gmail.com', role: 'admin' },
+              { name: 'Zubair Mohammed', email: 'mdzubair7592@gmail.com', role: 'admin' },
               { name: 'Omkar Chinnam', email: 'omkar.chinnam@gmail.com', role: 'member' },
               { name: 'Krutika Morande', email: 'krutika.morande@gmail.com', role: 'member' },
               { name: 'Anshuman Barik', email: 'anshuman.barik@gmail.com', role: 'member' }
@@ -447,9 +451,9 @@ exec node server.js`
             currency: 'INR',
             inviteCode: 'SPL-HYD402',
             splitsVisibility: 'personal_only',
-            adminEmail: 'mrzoromit3@gmail.com',
+            adminEmail: 'mdzubair7592@gmail.com',
             members: [
-              { name: 'Zubair Mohammed', email: 'mrzoromit3@gmail.com', role: 'admin' },
+              { name: 'Zubair Mohammed', email: 'mdzubair7592@gmail.com', role: 'admin' },
               { name: 'Omkar Chinnam', email: 'omkar.chinnam@gmail.com', role: 'member' },
               { name: 'Anshuman Barik', email: 'anshuman.barik@gmail.com', role: 'member' }
             ]
@@ -461,9 +465,9 @@ exec node server.js`
             currency: 'INR',
             inviteCode: 'SPL-LUNCH7',
             splitsVisibility: 'personal_only',
-            adminEmail: 'mrzoromit3@gmail.com',
+            adminEmail: 'mdzubair7592@gmail.com',
             members: [
-              { name: 'Zubair Mohammed', email: 'mrzoromit3@gmail.com', role: 'admin' },
+              { name: 'Zubair Mohammed', email: 'mdzubair7592@gmail.com', role: 'admin' },
               { name: 'Krutika Morande', email: 'krutika.morande@gmail.com', role: 'member' },
               { name: 'Omkar Chinnam', email: 'omkar.chinnam@gmail.com', role: 'member' }
             ]
@@ -476,12 +480,12 @@ exec node server.js`
             description: 'Beachfront Villa Booking (3 Nights)',
             amount: 14400,
             category: 'Travel & Stay',
-            paidByEmail: 'mrzoromit3@gmail.com',
+            paidByEmail: 'mdzubair7592@gmail.com',
             paidByName: 'Zubair Mohammed',
             splitType: 'equal',
             date: '2026-10-14',
             splits: [
-              { memberEmail: 'mrzoromit3@gmail.com', memberName: 'Zubair Mohammed', amount: 3600 },
+              { memberEmail: 'mdzubair7592@gmail.com', memberName: 'Zubair Mohammed', amount: 3600 },
               { memberEmail: 'omkar.chinnam@gmail.com', memberName: 'Omkar Chinnam', amount: 3600 },
               { memberEmail: 'krutika.morande@gmail.com', memberName: 'Krutika Morande', amount: 3600 },
               { memberEmail: 'anshuman.barik@gmail.com', memberName: 'Anshuman Barik', amount: 3600 }
@@ -498,7 +502,7 @@ exec node server.js`
             splitType: 'equal',
             date: '2026-10-15',
             splits: [
-              { memberEmail: 'mrzoromit3@gmail.com', memberName: 'Zubair Mohammed', amount: 800 },
+              { memberEmail: 'mdzubair7592@gmail.com', memberName: 'Zubair Mohammed', amount: 800 },
               { memberEmail: 'omkar.chinnam@gmail.com', memberName: 'Omkar Chinnam', amount: 800 },
               { memberEmail: 'krutika.morande@gmail.com', memberName: 'Krutika Morande', amount: 800 },
               { memberEmail: 'anshuman.barik@gmail.com', memberName: 'Anshuman Barik', amount: 800 }
@@ -510,12 +514,12 @@ exec node server.js`
             description: 'ACT Fibernet Broadband & Electricity Bill',
             amount: 2700,
             category: 'Rent & Utilities',
-            paidByEmail: 'mrzoromit3@gmail.com',
+            paidByEmail: 'mdzubair7592@gmail.com',
             paidByName: 'Zubair Mohammed',
             splitType: 'percentage',
             date: '2026-10-16',
             splits: [
-              { memberEmail: 'mrzoromit3@gmail.com', memberName: 'Zubair Mohammed', amount: 900, percentage: 33.33 },
+              { memberEmail: 'mdzubair7592@gmail.com', memberName: 'Zubair Mohammed', amount: 900, percentage: 33.33 },
               { memberEmail: 'omkar.chinnam@gmail.com', memberName: 'Omkar Chinnam', amount: 900, percentage: 33.33 },
               { memberEmail: 'anshuman.barik@gmail.com', memberName: 'Anshuman Barik', amount: 900, percentage: 33.34 }
             ]
@@ -531,7 +535,7 @@ exec node server.js`
             splitType: 'exact',
             date: '2026-10-17',
             splits: [
-              { memberEmail: 'mrzoromit3@gmail.com', memberName: 'Zubair Mohammed', amount: 550 },
+              { memberEmail: 'mdzubair7592@gmail.com', memberName: 'Zubair Mohammed', amount: 550 },
               { memberEmail: 'krutika.morande@gmail.com', memberName: 'Krutika Morande', amount: 550 },
               { memberEmail: 'omkar.chinnam@gmail.com', memberName: 'Omkar Chinnam', amount: 550 }
             ]
@@ -543,7 +547,7 @@ exec node server.js`
             groupId: 'grp_goa_trip',
             fromEmail: 'anshuman.barik@gmail.com',
             fromName: 'Anshuman Barik',
-            toEmail: 'mrzoromit3@gmail.com',
+            toEmail: 'mdzubair7592@gmail.com',
             toName: 'Zubair Mohammed',
             amount: 1500,
             currency: 'INR',
@@ -551,7 +555,7 @@ exec node server.js`
             referenceNote: 'Partial villa settlement via Amazon Pay UPI',
             status: 'confirmed',
             confirmedAt: '2026-10-16',
-            confirmedByEmail: 'mrzoromit3@gmail.com',
+            confirmedByEmail: 'mdzubair7592@gmail.com',
             settledAt: '2026-10-16'
           }
         ]
@@ -559,7 +563,7 @@ exec node server.js`
     }
 
     let appState = createDefaultState();
-    const SUPER_ADMIN_EMAILS = ['mdzubair7592@gmail.com', 'mrzoromit3@gmail.com'];
+    const SUPER_ADMIN_EMAILS = ['mdzubair7592@gmail.com'];
     const SUPER_ADMIN_EMAIL = SUPER_ADMIN_EMAILS[0];
 
     function isSuperAdminUser(user) {

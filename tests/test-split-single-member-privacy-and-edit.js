@@ -60,7 +60,7 @@ console.log('--- Test 1: Backend Privacy Filter for Payer, Admin, and Third-Part
 
 function sanitizeExpenseForUser(exp, user, group) {
   const requesterEmail = user.email.toLowerCase().trim();
-  const isSuperAdmin = Boolean(user.isSuperAdmin || user.role === 'super_admin' || ['mdzubair7592@gmail.com', 'mrzoromit3@gmail.com'].includes(requesterEmail));
+  const isSuperAdmin = Boolean(user.isSuperAdmin || user.role === 'super_admin' || ['mdzubair7592@gmail.com'].includes(requesterEmail));
   const isGroupAdmin = isSuperAdmin || Boolean(
     (group.adminEmail && group.adminEmail.toLowerCase() === requesterEmail) ||
     (group.createdByEmail && group.createdByEmail.toLowerCase() === requesterEmail) ||
@@ -132,7 +132,7 @@ function renderSplitPillsForUser(exp, currentUser, group, balanceMap = {}) {
   const isSuperAdmin = Boolean(
     currentUser?.isSuperAdmin ||
     currentUser?.role === 'super_admin' ||
-    ['mdzubair7592@gmail.com', 'mrzoromit3@gmail.com'].includes(currentEmail)
+    ['mdzubair7592@gmail.com'].includes(currentEmail)
   );
 
   const isGroupAdmin = isSuperAdmin || Boolean(

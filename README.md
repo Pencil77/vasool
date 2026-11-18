@@ -25,3 +25,10 @@ Full-stack expense splitting and verifiable debt settlement platform built with 
 8. **Interactive Chart Drill-Downs & 1-Click Demo Persona Switcher**:
    - Click any category slice in *Spending by Category* or member bar in *Net Member Balances* to filter matching bills in one tap.
    - 1-Click Demo Persona Switcher pills on the Sign-In view and top header for instant multi-role testing (`Aarav`, `Vikram`, `Rohan`, `Neha & Partner`, `Priya`).
+
+## Documentation & Architecture
+- [Platform Documentation](docs/docs.md): Comprehensive system architecture, module breakdowns, domain workflows, and API specifications.
+- [Product & Engineering Requirements](docs/requirements.md): Functional and non-functional requirements for the Aurora Modular Edition (v3.1).
+- [Technical Specifications](docs/Specs.md): Database schemas, runtime configurations, and security model.
+- [Scope of Improvements](docs/Vasool_Scope_of_Improvements.md): Production hardening roadmap and feature enhancements.
+
