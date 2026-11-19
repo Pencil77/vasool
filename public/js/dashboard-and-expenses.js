@@ -907,32 +907,34 @@
 
     function renderDashboardWidgets(filteredExpenses, simplified, balanceList) {
       const recentContainer = document.getElementById('dashboardRecentExpenses');
-      const currentEmail = (appState.currentUser?.email || '').toLowerCase().trim();
-      const userInvolvedExpenses = filteredExpenses.filter((e) => (typeof isUserInvolvedInExpense === 'function' ? isUserInvolvedInExpense(e, currentEmail) : true));
+      if (recentContainer) {
+        const currentEmail = (appState.currentUser?.email || '').toLowerCase().trim();
+        const userInvolvedExpenses = filteredExpenses.filter((e) => (typeof isUserInvolvedInExpense === 'function' ? isUserInvolvedInExpense(e, currentEmail) : true));
 
-      if (!userInvolvedExpenses.length) {
-        recentContainer.innerHTML = `<div class="text-xs text-slate-500 py-6 text-center">No bills where you are involved logged yet. Click "+ Add Bill" to start.</div>`;
-      } else {
-        recentContainer.innerHTML = userInvolvedExpenses
-          .slice(0, 4)
-          .map((e) => {
-            const grp = appState.groups.find((g) => g.id === e.groupId);
-            return `
-              <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 flex items-center justify-between gap-3 transition">
-                <div class="min-w-0">
-                  <div class="text-xs sm:text-sm font-semibold text-white truncate">${escapeHtml(e.description)}</div>
-                  <div class="text-[11px] text-slate-400 mt-0.5">
-                    Paid by <span class="text-emerald-300 font-medium">${escapeHtml(e.paidByName)}</span> · ${escapeHtml(grp ? grp.name : 'Group')} · <span class="uppercase text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">${escapeHtml(e.splitType)}</span> · 👤 Added by <span class="text-slate-300 font-medium">${escapeHtml(e.createdByName || e.createdByEmail || e.paidByName)}</span>
+        if (!userInvolvedExpenses.length) {
+          recentContainer.innerHTML = `<div class="text-xs text-slate-500 py-6 text-center">No bills where you are involved logged yet. Click "+ Add Bill" to start.</div>`;
+        } else {
+          recentContainer.innerHTML = userInvolvedExpenses
+            .slice(0, 4)
+            .map((e) => {
+              const grp = appState.groups.find((g) => g.id === e.groupId);
+              return `
+                <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 flex items-center justify-between gap-3 transition">
+                  <div class="min-w-0">
+                    <div class="text-xs sm:text-sm font-semibold text-white truncate">${escapeHtml(e.description)}</div>
+                    <div class="text-[11px] text-slate-400 mt-0.5">
+                      Paid by <span class="text-emerald-300 font-medium">${escapeHtml(e.paidByName)}</span> · ${escapeHtml(grp ? grp.name : 'Group')} · <span class="uppercase text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">${escapeHtml(e.splitType)}</span> · 👤 Added by <span class="text-slate-300 font-medium">${escapeHtml(e.createdByName || e.createdByEmail || e.paidByName)}</span>
+                    </div>
+                  </div>
+                  <div class="text-right flex-shrink-0">
+                    <div class="text-sm font-bold text-white">${formatINR(e.amount)}</div>
+                    <div class="text-[10px] text-slate-400">${escapeHtml(e.category)}</div>
                   </div>
                 </div>
-                <div class="text-right flex-shrink-0">
-                  <div class="text-sm font-bold text-white">${formatINR(e.amount)}</div>
-                  <div class="text-[10px] text-slate-400">${escapeHtml(e.category)}</div>
-                </div>
-              </div>
-            `;
-          })
-          .join('');
+              `;
+            })
+            .join('');
+        }
       }
 
       const simpContainer = document.getElementById('dashboardSimplifiedList');

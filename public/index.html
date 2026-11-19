@@ -468,35 +468,20 @@
         </div>
       </div>
 
-      <!-- Recent Expenses + Quick Simplified Debts Preview -->
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div class="lg:col-span-7 glass-panel glass-card-hover rounded-3xl p-5">
-          <div class="flex items-center justify-between mb-4">
-            <div>
-              <h3 class="text-sm font-bold text-white flex items-center gap-1.5">
-                <span>🧾</span> Recent Shared Expenses
-              </h3>
-              <p class="text-xs text-slate-400">Latest bills &amp; refunds across active groups</p>
-            </div>
-            <button onclick="switchMainTab('expenses')" class="px-3 py-1 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-xs font-semibold text-emerald-300 transition">View All &rarr;</button>
+      <!-- Quick Simplified Debts Preview -->
+      <div class="glass-panel glass-card-hover rounded-3xl p-5">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h3 class="text-sm font-bold text-white flex items-center gap-1.5">
+              <span>⚡</span> Simplified Settlement Plan
+            </h3>
+            <p class="text-xs text-slate-400">Minimum-cash-flow transfers to square up</p>
           </div>
-          <div id="dashboardRecentExpenses" data-testid="dashboard-recent-expenses" class="space-y-2.5"></div>
+          <button data-testid="btn-copy-settlement-summary" onclick="copySettlementSummary()" class="px-3 py-1 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-xs font-semibold text-teal-300 border border-teal-500/30 transition">
+            📋 Copy Plan
+          </button>
         </div>
-
-        <div class="lg:col-span-5 glass-panel glass-card-hover rounded-3xl p-5">
-          <div class="flex items-center justify-between mb-4">
-            <div>
-              <h3 class="text-sm font-bold text-white flex items-center gap-1.5">
-                <span>⚡</span> Simplified Settlement Plan
-              </h3>
-              <p class="text-xs text-slate-400">Minimum-cash-flow transfers to square up</p>
-            </div>
-            <button data-testid="btn-copy-settlement-summary" onclick="copySettlementSummary()" class="px-3 py-1 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-xs font-semibold text-teal-300 border border-teal-500/30 transition">
-              📋 Copy Plan
-            </button>
-          </div>
-          <div id="dashboardSimplifiedList" data-testid="dashboard-simplified-list" class="space-y-2.5"></div>
-        </div>
+        <div id="dashboardSimplifiedList" data-testid="dashboard-simplified-list" class="space-y-2.5"></div>
       </div>
     </div>
 
