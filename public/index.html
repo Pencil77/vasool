@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
@@ -435,21 +435,6 @@
       <div id="userPendingInvitesBannerDashboard" class="hidden"></div>
 
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <!-- Category Breakdown Chart -->
-        <div class="lg:col-span-5 glass-panel glass-card-hover rounded-3xl p-5">
-          <div class="flex items-center justify-between mb-3">
-            <div>
-              <h3 class="text-sm font-bold text-white flex items-center gap-1.5">
-                <span>🍩</span> Spending by Category
-              </h3>
-              <p class="text-xs text-slate-400">Click any category slice to filter bills</p>
-            </div>
-            <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Interactive Drill-Down</span>
-          </div>
-          <div class="relative h-72">
-            <canvas id="categoryChartCanvas"></canvas>
-          </div>
-        </div>
 
         <!-- Member Net Balances Chart -->
         <div class="lg:col-span-7 glass-panel glass-card-hover rounded-3xl p-5">
@@ -468,21 +453,6 @@
         </div>
       </div>
 
-      <!-- Quick Simplified Debts Preview -->
-      <div class="glass-panel glass-card-hover rounded-3xl p-5">
-        <div class="flex items-center justify-between mb-4">
-          <div>
-            <h3 class="text-sm font-bold text-white flex items-center gap-1.5">
-              <span>⚡</span> Simplified Settlement Plan
-            </h3>
-            <p class="text-xs text-slate-400">Minimum-cash-flow transfers to square up</p>
-          </div>
-          <button data-testid="btn-copy-settlement-summary" onclick="copySettlementSummary()" class="px-3 py-1 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-xs font-semibold text-teal-300 border border-teal-500/30 transition">
-            📋 Copy Plan
-          </button>
-        </div>
-        <div id="dashboardSimplifiedList" data-testid="dashboard-simplified-list" class="space-y-2.5"></div>
-      </div>
     </div>
 
     <!-- TAB 2: EXPENSES & SPLITS -->
