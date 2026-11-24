@@ -1360,7 +1360,7 @@
             if (revealed) { revealed = false; password.textContent = 'Password: ••••••••••'; reveal.textContent = 'Reveal Password'; return; }
             reveal.disabled = true; reveal.textContent = 'Loading…';
             try {
-              const result = await apiFetch('/api/admin/users/' + encodeURIComponent(userId) + '/credentials');
+              const result = await apiFetch('/api/admin/users/' + encodeURIComponent(userId) + '/credentials', { cache: 'no-store' });
               if (requestVersion !== adminDetailsRequestVersion || activeAdminDetailsRoot !== root) return;
               const creds = result.credentials || {};
               password.textContent = creds.passwordAvailable ? 'Password: ' + creds.password : 'Password: Not available for this account';
