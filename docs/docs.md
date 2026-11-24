@@ -74,3 +74,4 @@ To keep the platform maintainable and fast to load, both the backend and fronten
 
 - [Admin User Details & Credential Reveal Modal](implementation/admin-user-details-modal.md): Required per-user details modal, explicit password reveal behavior, API contract, and acceptance criteria.
 - [UI/UX, Frontend Architecture & Quality Improvements](implementation/ui-ux-frontend-quality.md): Detailed implementation roadmap for the interface, core user journeys, incremental frontend restructuring, accessibility, performance, and automated regression coverage.
+- [UI Visual Restoration & Split-to-Settle Workflow](implementation/ui-visual-restoration-and-settle-workflow.md): Product-owner-approved green-and-black visual direction and the Split Expenses relocation/navigation requirements.
