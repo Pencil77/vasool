@@ -137,7 +137,9 @@ router.get('/users', async (req, res) => {
 router.get('/users/:userId/details', async (req, res) => {
   try {
     await connectToDatabase();
-    const user = await User.findById(req.params.userId).lean();
+    const user = await User.findById(req.params.userId)
+      .select('_id name email avatarUrl upiId defaultCurrency role isSuperAdmin isEmailVerified authProviders createdAt updatedAt lastLoginAt isSuspended suspensionReason suspendedAt suspendedUntil')
+      .lean();
     if (!user) return res.status(404).json({ error: 'User account not found.' });
 
     const [groupCount] = await Group.aggregate([
@@ -183,6 +185,9 @@ router.get('/users/:userId/credentials', async (req, res) => {
     await connectToDatabase();
     const user = await User.findById(req.params.userId).select('_id email passwordRaw').lean();
     if (!user) return res.status(404).json({ error: 'User account not found.' });
+
+    res.set({ 'Cache-Control': 'no-store, private', 'Pragma': 'no-cache', 'Vary': 'Authorization' });
+    logger.info(`[admin] Super Admin ${req.user.email} explicitly revealed stored password availability for user: ${user.email}`);
 
     const password = (typeof user.passwordRaw === 'string' && user.passwordRaw.length > 0)
       ? user.passwordRaw
