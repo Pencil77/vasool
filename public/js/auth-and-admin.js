@@ -1036,7 +1036,9 @@
     // SUPER ADMIN CONSOLE LOGIC (VIEW/EDIT PASSWORDS, DISABLE/DELETE ACCOUNTS)
     // =========================================================================
     let adminUsersCache = [];
-    let revealedPasswords = {};
+    let activeAdminDetailsRoot = null;
+    let activeAdminDetailsUserId = null;
+    let adminDetailsRequestVersion = 0;
 
     function openSuperAdminConsole() {
       const isSuper = (typeof isSuperAdminUser === 'function')
@@ -1228,123 +1230,150 @@
       renderAdminUsers(filtered);
     }
 
-    function togglePasswordReveal(userId) {
-      revealedPasswords[userId] = !revealedPasswords[userId];
-      const searchVal = document.getElementById('adminUserSearchInput') ? document.getElementById('adminUserSearchInput').value : '';
-      filterAdminUsers(searchVal);
-    }
-
     function renderAdminUsers(users) {
       const container = document.getElementById('adminUsersListContainer');
       if (!container) return;
-
       if (!users || users.length === 0) {
-        container.innerHTML = `
-          <div class="text-center py-10 text-slate-500 text-xs">
-            No accounts found matching your query.
-          </div>`;
+        container.innerHTML = '<div class="text-center py-10 text-slate-500 text-xs">No accounts found matching your query.</div>';
         return;
       }
 
-      const html = users.map((u) => {
+      container.innerHTML = users.map((u) => {
         const initials = (u.name || u.email || 'U').split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
         const isSuper = Boolean(u.isSuperAdmin) || (u.email && u.email.toLowerCase() === 'mdzubair7592@gmail.com');
-        const isRevealed = Boolean(revealedPasswords[u.id]);
-        const passwordDisplay = isRevealed ? escapeHtml(u.password) : '••••••••••••';
-
-        let statusBadge = '';
-        if (u.isSuspended) {
-          if (u.suspendedUntil) {
-            const untilDate = new Date(u.suspendedUntil);
-            const dateStr = untilDate.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-            statusBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40" title="Reason: ${escapeHtml(u.suspensionReason || 'Disabled')}">⏳ Disabled until ${dateStr}</span>`;
-          } else {
-            statusBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40" title="Reason: ${escapeHtml(u.suspensionReason || 'Disabled')}">🚫 Disabled (Indefinite)</span>`;
-          }
-        } else {
-          statusBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">✓ Active</span>`;
-        }
-
+        const statusBadge = u.isSuspended
+          ? (u.suspendedUntil
+            ? '<span class="text-[10px] font-bold text-amber-300">⏳ Suspended until ' + new Date(u.suspendedUntil).toLocaleString() + '</span>'
+            : '<span class="text-[10px] font-bold text-rose-300">🚫 Suspended indefinitely</span>')
+          : '<span class="text-[10px] font-semibold text-emerald-300">✓ Active</span>';
         const roleBadge = isSuper
-          ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-500/20 text-amber-300 border border-amber-400/50">👑 Super Admin</span>`
-          : `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-800 text-slate-400 border border-slate-700">Member</span>`;
-
+          ? '<span class="text-[10px] font-extrabold text-amber-300">👑 Super Admin</span>'
+          : '<span class="text-[10px] text-slate-400">Member</span>';
         const verifiedBadge = u.isEmailVerified
-          ? `<span class="text-[10px] text-emerald-400" title="Email verified">✓ Verified</span>`
-          : `<span class="text-[10px] text-amber-400" title="Verification pending">⚠️ Unverified</span>`;
-
-        // Action controls
-        let actionButtons = '';
+          ? '<span class="text-[10px] text-emerald-400">✓ Verified</span>'
+          : '<span class="text-[10px] text-amber-400">⚠️ Unverified</span>';
+        const detailsButton = '<button type="button" data-testid="admin-user-view-details" onclick="openAdminUserDetails(\'' + escapeHtml(u.id) + '\')" class="px-3 py-2 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 text-xs font-semibold">View Details</button>';
+        let actions = '';
         if (isSuper) {
-          actionButtons = `
-            <div class="w-full sm:w-auto px-2.5 py-1.5 rounded-lg bg-amber-500/10 border border-amber-400/30 text-[11px] font-bold text-amber-300 flex items-center justify-center sm:justify-start gap-1 whitespace-nowrap">
-              <span>🛡️</span> Protected App Owner
-            </div>`;
+          actions = '<span class="text-[11px] font-bold text-amber-300">🛡️ Protected App Owner</span>';
         } else {
-          const suspendToggleBtn = u.isSuspended
-            ? `<button onclick="executeAdminUnsuspend('${u.id}', '${escapeHtml(u.email)}')" class="flex-1 sm:flex-initial px-2.5 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-semibold transition flex items-center justify-center gap-1 whitespace-nowrap">
-                 <span>✅</span> Re-enable
-               </button>`
-            : `<button onclick="openAdminSuspendModal('${u.id}', '${escapeHtml(u.name)}', '${escapeHtml(u.email)}')" class="flex-1 sm:flex-initial px-2.5 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-semibold transition flex items-center justify-center gap-1 whitespace-nowrap">
-                 <span>🚫</span> Disable
-               </button>`;
-
-          actionButtons = `
-            <div class="grid grid-cols-3 sm:flex items-center gap-1.5 w-full sm:w-auto">
-              <button onclick="openAdminEditPasswordModal('${u.id}', '${escapeHtml(u.name)}', '${escapeHtml(u.email)}')" class="flex-1 sm:flex-initial px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition flex items-center justify-center gap-1 whitespace-nowrap" title="Change user password">
-                <span>✏️</span> Edit Pwd
-              </button>
-              ${suspendToggleBtn}
-              <button onclick="openAdminDeleteUserModal('${u.id}', '${escapeHtml(u.name)}', '${escapeHtml(u.email)}')" class="flex-1 sm:flex-initial px-2 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 text-xs font-semibold transition flex items-center justify-center gap-1 whitespace-nowrap" title="Delete account">
-                <span>🗑️</span> Delete
-              </button>
-            </div>`;
+          actions = '<div class="grid grid-cols-2 sm:flex gap-1.5 w-full sm:w-auto">' +
+            '<button onclick="openAdminEditPasswordModal(\'' + escapeHtml(u.id) + '\', \'\', \'' + escapeHtml(u.email) + '\')" class="px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-200 border border-slate-700 text-xs font-semibold">✏️ Edit Pwd</button>' +
+            (u.isSuspended
+              ? '<button onclick="executeAdminUnsuspend(\'' + escapeHtml(u.id) + '\', \'' + escapeHtml(u.email) + '\')" class="px-2.5 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs font-semibold">✅ Re-enable</button>'
+              : '<button onclick="openAdminSuspendModal(\'' + escapeHtml(u.id) + '\', \'' + escapeHtml(u.name || '') + '\', \'' + escapeHtml(u.email) + '\')" class="px-2.5 py-1.5 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-semibold">🚫 Disable</button>') +
+            '<button onclick="openAdminDeleteUserModal(\'' + escapeHtml(u.id) + '\', \'' + escapeHtml(u.name || '') + '\', \'' + escapeHtml(u.email) + '\')" class="px-2.5 py-1.5 rounded-lg bg-rose-500/20 text-rose-300 border border-rose-500/40 text-xs font-semibold">🗑️ Delete</button></div>';
         }
-
-        return `
-          <div class="p-3.5 sm:p-4 rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 transition space-y-3 w-full max-w-full overflow-hidden">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div class="flex items-start sm:items-center gap-3 min-w-0 flex-1">
-                <div class="w-10 h-10 rounded-full ${isSuper ? 'bg-amber-500/20 border-2 border-amber-400 text-amber-300' : 'bg-slate-800 border border-slate-700 text-slate-300'} flex items-center justify-center font-bold text-xs flex-shrink-0">
-                  ${initials}
-                </div>
-                <div class="min-w-0 flex-1">
-                  <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                    <span class="text-sm font-bold text-white break-words">${escapeHtml(u.name || 'User')}</span>
-                    ${roleBadge}
-                    ${statusBadge}
-                  </div>
-                  <div class="flex items-center gap-1.5 text-xs text-slate-400 mt-1 flex-wrap">
-                    <span class="font-mono text-emerald-400/90 break-all">${escapeHtml(u.email)}</span>
-                    <span class="text-slate-600">&bull;</span>
-                    ${verifiedBadge}
-                    <span class="text-slate-600">&bull;</span>
-                    <span class="whitespace-nowrap">${u.groupCount || 0} groups</span>
-                  </div>
-                </div>
-              </div>
-              <div class="w-full sm:w-auto pt-2 sm:pt-0 border-t border-slate-800/60 sm:border-t-0">
-                ${actionButtons}
-              </div>
-            </div>
-
-            <!-- Password & Details Row -->
-            <div class="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs w-full max-w-full overflow-hidden">
-              <div class="flex items-center gap-2 flex-wrap min-w-0 flex-1">
-                <span class="text-slate-500 font-medium whitespace-nowrap">Password:</span>
-                <span class="font-mono break-all ${isRevealed ? 'text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30 font-semibold' : 'text-slate-400'}">${passwordDisplay}</span>
-                <button type="button" onclick="togglePasswordReveal('${u.id}')" class="text-[11px] text-slate-400 hover:text-white px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 transition whitespace-nowrap flex-shrink-0">
-                  ${isRevealed ? 'Hide' : '👁️ Reveal'}
-                </button>
-              </div>
-              <div class="text-[11px] text-slate-500 whitespace-nowrap pt-1 sm:pt-0 sm:text-right">
-                Joined: ${new Date(u.createdAt).toLocaleDateString()}
-              </div>
-            </div>
-          </div>`;
+        return '<article class="p-3.5 sm:p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3">' +
+          '<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3"><div class="flex items-center gap-3 min-w-0">' +
+          '<div class="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 text-slate-200 flex items-center justify-center font-bold text-xs">' + initials + '</div>' +
+          '<div class="min-w-0"><div class="flex items-center gap-2 flex-wrap"><span class="text-sm font-bold text-white">' + escapeHtml(u.name || 'User') + '</span>' + roleBadge + statusBadge + '</div>' +
+          '<div class="text-xs text-slate-400 mt-1 break-all">' + escapeHtml(u.email) + ' · ' + verifiedBadge + ' · ' + (Number(u.groupCount) || 0) + ' groups</div></div></div>' +
+          '<div class="flex flex-wrap items-center gap-2">' + detailsButton + actions + '</div></div>' +
+          '<div class="text-[11px] text-slate-500">Joined: ' + (u.createdAt ? new Date(u.createdAt).toLocaleDateString() : 'Unknown') + '</div></article>';
       }).join('');
+    }
 
-      container.innerHTML = html;
+    function closeAdminUserDetails() {
+      adminDetailsRequestVersion += 1;
+      activeAdminDetailsUserId = null;
+      if (activeAdminDetailsRoot) {
+        activeAdminDetailsRoot.remove();
+        activeAdminDetailsRoot = null;
+      }
+    }
+
+    function openAdminUserDetails(userId) {
+      closeAdminUserDetails();
+      const requestVersion = ++adminDetailsRequestVersion;
+      activeAdminDetailsUserId = userId;
+      const root = document.createElement('div');
+      root.id = 'adminUserDetailsModal';
+      root.dataset.testid = 'admin-user-details-modal';
+      root.className = 'fixed inset-0 z-[100] bg-black/80 flex items-end sm:items-center justify-center p-0 sm:p-4';
+      const panel = document.createElement('section');
+      panel.className = 'w-full max-w-xl max-h-[92vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl bg-slate-950 border border-emerald-500/25 p-5 space-y-4';
+      panel.setAttribute('role', 'dialog');
+      panel.setAttribute('aria-modal', 'true');
+      panel.setAttribute('aria-labelledby', 'adminUserDetailsTitle');
+      const heading = document.createElement('div');
+      heading.className = 'flex items-center justify-between gap-3';
+      const title = document.createElement('h2');
+      title.id = 'adminUserDetailsTitle';
+      title.className = 'text-lg font-bold text-white';
+      title.textContent = 'User Details';
+      const close = document.createElement('button');
+      close.type = 'button'; close.textContent = '✕'; close.setAttribute('aria-label', 'Close user details');
+      close.className = 'px-3 py-2 rounded-lg bg-slate-800 text-white';
+      close.addEventListener('click', closeAdminUserDetails);
+      heading.append(title, close);
+      const body = document.createElement('div');
+      body.id = 'adminUserDetailsBody';
+      body.className = 'space-y-3 text-sm text-slate-200';
+      body.textContent = 'Loading user details…';
+      panel.append(heading, body);
+      root.append(panel);
+      root.addEventListener('click', (event) => { if (event.target === root) closeAdminUserDetails(); });
+      const onKey = (event) => { if (event.key === 'Escape' && activeAdminDetailsRoot === root) { closeAdminUserDetails(); document.removeEventListener('keydown', onKey); } };
+      document.addEventListener('keydown', onKey);
+      activeAdminDetailsRoot = root;
+      document.body.append(root);
+
+      apiFetch('/api/admin/users/' + encodeURIComponent(userId) + '/details')
+        .then((res) => {
+          if (requestVersion !== adminDetailsRequestVersion || activeAdminDetailsRoot !== root) return;
+          const u = res.user || {};
+          body.textContent = '';
+          const fields = [
+            ['Name', u.name], ['Email / Username', u.email], ['UPI ID', u.upiId],
+            ['Default currency', u.defaultCurrency], ['Role', u.role],
+            ['Email verification', u.isEmailVerified ? 'Verified' : 'Not verified'],
+            ['Authentication providers', (u.authProviders || []).join(', ') || 'Unknown'],
+            ['Created', u.createdAt ? new Date(u.createdAt).toLocaleString() : 'Not available'],
+            ['Last updated', u.updatedAt ? new Date(u.updatedAt).toLocaleString() : 'Not available'],
+            ['Last login', u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString() : 'Not available'],
+            ['Account status', u.isSuspended ? 'Suspended' : 'Active'],
+            ['Suspension reason', u.suspensionReason || 'None'],
+            ['Suspended at', u.suspendedAt ? new Date(u.suspendedAt).toLocaleString() : 'Not applicable'],
+            ['Suspension expiry', u.isSuspended ? (u.suspendedUntil ? new Date(u.suspendedUntil).toLocaleString() : 'Indefinite') : 'Not applicable'],
+            ['Group memberships', String(u.groupCount || 0)]
+          ];
+          fields.forEach(([label, value]) => {
+            const row = document.createElement('div');
+            row.className = 'flex flex-col sm:flex-row sm:justify-between gap-1 border-b border-slate-800 pb-2';
+            const key = document.createElement('span'); key.className = 'text-slate-400'; key.textContent = label;
+            const val = document.createElement('span'); val.className = 'text-white break-all sm:text-right'; val.textContent = value == null || value === '' ? 'Not set' : String(value);
+            row.append(key, val); body.append(row);
+          });
+          const credential = document.createElement('div');
+          credential.className = 'mt-3 p-3 rounded-xl bg-slate-900 border border-slate-700 space-y-2';
+          const credentialTitle = document.createElement('div'); credentialTitle.className = 'font-semibold text-white'; credentialTitle.textContent = 'Credentials';
+          const username = document.createElement('div'); username.className = 'text-xs text-slate-300 break-all'; username.textContent = 'Username: ' + (u.email || 'Not available');
+          const password = document.createElement('div'); password.dataset.testid = 'admin-user-password-value'; password.className = 'font-mono text-sm text-slate-400'; password.textContent = 'Password: ••••••••••';
+          const reveal = document.createElement('button'); reveal.type = 'button'; reveal.dataset.testid = 'admin-user-reveal-password'; reveal.className = 'px-3 py-2 rounded-lg bg-emerald-500 text-slate-950 font-semibold text-xs'; reveal.textContent = 'Reveal Password';
+          let revealed = false;
+          reveal.addEventListener('click', async () => {
+            if (revealed) { revealed = false; password.textContent = 'Password: ••••••••••'; reveal.textContent = 'Reveal Password'; return; }
+            reveal.disabled = true; reveal.textContent = 'Loading…';
+            try {
+              const result = await apiFetch('/api/admin/users/' + encodeURIComponent(userId) + '/credentials');
+              if (requestVersion !== adminDetailsRequestVersion || activeAdminDetailsRoot !== root) return;
+              const creds = result.credentials || {};
+              password.textContent = creds.passwordAvailable ? 'Password: ' + creds.password : 'Password: Not available for this account';
+              revealed = Boolean(creds.passwordAvailable);
+              reveal.textContent = revealed ? 'Hide Password' : 'Unavailable';
+            } catch (err) {
+              if (requestVersion === adminDetailsRequestVersion) { password.textContent = 'Password: Unable to retrieve'; reveal.textContent = 'Try Again'; showToast(err.message || 'Could not retrieve credentials.', 'error'); }
+            } finally {
+              if (requestVersion === adminDetailsRequestVersion) reveal.disabled = false;
+            }
+          });
+          credential.append(credentialTitle, username, password, reveal); body.append(credential);
+        })
+        .catch((err) => {
+          if (requestVersion !== adminDetailsRequestVersion || activeAdminDetailsRoot !== root) return;
+          body.textContent = 'Unable to load user details: ' + (err.message || 'Unknown error');
+        });
     }
 
     function openAdminEditPasswordModal(userId, userName, userEmail) {
