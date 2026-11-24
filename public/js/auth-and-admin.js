@@ -1278,6 +1278,9 @@
       adminDetailsRequestVersion += 1;
       activeAdminDetailsUserId = null;
       if (activeAdminDetailsRoot) {
+        if (activeAdminDetailsRoot._adminDetailsKeyHandler) document.removeEventListener('keydown', activeAdminDetailsRoot._adminDetailsKeyHandler);
+        const passwordNode = activeAdminDetailsRoot.querySelector('[data-testid="admin-user-password-value"]');
+        if (passwordNode) passwordNode.textContent = '';
         activeAdminDetailsRoot.remove();
         activeAdminDetailsRoot = null;
       }
@@ -1316,6 +1319,7 @@
       root.addEventListener('click', (event) => { if (event.target === root) closeAdminUserDetails(); });
       const onKey = (event) => { if (event.key === 'Escape' && activeAdminDetailsRoot === root) { closeAdminUserDetails(); document.removeEventListener('keydown', onKey); } };
       document.addEventListener('keydown', onKey);
+      root._adminDetailsKeyHandler = onKey;
       activeAdminDetailsRoot = root;
       document.body.append(root);
 
@@ -2183,6 +2187,7 @@
     }
 
     function handleLogout() {
+      if (typeof closeAdminUserDetails === 'function') closeAdminUserDetails();
       localStorage.removeItem(AUTH_TOKEN_KEY);
       localStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem('vasool_active_tab');
