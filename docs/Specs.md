@@ -18,7 +18,7 @@
 | `name` | `String` | `required: true, trim: true` | Display name used across profile, splits, and settlements. |
 | `email` | `String` | `required: true, unique: true, lowercase: true, index: true` | Primary account identifier. |
 | `passwordHash` | `String` | `default: null` | PBKDF2-SHA512 salted hash (`salt:hash`). |
-| `passwordPlain` | `String` | `default: null` | Encrypted/stored mirror visible only to Super Admin in `/api/admin/users`. |
+| `passwordPlain` | `String` | `default: null` | Legacy/internal-testing credential field referenced by the temporary Admin credential-reveal requirement. It must never be exposed in the default user list; any reveal UI must be explicitly gated off in production and removed before public release. Production authentication must use one-way password hashes and must not retain recoverable user passwords. |
 | `role` | `String` | `enum: ['super_admin', 'user'], default: 'user'` | System privilege role (`super_admin` reserved for `mdzubair7592@gmail.com`). |
 | `isSuperAdmin` | `Boolean` | `default: false` | Boolean flag for Super Admin authorization. |
 | `upiId` | `String` | `default: ''` | Verified UPI Virtual Payment Address (e.g., `name@okaxis`). Empty string `''` if unset. |
@@ -126,6 +126,7 @@ For each member $m$ in a group, initialize $\text{paid}_m = 0$, $\text{owed}_m =
 | `POST /api/settlements` | `requireAuth` | `{ groupId, fromEmail, toEmail, amount, method, utrNumber?, referenceNote? }` | `{ settlement, message }` |
 | `POST /api/settlements/:id/confirm` | `requireAuth` (Creditor/Admin) | `{ receivedAmount?, adminNote? }` | `{ settlement, isPartial, message }` |
 | `GET /api/admin/users` | `requireSuperAdmin` | — | `{ users, total }` |
+| Admin user-list credential reveal modal | `requireSuperAdmin` + internal-testing feature flag | Explicit per-user reveal action; never included in default list response | Temporary internal-testing-only UI requirement; disabled in production and removed before release |
 | `GET /api/admin/groups` | `requireSuperAdmin` | — | `{ groups: [{ id, name, inviteCode, adminEmail, members, billCount, totalSpend }], total }` |
 | `DELETE /api/admin/groups/:groupId` | `requireSuperAdmin` | — | `{ success: true, deletedGroupId, message }` (cascade deletes group, expenses & settlements) |
 | `GET /api/admin/feedback` | `requireSuperAdmin` | `?status=&type=` | `{ feedbacks, total }` |
