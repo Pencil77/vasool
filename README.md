@@ -32,4 +32,4 @@ Full-stack expense splitting and verifiable debt settlement platform built with 
 - [Technical Specifications](docs/Specs.md): Database schemas, runtime configurations, and security model.
 - [Scope of Improvements](docs/Vasool_Scope_of_Improvements.md): Production hardening roadmap and feature enhancements.
 - [Implementation Specifications](docs/implementation/): Admin user-details/credential reveal modal and UI/UX, frontend architecture, and quality improvement roadmap.
-
+- [UI Visual Restoration & Split-to-Settle Workflow](docs/implementation/ui-visual-restoration-and-settle-workflow.md): Restore the green-and-black theme and move the full Split Expenses workflow into Settle without duplicating Home or Bills responsibilities.
