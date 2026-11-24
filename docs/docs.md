@@ -69,3 +69,8 @@ To keep the platform maintainable and fast to load, both the backend and fronten
 2. **Super Admin Exclusivity (`mdzubair7592@gmail.com`)**:
    - The bottom `System Status` link (`#btnFooterSystemStatus`) and diagnostic modals are strictly hidden from all non-super-admin users.
    - The dedicated **Super Admin Console** (`#panelAdmin`) provides three management sub-tabs: **👥 User Accounts** (view/edit passwords, suspend or delete users, configure global session token lifetime from 1 hour to 365 days), **🏘️ All Platform Groups** (inspect all groups on the platform, their members, bill counts, and total spend, and permanently delete any group), and **💬 User Feedback & Suggestions** (mobile-aligned feedback cards with status triage and developer notes).
+
+## 8. Implementation Specifications
+
+- [Admin User Details & Credential Reveal Modal](implementation/admin-user-details-modal.md): Required per-user details modal, explicit password reveal behavior, API contract, and acceptance criteria.
+- [UI/UX, Frontend Architecture & Quality Improvements](implementation/ui-ux-frontend-quality.md): Detailed implementation roadmap for the interface, core user journeys, incremental frontend restructuring, accessibility, performance, and automated regression coverage.
