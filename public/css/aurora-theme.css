@@ -1,16 +1,26 @@
 :root {
   --sat: env(safe-area-inset-top, 0px);
   --sab: env(safe-area-inset-bottom, 0px);
+  --vasool-bg: #050b09;
+  --vasool-surface: #0b1511;
+  --vasool-surface-raised: #101d17;
+  --vasool-border: rgba(52, 211, 153, 0.14);
+  --vasool-text: #f0fdf4;
+  --vasool-muted: #94a3a1;
+  --vasool-green: #10b981;
+  color-scheme: dark;
 }
+
+html { background: var(--vasool-bg); }
 
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background-color: #f8fafc;
+  background-color: var(--vasool-bg);
   background-image:
-    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(16, 185, 129, 0.05), transparent 70%),
-    radial-gradient(circle at 50% 100%, rgba(241, 245, 249, 0.7), transparent 80%);
+    radial-gradient(ellipse 75% 42% at 50% -12%, rgba(16, 185, 129, 0.12), transparent 72%),
+    radial-gradient(ellipse 55% 35% at 100% 100%, rgba(5, 150, 105, 0.06), transparent 75%);
   background-attachment: fixed;
-  color: #0f172a;
+  color: var(--vasool-text);
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -26,10 +36,11 @@ h1, h2, h3, h4, .font-display {
   font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
+/* Shared panels stay charcoal/green; avoid the unwanted silver card treatment. */
 .glass-panel {
-  background: #ffffff;
-  border: 1px solid rgba(0, 0, 0, 0.05);
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+  background: linear-gradient(145deg, rgba(13, 27, 20, 0.96), rgba(7, 16, 12, 0.98));
+  border: 1px solid var(--vasool-border);
+  box-shadow: 0 12px 32px -24px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(52, 211, 153, 0.035);
 }
 
 .glass-card-hover {
@@ -38,57 +49,42 @@ h1, h2, h3, h4, .font-display {
 
 .glass-card-hover:hover {
   transform: translateY(-2px);
-  border-color: rgba(16, 185, 129, 0.28);
-  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.5), inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
+  border-color: rgba(16, 185, 129, 0.35);
+  box-shadow: 0 12px 30px -8px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(16, 185, 129, 0.06);
 }
 
-.glow-emerald {
-  box-shadow: 0 2px 10px rgba(16, 185, 129, 0.15);
+.glow-emerald { box-shadow: 0 2px 12px rgba(16, 185, 129, 0.18); }
+.glow-amber { box-shadow: 0 2px 10px rgba(245, 158, 11, 0.15); }
+.glow-teal { box-shadow: 0 2px 10px rgba(20, 184, 166, 0.15); }
+.glow-cyan { box-shadow: 0 2px 10px rgba(6, 182, 212, 0.15); }
+
+.custom-scroll::-webkit-scrollbar { width: 5px; height: 5px; }
+.custom-scroll::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.5); border-radius: 9999px; }
+.custom-scroll::-webkit-scrollbar-thumb { background: rgba(71, 85, 105, 0.65); border-radius: 9999px; border: 1px solid rgba(255, 255, 255, 0.05); }
+.custom-scroll::-webkit-scrollbar-thumb:hover { background: rgba(52, 211, 153, 0.6); }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+button, a, input, select, textarea {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+button:active:not(:disabled) { transform: scale(0.98); transition: transform 0.1s ease; }
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.25);
 }
 
-.glow-amber {
-  box-shadow: 0 2px 10px rgba(245, 158, 11, 0.15);
+:focus-visible {
+  outline: 2px solid rgba(52, 211, 153, 0.9);
+  outline-offset: 2px;
 }
 
-.glow-teal {
-  box-shadow: 0 2px 10px rgba(20, 184, 166, 0.15);
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
-
-.glow-cyan {
-  box-shadow: 0 2px 10px rgba(6, 182, 212, 0.15);
-}
-    .custom-scroll::-webkit-scrollbar {
-      width: 5px;
-      height: 5px;
-    }
-    .custom-scroll::-webkit-scrollbar-track {
-      background: rgba(15, 23, 42, 0.5);
-      border-radius: 9999px;
-    }
-    .custom-scroll::-webkit-scrollbar-thumb {
-      background: rgba(71, 85, 105, 0.65);
-      border-radius: 9999px;
-      border: 1px solid rgba(255, 255, 255, 0.05);
-    }
-    .custom-scroll::-webkit-scrollbar-thumb:hover {
-      background: rgba(52, 211, 153, 0.6);
-    }
-    .no-scrollbar::-webkit-scrollbar {
-      display: none;
-    }
-    .no-scrollbar {
-      -ms-overflow-style: none;
-      scrollbar-width: none;
-    }
-    button, a, input, select, textarea {
-      touch-action: manipulation;
-      -webkit-tap-highlight-color: transparent;
-    }
-    button:active:not(:disabled) {
-      transform: scale(0.98);
-      transition: transform 0.1s ease;
-    }
-    input:focus, select:focus, textarea:focus {
-      outline: none;
-      box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.25);
-    }

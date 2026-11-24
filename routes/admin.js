@@ -44,7 +44,7 @@ router.use(requireAuth, requireSuperAdmin);
 
 /**
  * GET /api/admin/users
- * Lists all registered users with plaintext password visibility, suspension details, and group statistics.
+ * Lists safe account summaries only. Credentials are served by a separate explicit-reveal endpoint.
  */
 router.get('/users', async (req, res) => {
   const span = otel.startSpan('admin.get_users', {
@@ -99,9 +99,9 @@ router.get('/users', async (req, res) => {
         role: isSuper ? 'super_admin' : (u.role || 'user'),
         isSuperAdmin: isSuper,
         isEmailVerified: Boolean(u.isEmailVerified),
-        // Super Admin can see the password (raw or stored)
-        password: u.passwordRaw || u.passwordHash || 'Not Set',
-        hasRawPassword: Boolean(u.passwordRaw),
+        authProviders: Array.isArray(u.authProviders) ? u.authProviders : ['email'],
+        defaultCurrency: u.defaultCurrency || 'INR',
+        updatedAt: u.updatedAt || null,
         isSuspended,
         suspendedUntil,
         suspensionReason: u.suspensionReason || '',
@@ -127,6 +127,84 @@ router.get('/users', async (req, res) => {
     span.recordException(err);
     span.end();
     return res.status(500).json({ error: err.message || 'Failed to list users.' });
+  }
+});
+
+/**
+ * GET /api/admin/users/:userId/details
+ * Returns an allowlisted, non-credential account detail payload.
+ */
+router.get('/users/:userId/details', async (req, res) => {
+  try {
+    await connectToDatabase();
+    const user = await User.findById(req.params.userId)
+      .select('_id name email avatarUrl upiId defaultCurrency role isSuperAdmin isEmailVerified authProviders createdAt updatedAt lastLoginAt isSuspended suspensionReason suspendedAt suspendedUntil')
+      .lean();
+    if (!user) return res.status(404).json({ error: 'User account not found.' });
+
+    const [groupCount] = await Group.aggregate([
+      { $match: { 'members.email': String(user.email || '').toLowerCase() } },
+      { $count: 'count' }
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      user: {
+        id: String(user._id),
+        name: user.name || '',
+        email: user.email || '',
+        avatarUrl: user.avatarUrl || '',
+        upiId: user.upiId || '',
+        defaultCurrency: user.defaultCurrency || 'INR',
+        role: (user.isSuperAdmin || user.role === 'super_admin' || isSuperAdminEmail(user.email)) ? 'super_admin' : (user.role || 'user'),
+        isEmailVerified: Boolean(user.isEmailVerified),
+        authProviders: Array.isArray(user.authProviders) ? user.authProviders : ['email'],
+        createdAt: user.createdAt || null,
+        updatedAt: user.updatedAt || null,
+        lastLoginAt: user.lastLoginAt || null,
+        isSuspended: Boolean(user.isSuspended),
+        suspensionReason: user.suspensionReason || '',
+        suspendedAt: user.suspendedAt || null,
+        suspendedUntil: user.suspendedUntil || null,
+        groupCount: groupCount ? groupCount.count : 0
+      }
+    });
+  } catch (err) {
+    logger.error('[admin] Failed to fetch user details:', err);
+    return res.status(500).json({ error: 'Failed to retrieve user details.' });
+  }
+});
+
+/**
+ * GET /api/admin/users/:userId/credentials
+ * Credential material is returned only after an explicit reveal action by an authenticated Super Admin.
+ * A password hash is never presented as a recoverable password.
+ */
+router.get('/users/:userId/credentials', async (req, res) => {
+  try {
+    await connectToDatabase();
+    const user = await User.findById(req.params.userId).select('_id email passwordRaw').lean();
+    if (!user) return res.status(404).json({ error: 'User account not found.' });
+
+    res.set({ 'Cache-Control': 'no-store, private', 'Pragma': 'no-cache', 'Vary': 'Authorization' });
+    logger.info(`[admin] Super Admin ${req.user.email} explicitly revealed stored password availability for user: ${user.email}`);
+
+    const password = (typeof user.passwordRaw === 'string' && user.passwordRaw.length > 0)
+      ? user.passwordRaw
+      : null;
+
+    return res.status(200).json({
+      success: true,
+      credentials: {
+        userId: String(user._id),
+        username: user.email,
+        password,
+        passwordAvailable: Boolean(password)
+      }
+    });
+  } catch (err) {
+    logger.error('[admin] Failed to retrieve user credentials:', err);
+    return res.status(500).json({ error: 'Failed to retrieve user credentials.' });
   }
 });
 

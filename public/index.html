@@ -394,7 +394,7 @@
         </button>
         <button id="navTabExpenses" data-testid="nav-tab-expenses" onclick="switchMainTab('expenses')" class="whitespace-nowrap px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800/80 transition flex items-center gap-1.5">
           <span>🧾</span>
-          <span>Expenses &amp; Splits</span>
+          <span>Bills</span>
         </button>
         <button id="navTabGroups" data-testid="nav-tab-groups" onclick="switchMainTab('groups')" class="whitespace-nowrap px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800/80 transition flex items-center gap-1.5">
           <span>👥</span>
@@ -536,6 +536,15 @@
 
     <!-- TAB 4: SMART SETTLE-UP -->
     <div id="panelSettle" data-testid="panel-settle" class="hidden space-y-6">
+      <div class="glass-panel rounded-2xl p-4 sm:p-5 border border-emerald-500/20">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h2 class="text-base sm:text-lg font-bold text-white">Split &amp; Settle</h2>
+            <p class="text-xs sm:text-sm text-slate-400 mt-1">Review outstanding shares, see who pays whom, and complete or confirm payments. Bills remains the expense ledger.</p>
+          </div>
+          <span class="text-[10px] font-semibold uppercase tracking-wider text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-2.5 py-1 self-start">Action workspace</span>
+        </div>
+      </div>
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <!-- Recommended Minimum-Cash-Flow Transfers -->
         <div class="lg:col-span-7 glass-panel rounded-2xl p-5 space-y-4">
