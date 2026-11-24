@@ -345,3 +345,8 @@ A work item is complete only when:
 - Changing debt algorithms, split mathematics, or settlement accounting semantics.
 - A framework rewrite or a one-shot frontend rewrite.
 - Removing existing product capabilities merely to simplify the UI.
+
+
+## 10. Product-owner visual and navigation decisions
+
+The green-and-black visual restoration and relocation of the Split Expenses workflow from Home to Settle are specified in the dedicated [UI Visual Restoration & Split-to-Settle Workflow](ui-visual-restoration-and-settle-workflow.md) document. Treat those choices as approved requirements, not optional design suggestions. Do not reintroduce silver/metallic dominant surfaces or duplicate the full split workflow on Home.
