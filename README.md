@@ -31,4 +31,5 @@ Full-stack expense splitting and verifiable debt settlement platform built with 
 - [Product & Engineering Requirements](docs/requirements.md): Functional and non-functional requirements for the Aurora Modular Edition (v3.1).
 - [Technical Specifications](docs/Specs.md): Database schemas, runtime configurations, and security model.
 - [Scope of Improvements](docs/Vasool_Scope_of_Improvements.md): Production hardening roadmap and feature enhancements.
+- [Implementation Specifications](docs/implementation/): Admin user-details/credential reveal modal and UI/UX, frontend architecture, and quality improvement roadmap.
 
