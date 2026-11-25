@@ -15,7 +15,7 @@ const SettlementSchema = new mongoose.Schema(
     utrNumber: { type: String, default: '' },
     adminNote: { type: String, default: '' },
     confirmedRole: { type: String, default: '' },
-    settlementMode: { type: String, enum: ['direct_p2p', 'admin_hub'], default: 'direct_p2p' },
+    settlementMode: { type: String, enum: ['direct_p2p', 'admin_hub'], default: null },
     recordedByEmail: { type: String, lowercase: true, trim: true, default: null },
     status: {
       type: String,
