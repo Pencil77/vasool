@@ -290,8 +290,6 @@ router.post('/settlements/:id/confirm', requireAuth, async (req, res) => {
       canConfirm = true;
     } else if (isHub && (isGroupAdmin || isSuperAdmin)) {
       canConfirm = true;
-    } else if (isSuperAdmin) {
-      canConfirm = true;
     }
 
     if (!canConfirm) {
