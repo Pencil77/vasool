@@ -730,8 +730,11 @@
         switchPipelineViewer(activePipelineTab);
       }
       if (tab === 'admin' && isSuper) {
-        fetchAdminUsers();
+        // Admin settings/groups may load independently, but the user directory
+        // must remain untouched until the Super Admin explicitly clicks Load Users.
+        if (typeof fetchAdminSettings === 'function') fetchAdminSettings();
         if (typeof fetchAdminGroups === 'function') fetchAdminGroups(true);
+        if (typeof fetchAdminFeedback === 'function') fetchAdminFeedback(true);
       }
     }
 

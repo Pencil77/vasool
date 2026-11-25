@@ -1036,6 +1036,8 @@
     // SUPER ADMIN CONSOLE LOGIC (VIEW/EDIT PASSWORDS, DISABLE/DELETE ACCOUNTS)
     // =========================================================================
     let adminUsersCache = [];
+    let adminUsersLoaded = false;
+    let adminUsersRequest = null;
     let activeAdminDetailsRoot = null;
     let activeAdminDetailsUserId = null;
     let adminDetailsRequestVersion = 0;
@@ -1162,11 +1164,28 @@
       }
     }
 
-    async function fetchAdminUsers() {
-      // Also fetch session duration settings when opening console
-      fetchAdminSettings();
+    function renderAdminUsersLoadPrompt(message = 'User accounts have not been loaded yet.') {
+      const container = document.getElementById('adminUsersListContainer');
+      if (!container) return;
+      container.innerHTML = `
+        <div class="text-center py-12 px-4 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-2">
+          <div class="text-sm font-semibold text-slate-200">Platform users are not loaded</div>
+          <p class="text-xs text-slate-400">${escapeHtml(message)} Use the Load Users button above when you want to query the database.</p>
+        </div>`;
+    }
+
+    async function fetchAdminUsers(forceRefresh = false) {
+      // Never fetch implicitly: callers must explicitly request a load/refresh.
+      if (adminUsersRequest) return adminUsersRequest;
+      if (adminUsersLoaded && !forceRefresh) return;
 
       const container = document.getElementById('adminUsersListContainer');
+      const hadLoadedUsers = adminUsersLoaded;
+      const loadButton = document.getElementById('btnLoadAdminUsers');
+      if (loadButton) {
+        loadButton.disabled = true;
+        loadButton.textContent = 'Loading...';
+      }
       if (container) {
         container.innerHTML = `
           <div class="text-center py-10 text-slate-500 text-xs flex items-center justify-center gap-2">
@@ -1175,41 +1194,61 @@
           </div>`;
       }
 
-      try {
-        const res = await apiFetch('/api/admin/users');
-        adminUsersCache = res.users || [];
+      adminUsersRequest = (async () => {
+        try {
+          const res = await apiFetch('/api/admin/users');
+          adminUsersCache = Array.isArray(res.users) ? res.users : [];
+          adminUsersLoaded = true;
 
-        // Update stats
-        const totalEl = document.getElementById('adminTotalUsersStat');
-        const activeEl = document.getElementById('adminActiveUsersStat');
-        const suspEl = document.getElementById('adminSuspendedUsersStat');
+          const totalEl = document.getElementById('adminTotalUsersStat');
+          const activeEl = document.getElementById('adminActiveUsersStat');
+          const suspEl = document.getElementById('adminSuspendedUsersStat');
+          const total = adminUsersCache.length;
+          const suspended = adminUsersCache.filter((u) => u.isSuspended).length;
 
-        const total = adminUsersCache.length;
-        const suspended = adminUsersCache.filter((u) => u.isSuspended).length;
-        const active = total - suspended;
+          if (totalEl) totalEl.textContent = total;
+          if (activeEl) activeEl.textContent = total - suspended;
+          if (suspEl) suspEl.textContent = suspended;
+          const subTabUsersCount = document.getElementById('adminSubTabUsersCount');
+          if (subTabUsersCount) subTabUsersCount.textContent = total;
 
-        if (totalEl) totalEl.textContent = total;
-        if (activeEl) activeEl.textContent = active;
-        if (suspEl) suspEl.textContent = suspended;
-        const subTabUsersCount = document.getElementById('adminSubTabUsersCount');
-        if (subTabUsersCount) subTabUsersCount.textContent = total;
-        fetchAdminGroups(true);
-        fetchAdminFeedback(true);
-
-        const searchVal = document.getElementById('adminUserSearchInput') ? document.getElementById('adminUserSearchInput').value : '';
-        filterAdminUsers(searchVal);
-      } catch (err) {
-        if (container) {
-          container.innerHTML = `
-            <div class="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs text-center">
-              Failed to load accounts: ${escapeHtml(err.message || 'Access restricted')}
-            </div>`;
+          const refreshButton = document.getElementById('btnLoadAdminUsers');
+          if (refreshButton) {
+            refreshButton.classList.remove('hidden');
+            refreshButton.disabled = false;
+            refreshButton.textContent = 'Refresh Users';
+          }
+          const headerRefreshButton = document.getElementById('btnRefreshAdminUsers');
+          if (headerRefreshButton) headerRefreshButton.classList.remove('hidden');
+          const searchVal = document.getElementById('adminUserSearchInput')?.value || '';
+          filterAdminUsers(searchVal);
+          return true;
+        } catch (err) {
+          // Preserve the last successful list if an explicit refresh fails.
+          adminUsersLoaded = hadLoadedUsers;
+          if (hadLoadedUsers) {
+            const searchVal = document.getElementById('adminUserSearchInput')?.value || '';
+            filterAdminUsers(searchVal);
+          } else {
+            renderAdminUsersLoadPrompt('Could not load users: ' + (err.message || 'Please try again.'));
+          }
+          showToast(err.message || 'Failed to fetch admin users.', 'error');
+          return false;
+        } finally {
+          adminUsersRequest = null;
+          const refreshButton = document.getElementById('btnLoadAdminUsers');
+          if (refreshButton) {
+            refreshButton.disabled = false;
+            refreshButton.textContent = adminUsersLoaded ? 'Refresh Users' : 'Load Users';
+          }
         }
-        showToast(err.message || 'Failed to fetch admin users.', 'error');
-      }
+      })();
+
+      return adminUsersRequest;
     }
 
     function filterAdminUsers(query) {
+      if (!adminUsersLoaded) return;
       const q = String(query || '').trim().toLowerCase();
       const statusSelect = document.getElementById('adminStatusFilter');
       const statusFilter = statusSelect ? statusSelect.value : 'ALL';
@@ -1411,7 +1450,7 @@
         });
         closeModal('adminEditPasswordModal');
         showToast(`✅ ${res.message || 'Password updated successfully!'}`);
-        await fetchAdminUsers();
+        await fetchAdminUsers(true);
       } catch (err) {
         showToast(err.message || 'Failed to update user password.', 'error');
       } finally {
@@ -1478,7 +1517,7 @@
         });
         closeModal('adminSuspendModal');
         showToast(`🚫 ${res.message || 'Account disabled.'}`);
-        await fetchAdminUsers();
+        await fetchAdminUsers(true);
       } catch (err) {
         showToast(err.message || 'Failed to disable account.', 'error');
       } finally {
@@ -1496,7 +1535,7 @@
           body: JSON.stringify({ action: 'unsuspend' })
         });
         showToast(`✅ ${res.message || 'Account re-enabled!'}`);
-        await fetchAdminUsers();
+        await fetchAdminUsers(true);
       } catch (err) {
         showToast(err.message || 'Failed to re-enable account.', 'error');
       }
@@ -1524,7 +1563,7 @@
         });
         closeModal('adminDeleteUserModal');
         showToast(`🗑️ ${res.message || 'Account deleted.'}`);
-        await fetchAdminUsers();
+        await fetchAdminUsers(true);
       } catch (err) {
         showToast(err.message || 'Failed to delete account.', 'error');
       } finally {

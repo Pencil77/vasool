@@ -14,6 +14,11 @@ The user list remains a summary. Every user row has a **View Details** action th
 ### 2.1 Admin user list
 
 - Keep the existing registered-user list and account-management actions.
+- **Explicit lazy loading is required:** opening the Admin Panel, switching to the Users sub-tab, scrolling to the Users section, or interacting with its search/filter controls must not request `GET /api/admin/users`.
+- Initially show an unloaded state and a clearly labelled **Load Users** button. Fetch the user list only after the Super Admin explicitly clicks that button.
+- Show a loading state while the request is in progress, prevent duplicate concurrent requests, and provide a retry action after failures.
+- After a successful load, retain the list in the current page session and offer an explicit **Refresh Users** action. Returning to the Users sub-tab must not trigger another request.
+- Search and status filters operate only on the already-loaded client-side list and must never initiate a fetch.
 - Show useful summary fields such as name, email, role, verification state, account status, group count, and account creation date where space permits.
 - Do not render username/password credentials directly in the table, cards, row attributes, tooltips, or hidden expanded content.
 - Add a clearly labelled **View Details** button/action to every user row.
@@ -120,6 +125,10 @@ Never include credentials in the default list or general details response. Do no
 ## 6. Acceptance criteria
 
 - [ ] Every user row has a View Details action.
+- [ ] Opening the Admin Panel, scrolling to Users, and switching sub-tabs do not call `GET /api/admin/users`.
+- [ ] The user-list endpoint is called only after an explicit Load Users or Refresh Users click.
+- [ ] Concurrent clicks do not create duplicate user-list requests; failed requests can be retried.
+- [ ] Search/filter interactions before loading do not call the user-list endpoint.
 - [ ] The list endpoint and rendered list contain no password values or hashes.
 - [ ] The modal shows the selected user's available profile, account, and status details.
 - [ ] Password is masked until Reveal Password is explicitly selected.
