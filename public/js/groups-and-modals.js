@@ -799,7 +799,7 @@
       // 1. Overall Group / Event Settlement Status Banner
       if (isFullySettledAndClosed) {
         html += `
-          <div data-testid="status-fully-closed-banner" class="mb-4 p-5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center gap-3">
+          <div data-testid="status-fully-closed-banner" class="mb-3 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center gap-3">
             <span class="text-2xl">🎉</span>
             <div>
               <div class="text-sm font-bold text-emerald-300">All settled</div>
@@ -811,7 +811,7 @@
         const totalPendingApproval = pendingApprovalList.reduce((acc, s) => acc + s.amount, 0);
 
         html += `
-          <div data-testid="status-pending-due-banner" class="mb-4 p-4 rounded-2xl bg-slate-900 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div data-testid="status-pending-due-banner" class="mb-3 p-3 rounded-xl bg-slate-900 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div class="flex items-center gap-2.5">
               <span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
               <div>
@@ -879,37 +879,6 @@
                 </div>
               `;}).join('')}
             </div>
-          </div>
-        `;
-      }
-
-      // 3. Routing Mode Banner
-      const isDirectPairwise = activeGroups.length > 0 && (selectedGroupId === 'ALL' ? activeGroups.some((g) => g.minimizeDebts === false) : activeGroups[0]?.minimizeDebts === false);
-      if (isHubActive) {
-        html += `
-          <div class="mb-3 px-3.5 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-between text-xs text-amber-300">
-            <span class="flex items-center gap-2">
-              <span class="text-base">👑</span>
-              <span><strong>Admin-Hub</strong> · Payments route through the group Admin.</span>
-            </span>
-          </div>
-        `;
-      } else if (isDirectPairwise) {
-        html += `
-          <div class="mb-3 px-3.5 py-2.5 rounded-xl bg-teal-500/10 border border-teal-500/30 flex items-center justify-between text-xs text-teal-300">
-            <span class="flex items-center gap-2">
-              <span class="text-base">🤝</span>
-              <span><strong>Direct pair-wise</strong> · Each person pays the member they owe.</span>
-            </span>
-          </div>
-        `;
-      } else {
-        html += `
-          <div class="mb-3 px-3.5 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-between text-xs text-emerald-300">
-            <span class="flex items-center gap-2">
-              <span class="text-base">⚡</span>
-              <span><strong>Fewest transfers</strong> · Group dues are simplified into direct payments.</span>
-            </span>
           </div>
         `;
       }
