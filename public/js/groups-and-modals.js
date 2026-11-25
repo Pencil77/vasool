@@ -942,9 +942,11 @@
               // A recipient confirmation remains a creditor confirmation even if group settings later change.
               const confirmedByEmail = String(s.confirmedByEmail || '').toLowerCase().trim();
               const recipientEmail = String(s.toEmail || '').toLowerCase().trim();
-              const roleTitle = confirmedByEmail && recipientEmail && confirmedByEmail === recipientEmail
-                ? 'Creditor'
-                : (s.confirmedRole === 'admin' ? 'Admin' : 'Creditor');
+              const roleTitle = s.settlementMode === 'admin_hub' && s.confirmedRole === 'admin'
+                ? 'Admin'
+                : (confirmedByEmail && recipientEmail && confirmedByEmail === recipientEmail
+                  ? 'Creditor'
+                  : (s.confirmedRole === 'admin' ? 'Admin' : 'Creditor'));
               statusBadge = isPartial
                 ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/20 text-teal-300 border border-teal-500/40">⚖️ Partial: ${formatINR(s.amount)} Confirmed by ${roleTitle}</span>`
                 : `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">✅ Confirmed by ${roleTitle}</span>`;
