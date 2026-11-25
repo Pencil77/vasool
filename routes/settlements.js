@@ -606,10 +606,10 @@ router.get('/settlements', requireAuth, async (req, res) => {
     if (req.query.groupId) {
       filter.groupId = req.query.groupId;
     } else {
-      const userGroups = await Group.find({ 'members.email': req.user.email }, { _id: 1 });
+      const userGroups = await Group.find({ 'members.email': req.user.email }, { _id: 1 }).lean();
       filter.groupId = { $in: userGroups.map((g) => g._id) };
     }
-    const settlements = await Settlement.find(filter).sort({ settledAt: -1, createdAt: -1 });
+    const settlements = await Settlement.find(filter).sort({ settledAt: -1, createdAt: -1 }).lean();
     return res.status(200).json({ settlements });
   } catch (err) {
     return res.status(500).json({ error: err.message });

@@ -13,6 +13,7 @@
       const authBanner = document.getElementById('authActiveUserBanner');
       const mobileNav = document.getElementById('mobileBottomNav');
       const mobileFab = document.getElementById('mobileFabAddExpense');
+      const startupLoader = document.getElementById('startupNeutralLoader');
 
       // Never expose protected app content while the initial session check is unresolved.
       if (window.__vasoolAuthReady !== true) {
@@ -22,6 +23,11 @@
         if (mobileFab) mobileFab.classList.add('hidden');
         if (toggleBtn) toggleBtn.classList.add('hidden');
         return;
+      }
+
+      if (startupLoader) startupLoader.classList.add('hidden');
+      if (typeof document !== 'undefined' && document.documentElement) {
+        document.documentElement.classList.remove('vasool-has-token');
       }
 
       if (showingAuthPortal || !appState.currentUser) {
@@ -1064,34 +1070,37 @@
       switchMainTab('admin');
     }
 
+    function applyAdminSettingsData(s) {
+      if (!s) return;
+      const badge = document.getElementById('adminSessionActiveBadge');
+      const presetSelect = document.getElementById('adminSessionPresetSelect');
+      const customVal = document.getElementById('adminCustomDurationValue');
+      const customUnit = document.getElementById('adminCustomDurationUnit');
+      const customCont = document.getElementById('adminCustomDurationContainer');
+
+      const str = s.sessionDurationString || `${s.sessionDurationValue}${s.sessionDurationUnit === 'hours' ? 'h' : 'd'}`;
+      if (badge) {
+        badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span> Active: ${s.sessionDurationValue} ${s.sessionDurationUnit} (${str})`;
+      }
+
+      const presets = ['7d', '14d', '30d', '90d', '180d', '365d'];
+      if (presets.includes(str)) {
+        if (presetSelect) presetSelect.value = str;
+        if (customCont) customCont.classList.add('hidden');
+      } else {
+        if (presetSelect) presetSelect.value = 'custom';
+        if (customCont) customCont.classList.remove('hidden');
+      }
+
+      if (customVal) customVal.value = s.sessionDurationValue;
+      if (customUnit) customUnit.value = s.sessionDurationUnit || 'days';
+    }
+
     async function fetchAdminSettings() {
       try {
         const res = await apiFetch('/api/admin/settings');
         if (res && res.settings) {
-          const s = res.settings;
-          const badge = document.getElementById('adminSessionActiveBadge');
-          const presetSelect = document.getElementById('adminSessionPresetSelect');
-          const customVal = document.getElementById('adminCustomDurationValue');
-          const customUnit = document.getElementById('adminCustomDurationUnit');
-          const customCont = document.getElementById('adminCustomDurationContainer');
-
-          const str = s.sessionDurationString || `${s.sessionDurationValue}${s.sessionDurationUnit === 'hours' ? 'h' : 'd'}`;
-          if (badge) {
-            badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span> Active: ${s.sessionDurationValue} ${s.sessionDurationUnit} (${str})`;
-          }
-
-          // Check if matches preset
-          const presets = ['7d', '14d', '30d', '90d', '180d', '365d'];
-          if (presets.includes(str)) {
-            if (presetSelect) presetSelect.value = str;
-            if (customCont) customCont.classList.add('hidden');
-          } else {
-            if (presetSelect) presetSelect.value = 'custom';
-            if (customCont) customCont.classList.remove('hidden');
-          }
-
-          if (customVal) customVal.value = s.sessionDurationValue;
-          if (customUnit) customUnit.value = s.sessionDurationUnit || 'days';
+          applyAdminSettingsData(res.settings);
         }
       } catch (err) {
         console.warn('[Admin Settings] Failed to fetch settings:', err);
@@ -1761,6 +1770,17 @@
       }
     }
 
+    function applyAdminGroupsData(groups) {
+      adminGroupsCache = Array.isArray(groups) ? groups : [];
+      const totalGroupsEl = document.getElementById('adminTotalGroupsStat');
+      const subTabGroupsCount = document.getElementById('adminSubTabGroupsCount');
+      if (totalGroupsEl) totalGroupsEl.textContent = adminGroupsCache.length;
+      if (subTabGroupsCount) subTabGroupsCount.textContent = adminGroupsCache.length;
+
+      const q = document.getElementById('adminGroupSearchInput') ? document.getElementById('adminGroupSearchInput').value : '';
+      filterAdminGroups(q);
+    }
+
     async function fetchAdminGroups(silent = false) {
       const container = document.getElementById('adminGroupsListContainer');
       if (container && !silent) {
@@ -1773,15 +1793,7 @@
 
       try {
         const res = await apiFetch('/api/admin/groups');
-        adminGroupsCache = (res && res.groups) || [];
-
-        const totalGroupsEl = document.getElementById('adminTotalGroupsStat');
-        const subTabGroupsCount = document.getElementById('adminSubTabGroupsCount');
-        if (totalGroupsEl) totalGroupsEl.textContent = adminGroupsCache.length;
-        if (subTabGroupsCount) subTabGroupsCount.textContent = adminGroupsCache.length;
-
-        const q = document.getElementById('adminGroupSearchInput') ? document.getElementById('adminGroupSearchInput').value : '';
-        filterAdminGroups(q);
+        applyAdminGroupsData((res && res.groups) || []);
       } catch (err) {
         if (container && !silent) {
           container.innerHTML = `
@@ -1912,6 +1924,37 @@
       }
     }
 
+    function applyAdminFeedbackData(feedbacks) {
+      adminFeedbackCache = Array.isArray(feedbacks) ? feedbacks : [];
+
+      const total = adminFeedbackCache.length;
+      const newCount = adminFeedbackCache.filter((f) => f.status === 'new').length;
+
+      const totalEl = document.getElementById('adminTotalFeedbackStat');
+      const badgeEl = document.getElementById('adminNewFeedbackBadge');
+      const subTabCountEl = document.getElementById('adminSubTabFeedbackCount');
+
+      if (totalEl) totalEl.textContent = total;
+      if (badgeEl) badgeEl.textContent = `${newCount} new`;
+      if (subTabCountEl) subTabCountEl.textContent = newCount > 0 ? `${newCount} new` : total;
+
+      const searchVal = document.getElementById('adminFeedbackSearchInput') ? document.getElementById('adminFeedbackSearchInput').value : '';
+      filterAdminFeedback(searchVal);
+    }
+
+    function hydrateAdminFromBootstrap(adminData) {
+      if (!adminData) return;
+      if (adminData.settings) applyAdminSettingsData(adminData.settings);
+      if (Array.isArray(adminData.groups)) applyAdminGroupsData(adminData.groups);
+      if (Array.isArray(adminData.feedbacks)) applyAdminFeedbackData(adminData.feedbacks);
+      if (typeof window !== 'undefined') {
+        window.__vasoolAdminBootstrapped = true;
+      }
+    }
+    if (typeof window !== 'undefined') {
+      window.hydrateAdminFromBootstrap = hydrateAdminFromBootstrap;
+    }
+
     async function fetchAdminFeedback(silent = false) {
       const container = document.getElementById('adminFeedbackListContainer');
       if (container && !silent) {
@@ -1924,22 +1967,7 @@
 
       try {
         const res = await apiFetch('/api/admin/feedback');
-        adminFeedbackCache = res.feedbacks || [];
-
-        // Update counts
-        const total = adminFeedbackCache.length;
-        const newCount = adminFeedbackCache.filter((f) => f.status === 'new').length;
-
-        const totalEl = document.getElementById('adminTotalFeedbackStat');
-        const badgeEl = document.getElementById('adminNewFeedbackBadge');
-        const subTabCountEl = document.getElementById('adminSubTabFeedbackCount');
-
-        if (totalEl) totalEl.textContent = total;
-        if (badgeEl) badgeEl.textContent = `${newCount} new`;
-        if (subTabCountEl) subTabCountEl.textContent = newCount > 0 ? `${newCount} new` : total;
-
-        const searchVal = document.getElementById('adminFeedbackSearchInput') ? document.getElementById('adminFeedbackSearchInput').value : '';
-        filterAdminFeedback(searchVal);
+        applyAdminFeedbackData((res && res.feedbacks) || []);
       } catch (err) {
         if (container && !silent) {
           container.innerHTML = `

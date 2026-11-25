@@ -160,9 +160,9 @@ async function requireAuth(req, res, next) {
       return next();
     }
 
-    // Check suspension state in database
+    // Check suspension state in database (use lean read to avoid full Mongoose doc hydration on every API request)
     await connectToDatabase();
-    const userDoc = await User.findById(decoded.sub);
+    const userDoc = await User.findById(decoded.sub).lean();
     if (!userDoc) {
       return res.status(401).json({ error: 'Account not found or deleted.' });
     }
@@ -172,7 +172,10 @@ async function requireAuth(req, res, next) {
         userDoc.isSuspended = false;
         userDoc.suspendedUntil = null;
         userDoc.suspensionReason = '';
-        await userDoc.save();
+        await User.updateOne(
+          { _id: userDoc._id },
+          { $set: { isSuspended: false, suspendedUntil: null, suspensionReason: '' } }
+        );
       } else {
         const untilStr = userDoc.suspendedUntil
           ? `until ${new Date(userDoc.suspendedUntil).toLocaleString()}`
@@ -185,6 +188,7 @@ async function requireAuth(req, res, next) {
       }
     }
 
+    req.userDoc = userDoc;
     return next();
   } catch (err) {
     return res.status(401).json({ error: 'Invalid or expired authentication token.' });
@@ -529,8 +533,11 @@ router.post('/google', (req, res) => {
  */
 router.get('/me', requireAuth, async (req, res) => {
   try {
-    await connectToDatabase();
-    const user = await User.findById(req.user.sub);
+    let user = req.userDoc;
+    if (!user) {
+      await connectToDatabase();
+      user = await User.findById(req.user.sub).lean();
+    }
     if (!user) {
       return res.status(404).json({ error: 'User not found.' });
     }

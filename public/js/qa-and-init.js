@@ -810,7 +810,11 @@
       window.updateToggleAllSplitButton = updateToggleAllSplitButton;
     }
 
-    window.onload = async function () {
+    let __vasoolInitialized = false;
+    async function initVasoolApp() {
+      if (__vasoolInitialized) return;
+      __vasoolInitialized = true;
+
       // Check for group invite parameter in URL (?join=CODE or ?invite=CODE)
       const urlParams = new URLSearchParams(window.location.search);
       const joinParam = urlParams.get('join') || urlParams.get('invite');
@@ -819,7 +823,9 @@
       }
 
       loadState();
-      await checkVerificationUrlParams();
+      if (urlParams.get('verified') || urlParams.get('resetToken') || urlParams.get('verifyToken')) {
+        await checkVerificationUrlParams();
+      }
 
       const pendingCode = sessionStorage.getItem('pending_join_code');
       const inviteBanner = document.getElementById('authPendingInviteBanner');
@@ -827,68 +833,103 @@
         inviteBanner.classList.remove('hidden');
       }
 
-      renderTopLevelView();
-
       // Restore persisted active tab across page refreshes (only standard user tabs before auth)
       const rawHash = (window.location.hash || '').replace('#', '').trim();
       let savedTab = rawHash || localStorage.getItem('vasool_active_tab') || 'dashboard';
       if (savedTab === 'admin' || savedTab === 'tests') {
         savedTab = 'dashboard';
-        if (window.history && window.history.replaceState) {
+        if (rawHash === 'tests' && window.history && window.history.replaceState) {
           window.history.replaceState(null, '', window.location.pathname);
         }
       }
       const validTabs = ['dashboard', 'expenses', 'groups', 'settle'];
       const initialTab = validTabs.includes(savedTab) ? savedTab : 'dashboard';
-      // Capture the requested tab without rendering protected data before auth resolves.
-      switchMainTab(initialTab, true);
-
-      // The QA suite is intentionally user-triggered from the Tests tab.
-      // Running it on every page load blocks the main thread during normal startup.
-      switchPipelineViewer('github');
 
       const token = localStorage.getItem(AUTH_TOKEN_KEY);
       if (token) {
+        // Capture requested tab without mutating URL hash yet (preserving #admin until verified)
+        if (rawHash !== 'admin') {
+          switchMainTab(initialTab, true);
+        }
+
         try {
-          // Verify the session and hydrate protected data concurrently. The workspace
-          // remains hidden until /me confirms that the session is valid.
-          const backendDataPromise = Promise.all([
-            apiFetch('/api/groups'),
-            apiFetch('/api/expenses'),
-            apiFetch('/api/settlements')
-          ]).then((responses) => ({ responses })).catch((error) => ({ error }));
-          const [me, backendData] = await Promise.all([
-            apiFetch('/api/auth/me'),
-            backendDataPromise
-          ]);
-          if (me && me.user) {
-            appState.currentUser = me.user;
-            if (!appState.users.some((u) => u.email === me.user.email)) {
-              appState.users.push(me.user);
+          let bootstrapData = null;
+          let fallbackNeeded = false;
+
+          try {
+            if (window.__vasoolBootstrapPreflight) {
+              const preflight = window.__vasoolBootstrapPreflight;
+              window.__vasoolBootstrapPreflight = null;
+              bootstrapData = await preflight;
+            } else {
+              const adminQuery = rawHash === 'admin' ? '?includeAdmin=1' : '';
+              bootstrapData = await apiFetch('/api/bootstrap' + adminQuery);
+            }
+          } catch (bootErr) {
+            // Fall back to legacy endpoints only when /api/bootstrap is not served (e.g., mocked/static harnesses)
+            if (bootErr && (bootErr.status === 404 || bootErr.status === 405)) {
+              fallbackNeeded = true;
+            } else {
+              throw bootErr;
+            }
+          }
+
+          if (fallbackNeeded) {
+            const backendDataPromise = Promise.all([
+              apiFetch('/api/groups'),
+              apiFetch('/api/expenses'),
+              apiFetch('/api/settlements')
+            ]).then((responses) => ({ responses })).catch((error) => ({ error }));
+            const [me, backendData] = await Promise.all([
+              apiFetch('/api/auth/me'),
+              backendDataPromise
+            ]);
+            if (me && me.user) {
+              bootstrapData = {
+                user: me.user,
+                groups: backendData.responses?.[0]?.groups || [],
+                expenses: backendData.responses?.[1]?.expenses || [],
+                settlements: backendData.responses?.[2]?.settlements || []
+              };
+              if (!backendData.responses) {
+                console.warn('[Sync] Startup data hydration warning:', backendData.error?.message || 'Data requests failed.');
+              }
+            }
+          }
+
+          if (bootstrapData && bootstrapData.user) {
+            appState.currentUser = bootstrapData.user;
+            if (!appState.users.some((u) => u.email === bootstrapData.user.email)) {
+              appState.users.push(bootstrapData.user);
             }
             showingAuthPortal = false;
-            renderTopLevelView();
-            if (backendData.responses) {
-              await syncWithBackend({ refresh: false, responses: backendData.responses });
-            } else {
-              console.warn('[Sync] Startup data hydration warning:', backendData.error?.message || 'Data requests failed.');
-            }
+            await syncWithBackend({ refresh: false, bootstrapData });
 
             // Only navigate to admin if verified user is Super Admin AND originally requested #admin
             const isSuper = (typeof isSuperAdminUser === 'function')
-              ? isSuperAdminUser(me.user)
-              : Boolean(me.user.isSuperAdmin || me.user.role === 'super_admin' || (me.user.email && me.user.email.toLowerCase() === 'mdzubair7592@gmail.com'));
+              ? isSuperAdminUser(bootstrapData.user)
+              : Boolean(bootstrapData.user.isSuperAdmin || bootstrapData.user.role === 'super_admin' || (bootstrapData.user.email && bootstrapData.user.email.toLowerCase() === 'mdzubair7592@gmail.com'));
+
+            // Auth & hydration complete; reveal protected workspace immediately
+            window.__vasoolAuthReady = true;
 
             if (rawHash === 'admin' && isSuper) {
+              if (bootstrapData.admin && typeof window.hydrateAdminFromBootstrap === 'function') {
+                window.hydrateAdminFromBootstrap(bootstrapData.admin);
+              }
               switchMainTab('admin');
-            } else if (activeMainTab === 'admin' && !isSuper) {
-              switchMainTab('dashboard');
             } else {
+              if (rawHash === 'admin' && !isSuper && window.history && window.history.replaceState) {
+                window.history.replaceState(null, '', window.location.pathname);
+              }
               // Reapply the tab captured before authentication/backend sync so startup hydration
               // cannot silently send the user back Home.
               switchMainTab(initialTab);
             }
-            await checkAndProcessPendingJoin();
+
+            if (sessionStorage.getItem('pending_join_code')) {
+              checkAndProcessPendingJoin().catch(() => {});
+            }
           }
         } catch (err) {
           if (err && err.status === 401) {
@@ -900,7 +941,7 @@
             }
             appState.currentUser = null;
             showingAuthPortal = true;
-            renderTopLevelView();
+            window.__vasoolAuthReady = true;
             switchMainTab('dashboard', true);
           } else {
             // Fail closed when the session cannot be verified. Keep the token for retry,
@@ -922,6 +963,7 @@
             window.location.hash = '';
           }
         }
+        switchMainTab('dashboard', true);
       }
 
       // Initial authentication has now resolved. Reveal only the correct top-level view.
@@ -936,38 +978,49 @@
           switchMainTab(hash);
         }
       });
+    }
 
-      // Report Navigation Timings & Performance to OpenTelemetry RUM
-      setTimeout(() => {
-        try {
-          if (typeof window !== 'undefined' && window.performance && window.performance.timing) {
-            const t = window.performance.timing;
-            const pageLoadTime = t.loadEventEnd > 0 ? (t.loadEventEnd - t.navigationStart) : (Date.now() - t.navigationStart);
-            const ttfb = t.responseStart > 0 ? (t.responseStart - t.requestStart) : 0;
-            const domInteractive = t.domInteractive > 0 ? (t.domInteractive - t.responseEnd) : 0;
+    if (typeof window !== 'undefined') {
+      window.initVasoolApp = initVasoolApp;
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initVasoolApp);
+      } else {
+        initVasoolApp();
+      }
 
-            reportRumTelemetry({
-              spans: [
-                {
-                  name: 'Navigation & Core Web Vitals',
-                  traceId: sessionTraceId,
-                  spanId: generateHex(16),
-                  durationMs: pageLoadTime,
-                  attributes: {
-                    'page.url': window.location.href,
-                    'page.load_time_ms': pageLoadTime,
-                    'page.ttfb_ms': ttfb,
-                    'page.dom_interactive_ms': domInteractive,
-                    'client.screen': window.innerWidth < 640 ? 'mobile' : 'desktop'
+      // Report Navigation Timings & Performance to OpenTelemetry RUM after full load
+      window.addEventListener('load', () => {
+        setTimeout(() => {
+          try {
+            if (window.performance && window.performance.timing) {
+              const t = window.performance.timing;
+              const pageLoadTime = t.loadEventEnd > 0 ? (t.loadEventEnd - t.navigationStart) : (Date.now() - t.navigationStart);
+              const ttfb = t.responseStart > 0 ? (t.responseStart - t.requestStart) : 0;
+              const domInteractive = t.domInteractive > 0 ? (t.domInteractive - t.responseEnd) : 0;
+
+              reportRumTelemetry({
+                spans: [
+                  {
+                    name: 'Navigation & Core Web Vitals',
+                    traceId: sessionTraceId,
+                    spanId: generateHex(16),
+                    durationMs: pageLoadTime,
+                    attributes: {
+                      'page.url': window.location.href,
+                      'page.load_time_ms': pageLoadTime,
+                      'page.ttfb_ms': ttfb,
+                      'page.dom_interactive_ms': domInteractive,
+                      'client.screen': window.innerWidth < 640 ? 'mobile' : 'desktop'
+                    }
                   }
-                }
-              ],
-              metrics: [
-                { name: 'vasool_rum_page_load_ms', type: 'histogram', value: pageLoadTime },
-                { name: 'vasool_rum_ttfb_ms', type: 'histogram', value: ttfb }
-              ]
-            });
-          }
-        } catch {}
-      }, 1500);
-    };
+                ],
+                metrics: [
+                  { name: 'vasool_rum_page_load_ms', type: 'histogram', value: pageLoadTime },
+                  { name: 'vasool_rum_ttfb_ms', type: 'histogram', value: ttfb }
+                ]
+              });
+            }
+          } catch {}
+        }, 1500);
+      });
+    }

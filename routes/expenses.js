@@ -24,12 +24,78 @@ const {
 
 const router = express.Router();
 
+function sanitizeExpensesForRequester(expenses, userGroups, requesterUser, involvedOnly = false) {
+  const groupMap = {};
+  userGroups.forEach((g) => {
+    groupMap[g._id.toString()] = g;
+  });
+
+  const requesterEmail = (requesterUser.email || '').toLowerCase().trim();
+  const isSuper = isSuperAdminUser(requesterUser);
+
+  const sanitizedExpenses = expenses.map((exp) => {
+    const g = groupMap[exp.groupId.toString()];
+    if (!g) return exp;
+
+    const isGroupAdmin = isSuper || Boolean(
+      (g.adminEmail && g.adminEmail.toLowerCase().trim() === requesterEmail) ||
+      (g.createdByEmail && g.createdByEmail.toLowerCase().trim() === requesterEmail) ||
+      (Array.isArray(g.members) && g.members.some((m) => m.email.toLowerCase().trim() === requesterEmail && (m.role === 'admin' || m.role === 'owner'))) ||
+      ((g.members?.[0]?.email || '').toLowerCase().trim() === requesterEmail)
+    );
+
+    const isPayer = (exp.paidByEmail && exp.paidByEmail.toLowerCase().trim() === requesterEmail) ||
+      (Array.isArray(exp.paidByAllocations) && exp.paidByAllocations.some((p) => String(p.memberEmail || p.email || '').toLowerCase().trim() === requesterEmail));
+
+    const isCreator = Boolean(exp.createdByEmail && exp.createdByEmail.toLowerCase().trim() === requesterEmail);
+    const isPersonalOnly = (g.splitsVisibility || 'personal_only') === 'personal_only';
+
+    // Full access for admins, payers, and creators
+    if (!isPersonalOnly || isGroupAdmin || isPayer || isCreator) {
+      const expObj = exp.toObject ? exp.toObject() : { ...exp };
+      expObj.isInvolved = isUserInvolvedInExpense(exp, requesterEmail);
+      return expObj;
+    }
+
+    // Redact other members' split shares, only show requester's share
+    const mySplit = exp.splits.find((s) => s.memberEmail.toLowerCase() === requesterEmail);
+    const otherSum = exp.splits
+      .filter((s) => s.memberEmail.toLowerCase() !== requesterEmail)
+      .reduce((acc, s) => acc + s.amount, 0);
+
+    const visibleSplits = [];
+    if (mySplit) visibleSplits.push(mySplit);
+    if (otherSum > 0) {
+      visibleSplits.push({
+        memberEmail: 'private@group',
+        memberName: 'Other Members (Hidden by Admin)',
+        amount: Math.round(otherSum * 100) / 100,
+        isPrivate: true
+      });
+    }
+
+    const expObj = exp.toObject ? exp.toObject() : { ...exp };
+    expObj.splits = visibleSplits;
+    expObj.isPersonalView = true;
+    expObj.isInvolved = isUserInvolvedInExpense(exp, requesterEmail);
+    return expObj;
+  });
+
+  if (involvedOnly) {
+    return sanitizedExpenses.filter((e) => isUserInvolvedInExpense(e, requesterEmail));
+  }
+  return sanitizedExpenses;
+}
+
 // GET /api/expenses - List expenses (optionally filtered by groupId)
 router.get('/expenses', requireAuth, async (req, res) => {
   try {
     await connectToDatabase();
     const filter = {};
-    const userGroups = await Group.find({ 'members.email': req.user.email });
+    const userGroups = await Group.find(
+      { 'members.email': req.user.email },
+      { auditLog: 0 }
+    ).lean();
     const userGroupIds = userGroups.map((g) => g._id.toString());
 
     if (req.query.groupId) {
@@ -41,70 +107,13 @@ router.get('/expenses', requireAuth, async (req, res) => {
       filter.groupId = { $in: userGroups.map((g) => g._id) };
     }
 
-    const expenses = await Expense.find(filter).sort({ expenseDate: -1, createdAt: -1 });
-
-    const groupMap = {};
-    userGroups.forEach((g) => {
-      groupMap[g._id.toString()] = g;
-    });
-
-    const requesterEmail = req.user.email.toLowerCase().trim();
-
-    // Privacy filter: if group has splitsVisibility === 'personal_only' and user is not admin,
-    // normal users can only see their own part of the share, not others.
-    // HOWEVER: The payer(s) and creator of an expense must ALWAYS see the full split details of their own bill!
-    const sanitizedExpenses = expenses.map((exp) => {
-      const g = groupMap[exp.groupId.toString()];
-      if (!g) return exp;
-
-      const isGroupAdmin = isSuperAdminUser(req.user) || Boolean(
-        (g.adminEmail && g.adminEmail.toLowerCase().trim() === requesterEmail) ||
-        (g.createdByEmail && g.createdByEmail.toLowerCase().trim() === requesterEmail) ||
-        (Array.isArray(g.members) && g.members.some((m) => m.email.toLowerCase().trim() === requesterEmail && (m.role === 'admin' || m.role === 'owner'))) ||
-        ((g.members?.[0]?.email || '').toLowerCase().trim() === requesterEmail)
-      );
-
-      const isPayer = (exp.paidByEmail && exp.paidByEmail.toLowerCase().trim() === requesterEmail) ||
-        (Array.isArray(exp.paidByAllocations) && exp.paidByAllocations.some((p) => String(p.memberEmail || p.email || '').toLowerCase().trim() === requesterEmail));
-
-      const isCreator = Boolean(exp.createdByEmail && exp.createdByEmail.toLowerCase().trim() === requesterEmail);
-      const isPersonalOnly = (g.splitsVisibility || 'personal_only') === 'personal_only';
-
-      // Full access for admins, payers, and creators
-      if (!isPersonalOnly || isGroupAdmin || isPayer || isCreator) {
-        const expObj = exp.toObject ? exp.toObject() : { ...exp };
-        expObj.isInvolved = isUserInvolvedInExpense(exp, requesterEmail);
-        return expObj;
-      }
-
-      // Redact other members' split shares, only show requester's share
-      const mySplit = exp.splits.find((s) => s.memberEmail.toLowerCase() === requesterEmail);
-      const otherSum = exp.splits
-        .filter((s) => s.memberEmail.toLowerCase() !== requesterEmail)
-        .reduce((acc, s) => acc + s.amount, 0);
-
-      const visibleSplits = [];
-      if (mySplit) visibleSplits.push(mySplit);
-      if (otherSum > 0) {
-        visibleSplits.push({
-          memberEmail: 'private@group',
-          memberName: 'Other Members (Hidden by Admin)',
-          amount: Math.round(otherSum * 100) / 100,
-          isPrivate: true
-        });
-      }
-
-      const expObj = exp.toObject ? exp.toObject() : { ...exp };
-      expObj.splits = visibleSplits;
-      expObj.isPersonalView = true;
-      expObj.isInvolved = isUserInvolvedInExpense(exp, requesterEmail);
-      return expObj;
-    });
-
-    let finalExpenses = sanitizedExpenses;
-    if (req.query.involvedOnly === 'true') {
-      finalExpenses = finalExpenses.filter((e) => isUserInvolvedInExpense(e, requesterEmail));
-    }
+    const expenses = await Expense.find(filter).sort({ expenseDate: -1, createdAt: -1 }).lean();
+    const finalExpenses = sanitizeExpensesForRequester(
+      expenses,
+      userGroups,
+      req.user,
+      req.query.involvedOnly === 'true'
+    );
 
     return res.status(200).json({ expenses: finalExpenses });
   } catch (err) {
@@ -441,4 +450,4 @@ router.delete('/expenses/:id', requireAuth, async (req, res) => {
   }
 });
 
-module.exports = { expensesRouter: router };
+module.exports = { expensesRouter: router, sanitizeExpensesForRequester };

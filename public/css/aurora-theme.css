@@ -12,6 +12,7 @@
 }
 
 html { background: var(--vasool-bg); }
+html.vasool-has-token #startupNeutralLoader { display: flex; }
 
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;

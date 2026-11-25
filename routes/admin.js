@@ -404,6 +404,23 @@ router.delete('/users/:userId', async (req, res) => {
   }
 });
 
+function formatAdminSettings(config) {
+  const c = config || {
+    sessionDurationValue: 7,
+    sessionDurationUnit: 'days',
+    sessionDurationString: '7d',
+    updatedAt: null,
+    updatedByEmail: 'system'
+  };
+  return {
+    sessionDurationValue: c.sessionDurationValue || 7,
+    sessionDurationUnit: c.sessionDurationUnit || 'days',
+    sessionDurationString: c.sessionDurationString || '7d',
+    updatedAt: c.updatedAt || null,
+    updatedByEmail: c.updatedByEmail || 'system'
+  };
+}
+
 /**
  * GET /api/admin/settings
  * Retrieves global application system configuration (session timeout, etc.)
@@ -415,30 +432,14 @@ router.get('/settings', async (req, res) => {
 
   try {
     await connectToDatabase();
-    let config = await SystemConfig.findOne({ key: 'auth_session' }).lean();
-    if (!config) {
-      config = {
-        key: 'auth_session',
-        sessionDurationValue: 7,
-        sessionDurationUnit: 'days',
-        sessionDurationString: '7d',
-        description: 'Global application session timeout and security settings',
-        updatedByEmail: 'system'
-      };
-    }
+    const config = await SystemConfig.findOne({ key: 'auth_session' }).lean();
 
     span.setStatus('OK');
     span.end();
 
     return res.status(200).json({
       success: true,
-      settings: {
-        sessionDurationValue: config.sessionDurationValue || 7,
-        sessionDurationUnit: config.sessionDurationUnit || 'days',
-        sessionDurationString: config.sessionDurationString || '7d',
-        updatedAt: config.updatedAt || null,
-        updatedByEmail: config.updatedByEmail || 'system'
-      }
+      settings: formatAdminSettings(config)
     });
   } catch (err) {
     logger.error('[admin] Failed to fetch system settings:', err);
@@ -536,12 +537,14 @@ router.get('/feedback', async (req, res) => {
   const filter = {};
   if (status) filter.status = status;
   if (type) filter.type = type;
-  const feedbacks = await Feedback.find(filter)
-    .sort({ createdAt: -1 })
-    .skip(Number(skip))
-    .limit(Number(limit))
-    .lean();
-  const total = await Feedback.countDocuments(filter);
+  const [feedbacks, total] = await Promise.all([
+    Feedback.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(Number(skip))
+      .limit(Number(limit))
+      .lean(),
+    Feedback.countDocuments(filter)
+  ]);
   return res.json({ feedbacks, total });
 });
 
@@ -607,6 +610,54 @@ router.get('/system-status', async (req, res) => {
 });
 
 
+function buildAdminGroupsSummary(groups, expenses, settlements) {
+  const expStatsMap = {};
+  (expenses || []).forEach((e) => {
+    const gid = String(e.groupId || '');
+    if (!expStatsMap[gid]) expStatsMap[gid] = { billCount: 0, totalSpend: 0 };
+    expStatsMap[gid].billCount += 1;
+    if (e.type === 'income') {
+      expStatsMap[gid].totalSpend -= Number(e.amount) || 0;
+    } else {
+      expStatsMap[gid].totalSpend += Number(e.amount) || 0;
+    }
+  });
+
+  const stlStatsMap = {};
+  (settlements || []).forEach((s) => {
+    const gid = String(s.groupId || '');
+    if (!stlStatsMap[gid]) stlStatsMap[gid] = { settlementCount: 0 };
+    stlStatsMap[gid].settlementCount += 1;
+  });
+
+  return (groups || []).map((g) => {
+    const gid = g._id.toString();
+    const eStat = expStatsMap[gid] || { billCount: 0, totalSpend: 0 };
+    const sStat = stlStatsMap[gid] || { settlementCount: 0 };
+    return {
+      id: gid,
+      _id: gid,
+      name: g.name,
+      category: g.category || 'Trip',
+      currency: g.currency || 'INR',
+      inviteCode: g.inviteCode,
+      createdByEmail: g.createdByEmail,
+      adminEmail: g.adminEmail || (g.members && g.members[0] ? g.members[0].email : ''),
+      isArchived: Boolean(g.isArchived),
+      adminHubSettlement: Boolean(g.adminHubSettlement),
+      minimizeDebts: g.minimizeDebts !== false,
+      splitsVisibility: g.splitsVisibility || 'personal_only',
+      members: g.members || [],
+      memberCount: (g.members || []).length,
+      billCount: eStat.billCount,
+      totalSpend: Math.round(eStat.totalSpend * 100) / 100,
+      settlementCount: sStat.settlementCount,
+      createdAt: g.createdAt,
+      updatedAt: g.updatedAt
+    };
+  });
+}
+
 /**
  * GET /api/admin/groups
  * Lists all groups across the entire platform with members, bill counts, and total spend for Super Admin.
@@ -614,55 +665,13 @@ router.get('/system-status', async (req, res) => {
 router.get('/groups', async (req, res) => {
   try {
     await connectToDatabase();
-    const groups = await Group.find().sort({ updatedAt: -1, createdAt: -1 }).lean();
-    const expenses = await Expense.find({}, 'groupId amount type').lean();
-    const settlements = await Settlement.find({}, 'groupId amount status').lean();
+    const [groups, expenses, settlements] = await Promise.all([
+      Group.find({}, { auditLog: 0 }).sort({ updatedAt: -1, createdAt: -1 }).lean(),
+      Expense.find({}, 'groupId amount type').lean(),
+      Settlement.find({}, 'groupId amount status').lean()
+    ]);
 
-    const expStatsMap = {};
-    expenses.forEach((e) => {
-      const gid = String(e.groupId || '');
-      if (!expStatsMap[gid]) expStatsMap[gid] = { billCount: 0, totalSpend: 0 };
-      expStatsMap[gid].billCount += 1;
-      if (e.type === 'income') {
-        expStatsMap[gid].totalSpend -= Number(e.amount) || 0;
-      } else {
-        expStatsMap[gid].totalSpend += Number(e.amount) || 0;
-      }
-    });
-
-    const stlStatsMap = {};
-    settlements.forEach((s) => {
-      const gid = String(s.groupId || '');
-      if (!stlStatsMap[gid]) stlStatsMap[gid] = { settlementCount: 0 };
-      stlStatsMap[gid].settlementCount += 1;
-    });
-
-    const enrichedGroups = groups.map((g) => {
-      const gid = g._id.toString();
-      const eStat = expStatsMap[gid] || { billCount: 0, totalSpend: 0 };
-      const sStat = stlStatsMap[gid] || { settlementCount: 0 };
-      return {
-        id: gid,
-        _id: gid,
-        name: g.name,
-        category: g.category || 'Trip',
-        currency: g.currency || 'INR',
-        inviteCode: g.inviteCode,
-        createdByEmail: g.createdByEmail,
-        adminEmail: g.adminEmail || (g.members && g.members[0] ? g.members[0].email : ''),
-        isArchived: Boolean(g.isArchived),
-        adminHubSettlement: Boolean(g.adminHubSettlement),
-        minimizeDebts: g.minimizeDebts !== false,
-        splitsVisibility: g.splitsVisibility || 'personal_only',
-        members: g.members || [],
-        memberCount: (g.members || []).length,
-        billCount: eStat.billCount,
-        totalSpend: Math.round(eStat.totalSpend * 100) / 100,
-        settlementCount: sStat.settlementCount,
-        createdAt: g.createdAt,
-        updatedAt: g.updatedAt
-      };
-    });
+    const enrichedGroups = buildAdminGroupsSummary(groups, expenses, settlements);
 
     return res.status(200).json({
       groups: enrichedGroups,
@@ -708,4 +717,4 @@ router.delete('/groups/:groupId', async (req, res) => {
   }
 });
 
-module.exports = { adminRouter: router };
+module.exports = { adminRouter: router, buildAdminGroupsSummary, formatAdminSettings };

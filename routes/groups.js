@@ -59,27 +59,32 @@ async function hydrateGroupMembersUpi(groupsList) {
 }
 
 
+function classifyUserGroups(groups, userEmail) {
+  const activeGroups = [];
+  const pendingInvites = [];
+  groups.forEach((g) => {
+    const myMember = (g.members || []).find((m) => m.email && m.email.toLowerCase().trim() === userEmail);
+    if (myMember && myMember.status === 'pending_acceptance') {
+      pendingInvites.push(g);
+    } else {
+      activeGroups.push(g);
+    }
+  });
+  return { activeGroups, pendingInvites };
+}
+
 // GET /api/groups - List groups where user is a member
 router.get('/groups', requireAuth, async (req, res) => {
   try {
     await connectToDatabase();
     const userEmail = (req.user.email || '').toLowerCase().trim();
-    const groups = await Group.find({
-      'members.email': { $regex: new RegExp('^' + userEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') }
-    }).sort({ updatedAt: -1 });
+    const groups = await Group.find(
+      { 'members.email': { $regex: new RegExp('^' + userEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') } },
+      { auditLog: 0 }
+    ).sort({ updatedAt: -1 }).lean();
     await hydrateGroupMembersUpi(groups);
 
-    const activeGroups = [];
-    const pendingInvites = [];
-    groups.forEach((g) => {
-      const myMember = g.members.find((m) => m.email && m.email.toLowerCase().trim() === userEmail);
-      if (myMember && myMember.status === 'pending_acceptance') {
-        pendingInvites.push(g);
-      } else {
-        activeGroups.push(g);
-      }
-    });
-
+    const { activeGroups, pendingInvites } = classifyUserGroups(groups, userEmail);
     return res.status(200).json({ groups, activeGroups, pendingInvites });
   } catch (err) {
     logger.error('[splits:groups] Error fetching user groups:', err);
@@ -942,4 +947,4 @@ router.patch('/groups/:id/settings', requireAuth, async (req, res) => {
   }
 });
 
-module.exports = { groupsRouter: router };
+module.exports = { groupsRouter: router, hydrateGroupMembersUpi, classifyUserGroups };

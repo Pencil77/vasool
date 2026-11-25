@@ -732,9 +732,13 @@
       if (tab === 'admin' && isSuper) {
         // Admin settings/groups may load independently, but the user directory
         // must remain untouched until the Super Admin explicitly clicks Load Users.
-        if (typeof fetchAdminSettings === 'function') fetchAdminSettings();
-        if (typeof fetchAdminGroups === 'function') fetchAdminGroups(true);
-        if (typeof fetchAdminFeedback === 'function') fetchAdminFeedback(true);
+        if (typeof window !== 'undefined' && window.__vasoolAdminBootstrapped) {
+          window.__vasoolAdminBootstrapped = false;
+        } else {
+          if (typeof fetchAdminSettings === 'function') fetchAdminSettings();
+          if (typeof fetchAdminGroups === 'function') fetchAdminGroups(true);
+          if (typeof fetchAdminFeedback === 'function') fetchAdminFeedback(true);
+        }
       }
     }
 
@@ -771,7 +775,14 @@
     }
 
     function refreshAllViews() {
+      const currentTab = typeof activeMainTab !== 'undefined' ? activeMainTab : 'dashboard';
       renderTopLevelView();
+      if (currentTab === 'admin') {
+        if (typeof updateCloudInspector === 'function') {
+          updateCloudInspector();
+        }
+        return;
+      }
       populateGroupFilterDropdown();
 
       const { balanceList, simplified, filteredExpenses, filteredSettlements, totalSpend } =
@@ -901,15 +912,15 @@
 
       // Render only the active workspace. The other panels are rendered when the user
       // opens them, avoiding four full DOM rebuilds on every refresh and tab change.
-      if (activeMainTab === 'dashboard') {
+      if (currentTab === 'dashboard') {
         renderDashboardWidgets(filteredExpenses, simplified, balanceList);
-      } else if (activeMainTab === 'expenses') {
+      } else if (currentTab === 'expenses') {
         renderExpensesList();
-      } else if (activeMainTab === 'groups') {
+      } else if (currentTab === 'groups') {
         renderGroupsGrid();
-      } else if (activeMainTab === 'settle') {
+      } else if (currentTab === 'settle') {
         renderSettleView(simplified, filteredSettlements);
-      } else if (activeMainTab === 'tests') {
+      } else if (currentTab === 'tests') {
         // The QA tab checks that all primary panels are populated.
         renderDashboardWidgets(filteredExpenses, simplified, balanceList);
         renderExpensesList();

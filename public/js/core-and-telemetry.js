@@ -159,15 +159,21 @@ const STORAGE_KEY = 'vasool_clean_state_v1';
       return data;
     }
 
-    async function syncWithBackend({ refresh = true, responses = null } = {}) {
+    async function syncWithBackend({ refresh = true, responses = null, bootstrapData = null } = {}) {
       const token = localStorage.getItem(AUTH_TOKEN_KEY);
       if (!token) return;
       try {
-        const [groupsRes, expRes, stlRes] = responses || await Promise.all([
-          apiFetch('/api/groups'),
-          apiFetch('/api/expenses'),
-          apiFetch('/api/settlements')
-        ]);
+        const [groupsRes, expRes, stlRes] = bootstrapData
+          ? [
+              { groups: bootstrapData.groups || [] },
+              { expenses: bootstrapData.expenses || [] },
+              { settlements: bootstrapData.settlements || [] }
+            ]
+          : (responses || await Promise.all([
+              apiFetch('/api/groups'),
+              apiFetch('/api/expenses'),
+              apiFetch('/api/settlements')
+            ]));
 
         if (groupsRes && Array.isArray(groupsRes.groups)) {
           appState.groups = groupsRes.groups.map((g) => ({

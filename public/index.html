@@ -12,12 +12,52 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   <title>Vasool — Smart Expense Splitting &amp; Debt Simplification</title>
+  <script>
+    (function () {
+      try {
+        var token = localStorage.getItem('vasool_jwt_token');
+        if (token) {
+          document.documentElement.classList.add('vasool-has-token');
+          var origin = (window.location && window.location.origin && window.location.origin !== 'null')
+            ? window.location.origin
+            : '';
+          if (origin && origin.indexOf('http') === 0 && typeof fetch === 'function') {
+            var adminQuery = window.location.hash === '#admin' ? '?includeAdmin=1' : '';
+            window.__vasoolBootstrapPreflight = fetch(origin + '/api/bootstrap' + adminQuery, {
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + token
+              }
+            }).then(function (res) {
+              var readPromise = typeof res.text === 'function'
+                ? res.text().then(function (text) {
+                    try { return JSON.parse(text); } catch (e) { return { raw: text }; }
+                  })
+                : res.json();
+              return readPromise.then(function (data) {
+                if (!res.ok) {
+                  var err = new Error(data.message || data.error || ('HTTP ' + res.status));
+                  err.status = res.status;
+                  err.data = data;
+                  throw err;
+                }
+                return data;
+              });
+            });
+            window.__vasoolBootstrapPreflight.catch(function () {});
+          }
+        } else {
+          document.documentElement.classList.add('vasool-no-token');
+        }
+      } catch (e) {}
+    })();
+  </script>
+  <link rel="stylesheet" href="/css/tailwind.min.css" />
+  <link rel="stylesheet" href="/css/aurora-theme.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
-  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
-    <link rel="stylesheet" href="/css/aurora-theme.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" /></noscript>
 </head>
 <body class="min-h-screen bg-slate-950 text-slate-100 antialiased selection:bg-emerald-500 selection:text-slate-950">
 
@@ -96,6 +136,14 @@
       </div>
     </div>
   </header>
+
+  <!-- Neutral Startup Session Loader (shown only while verifying an active token; zero protected data) -->
+  <div id="startupNeutralLoader" data-testid="startup-neutral-loader" class="hidden items-center justify-center min-h-[60vh] px-4">
+    <div class="flex flex-col items-center gap-3 text-center">
+      <div class="w-8 h-8 border-2 border-emerald-500/80 border-t-transparent rounded-full animate-spin"></div>
+      <span class="text-xs font-medium text-slate-400 tracking-wide">Loading workspace...</span>
+    </div>
+  </div>
 
   <!-- ===================================================================== -->
   <!-- VIEW 1: AUTHENTICATION PORTAL (EMAIL/PASSWORD + OTP VERIFICATION)     -->
