@@ -1511,7 +1511,7 @@
         });
         closeModal('adminSuspendModal');
         showToast(`🚫 ${res.message || 'Account disabled.'}`);
-        await fetchAdminUsers();
+        await fetchAdminUsers(true);
       } catch (err) {
         showToast(err.message || 'Failed to disable account.', 'error');
       } finally {
@@ -1529,7 +1529,7 @@
           body: JSON.stringify({ action: 'unsuspend' })
         });
         showToast(`✅ ${res.message || 'Account re-enabled!'}`);
-        await fetchAdminUsers();
+        await fetchAdminUsers(true);
       } catch (err) {
         showToast(err.message || 'Failed to re-enable account.', 'error');
       }
@@ -1557,7 +1557,7 @@
         });
         closeModal('adminDeleteUserModal');
         showToast(`🗑️ ${res.message || 'Account deleted.'}`);
-        await fetchAdminUsers();
+        await fetchAdminUsers(true);
       } catch (err) {
         showToast(err.message || 'Failed to delete account.', 'error');
       } finally {
