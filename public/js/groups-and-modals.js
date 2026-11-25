@@ -846,7 +846,6 @@
                 <span class="text-lg">🤝</span>
                 <h4 class="text-sm font-bold text-amber-200">Confirm payments (${actionablePendingList.length})</h4>
               </div>
-              
             </div>
             <div class="space-y-2">
               ${actionablePendingList.map((s) => {
@@ -970,11 +969,13 @@
             const isPartial = Boolean(s.originalClaimedAmount && Number(s.originalClaimedAmount) > Number(s.amount));
             let statusBadge = '';
             if (isConfirmed) {
-              // Direct P2P settlements are acknowledged by the receiving creditor.
-              // Only Admin-Hub groups use the Group Admin as the confirmation authority.
-              const groupAdminEmail = String(grp.adminEmail || grp.members?.find((m) => m.role === 'admin')?.email || '').toLowerCase().trim();
+              // Use the confirmation actor recorded on this settlement, not the group's current mode.
+              // A recipient confirmation remains a creditor confirmation even if group settings later change.
               const confirmedByEmail = String(s.confirmedByEmail || '').toLowerCase().trim();
-              const roleTitle = grp.adminHubSettlement && (s.confirmedRole === 'admin' || (groupAdminEmail && confirmedByEmail === groupAdminEmail)) ? 'Admin' : 'Creditor';
+              const recipientEmail = String(s.toEmail || '').toLowerCase().trim();
+              const roleTitle = confirmedByEmail && recipientEmail && confirmedByEmail === recipientEmail
+                ? 'Creditor'
+                : (s.confirmedRole === 'admin' ? 'Admin' : 'Creditor');
               statusBadge = isPartial
                 ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/20 text-teal-300 border border-teal-500/40">⚖️ Partial: ${formatINR(s.amount)} Confirmed by ${roleTitle}</span>`
                 : `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">✅ Confirmed by ${roleTitle}</span>`;
