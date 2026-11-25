@@ -930,47 +930,21 @@
           .map((t, idx) => {
             const pendingAmt = t.pendingApprovalAmount || 0;
             const remDue = typeof t.remainingDue === 'number' ? t.remainingDue : Math.max(0, t.amount - pendingAmt);
-            const remMsg = `Hey ${t.fromName}! Friendly reminder from Vasool: your remaining split share for the group is ${formatINR(remDue)}. Please settle via UPI or mark as paid. Link: ${window.location.origin}`;
-            const waLink = `https://wa.me/?text=${encodeURIComponent(remMsg)}`;
 
             return `
-              <div data-testid="settle-card-${idx}" class="p-4 rounded-xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2.5">
-                <div>
-                  <div class="text-xs sm:text-sm flex items-center gap-1.5 flex-wrap">
-                    <strong class="text-rose-300">${escapeHtml(t.fromName)}</strong>
-                    <span class="text-slate-400">pays</span>
-                    <strong class="text-emerald-300">${escapeHtml(t.toName)}</strong>
-                    ${t.type === 'pay_to_admin' ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">Pay to Admin 👑</span>' : ''}
-                    ${t.type === 'admin_payout' ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/20 text-teal-300 border border-teal-500/40">Admin Settlement 💸</span>' : ''}
-                    ${t.type === 'direct_pairwise' ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/20 text-teal-300 border border-teal-500/40">Direct Pair-Wise 🤝</span>' : ''}
-                    ${t.type === 'standard_greedy' || (!t.isAdminTransfer && !t.type) ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">Fewest Transfers ⚡</span>' : ''}
-                    ${t.groupName ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-teal-300 border border-slate-700">📁 ${escapeHtml(t.groupName)}</span>` : ''}
-                  </div>
-                  <div class="text-[11px] text-slate-400 mt-0.5">${escapeHtml(t.fromEmail)} &rarr; ${escapeHtml(t.toEmail)}</div>
-                  ${pendingAmt > 0 ? `
-                    <div class="mt-1 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-amber-500/15 border border-amber-500/30 text-[11px] text-amber-300 font-semibold">
-                      <span>⏳ ${formatINR(pendingAmt)} paid</span>
-                      <span class="text-slate-400">· Awaiting Admin Confirmation</span>
-                    </div>
-                  ` : ''}
+              <div data-testid="settle-card-${idx}" class="px-3 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between gap-3 mb-2">
+                <div class="min-w-0 flex items-center gap-2 flex-wrap text-xs sm:text-sm">
+                  <strong class="text-rose-300 truncate">${escapeHtml(t.fromName)}</strong>
+                  <span class="text-slate-500">pays</span>
+                  <strong class="text-emerald-300 truncate">${escapeHtml(t.toName)}</strong>
+                  ${pendingAmt > 0 ? `<span class="text-[10px] text-amber-300 whitespace-nowrap">· ${formatINR(pendingAmt)} pending</span>` : ''}
                 </div>
-                <div class="flex items-center gap-2 sm:gap-3 flex-wrap">
-                  <div class="text-right">
-                    <div class="text-base font-extrabold text-white">${formatINR(t.amount)}</div>
-                    ${pendingAmt > 0 ? `<div class="text-[10px] text-slate-400">Remaining Due: <strong class="text-rose-300">${formatINR(remDue)}</strong></div>` : ''}
-                  </div>
-                  <a href="${waLink}" target="_blank" rel="noopener noreferrer" title="Send WhatsApp reminder" class="px-2.5 py-1.5 rounded-xl bg-teal-500/15 hover:bg-teal-500/25 text-teal-300 border border-teal-500/30 font-semibold text-xs transition flex items-center gap-1 flex-shrink-0">
-                    <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z"/></svg>
-                    <span>Remind</span>
-                  </a>
+                <div class="flex items-center gap-2 flex-shrink-0">
+                  <div class="text-sm font-bold text-white whitespace-nowrap">${formatINR(remDue > 0.01 ? remDue : t.amount)}</div>
                   ${remDue <= 0.01 && pendingAmt > 0 ? `
-                    <span class="px-3.5 py-2 rounded-xl bg-amber-500/15 text-amber-300 border border-amber-500/30 font-semibold text-xs">
-                      ⏳ Pending Approval
-                    </span>
+                    <span class="px-2.5 py-1.5 rounded-lg bg-amber-500/15 text-amber-300 border border-amber-500/30 font-semibold text-[11px] whitespace-nowrap">Pending</span>
                   ` : `
-                    <button data-testid="btn-record-payment-${idx}" onclick="openSettleConfirm('${escapeHtml(t.fromEmail)}', '${escapeHtml(t.fromName)}', '${escapeHtml(t.toEmail)}', '${escapeHtml(t.toName)}', ${remDue}, '${escapeHtml(t.groupId || '')}')" class="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition">
-                      ${isViewerAdminOfAny ? 'Record Payment' : 'Mark as Settled'}
-                    </button>
+                    <button data-testid="btn-record-payment-${idx}" onclick="openSettleConfirm('${escapeHtml(t.fromEmail)}', '${escapeHtml(t.fromName)}', '${escapeHtml(t.toEmail)}', '${escapeHtml(t.toName)}', ${remDue}, '${escapeHtml(t.groupId || '')}')" class="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition whitespace-nowrap">Settle</button>
                   `}
                 </div>
               </div>
