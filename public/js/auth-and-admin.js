@@ -1218,6 +1218,8 @@
             refreshButton.disabled = false;
             refreshButton.textContent = 'Refresh Users';
           }
+          const headerRefreshButton = document.getElementById('btnRefreshAdminUsers');
+          if (headerRefreshButton) headerRefreshButton.classList.remove('hidden');
           const searchVal = document.getElementById('adminUserSearchInput')?.value || '';
           filterAdminUsers(searchVal);
           return true;
