@@ -195,3 +195,16 @@ Do not perform a broad HTML rewrite or framework migration for this task.
 ## 7. Product-owner approval boundary
 
 The green-and-black theme and the relocation of the Split Expenses workflow to Settle are explicit product-owner preferences. Do not reverse either decision or introduce a silver/grey redesign without asking for approval.
+
+
+## 8. Persistent bottom-tab navigation
+- Preserve the active bottom-navigation tab across a full page reload for Home, Bills, Groups, and Settle.
+- Persist the selected tab in local storage and keep the URL hash synchronized.
+- Reapply the tab captured at startup after authentication validation and backend data synchronization so initialization cannot reset a user to Home.
+- Admin restoration is permitted only after successful Super Admin authorization; internal QA tabs are never restored as user-facing tabs.
+- Clear the saved tab on sign-out or an invalid/expired session.
+
+## 9. Settlement confirmation authority by mode
+- **Direct P2P (`adminHubSettlement: false`)**: only the receiving creditor/recipient may confirm receipt. This applies even when the payer or another group member is an Admin or Super Admin. The settlement history must display **Confirmed by Creditor** (or an equivalent receiver-confirmed label), never **Confirmed by Admin**.
+- **Admin-Hub (`adminHubSettlement: true`)**: the Group Admin may confirm payments routed through the admin. The history may display **Confirmed by Admin** when the admin actually performed the confirmation.
+- Preserve the existing pending/confirmed states, partial-confirmation amounts, audit records, and balance calculations. Do not rewrite existing settlement records as part of this UI/authorization correction.
