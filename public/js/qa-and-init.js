@@ -888,15 +888,17 @@
             switchMainTab('dashboard');
             refreshAllViews();
           } else {
-            console.warn('[Auth Me] Transient network/server error while validating session. Preserving login state:', err.message);
-            if (appState.currentUser) {
-              showingAuthPortal = false;
-              renderTopLevelView();
-              refreshAllViews();
-            }
+            // Fail closed when the session cannot be verified. Keep the token for retry,
+            // but never reveal cached protected data on an unverified session.
+            console.warn('[Auth Me] Could not verify session; keeping protected content hidden:', err.message);
+            appState.currentUser = null;
+            showingAuthPortal = true;
           }
         }
       } else {
+        // No token means no authenticated user, even if stale profile data exists in local state.
+        appState.currentUser = null;
+        showingAuthPortal = true;
         // Unauthenticated session: ensure clean URL with no #admin hash
         if (window.location.hash === '#admin' || window.location.hash === '#tests') {
           if (window.history && window.history.replaceState) {
@@ -906,6 +908,10 @@
           }
         }
       }
+
+      // Initial authentication has now resolved. Reveal only the correct top-level view.
+      window.__vasoolAuthReady = true;
+      renderTopLevelView();
 
       // Hashchange listener to guard manual URL changes
       window.addEventListener('hashchange', () => {

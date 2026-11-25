@@ -14,6 +14,16 @@
       const mobileNav = document.getElementById('mobileBottomNav');
       const mobileFab = document.getElementById('mobileFabAddExpense');
 
+      // Never expose protected app content while the initial session check is unresolved.
+      if (window.__vasoolAuthReady !== true) {
+        if (authSec) authSec.classList.add('hidden');
+        if (appSec) appSec.classList.add('hidden');
+        if (mobileNav) mobileNav.classList.add('hidden');
+        if (mobileFab) mobileFab.classList.add('hidden');
+        if (toggleBtn) toggleBtn.classList.add('hidden');
+        return;
+      }
+
       if (showingAuthPortal || !appState.currentUser) {
         authSec.classList.remove('hidden');
         appSec.classList.add('hidden');
