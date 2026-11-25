@@ -840,7 +840,8 @@
       }
       const validTabs = ['dashboard', 'expenses', 'groups', 'settle'];
       const initialTab = validTabs.includes(savedTab) ? savedTab : 'dashboard';
-      switchMainTab(initialTab);
+      // Capture the requested tab without rendering protected data before auth resolves.
+      switchMainTab(initialTab, true);
 
       // The QA suite is intentionally user-triggered from the Tests tab.
       // Running it on every page load blocks the main thread during normal startup.
@@ -849,7 +850,12 @@
       const token = localStorage.getItem(AUTH_TOKEN_KEY);
       if (token) {
         try {
-          const me = await apiFetch('/api/auth/me');
+          // Verify the session and hydrate protected data concurrently. The workspace
+          // remains hidden until /me confirms that the session is valid.
+          const [me] = await Promise.all([
+            apiFetch('/api/auth/me'),
+            syncWithBackend({ refresh: false })
+          ]);
           if (me && me.user) {
             appState.currentUser = me.user;
             if (!appState.users.some((u) => u.email === me.user.email)) {
@@ -857,7 +863,6 @@
             }
             showingAuthPortal = false;
             renderTopLevelView();
-            await syncWithBackend();
 
             // Only navigate to admin if verified user is Super Admin AND originally requested #admin
             const isSuper = (typeof isSuperAdminUser === 'function')
@@ -886,8 +891,7 @@
             appState.currentUser = null;
             showingAuthPortal = true;
             renderTopLevelView();
-            switchMainTab('dashboard');
-            refreshAllViews();
+            switchMainTab('dashboard', true);
           } else {
             // Fail closed when the session cannot be verified. Keep the token for retry,
             // but never reveal cached protected data on an unverified session.
