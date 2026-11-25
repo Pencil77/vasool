@@ -208,3 +208,10 @@ The green-and-black theme and the relocation of the Split Expenses workflow to S
 - **Direct P2P (`adminHubSettlement: false`)**: only the receiving creditor/recipient may confirm receipt. This applies even when the payer or another group member is an Admin or Super Admin. The settlement history must display **Confirmed by Creditor** (or an equivalent receiver-confirmed label), never **Confirmed by Admin**.
 - **Admin-Hub (`adminHubSettlement: true`)**: the Group Admin may confirm payments routed through the admin. The history may display **Confirmed by Admin** when the admin actually performed the confirmation.
 - Preserve the existing pending/confirmed states, partial-confirmation amounts, audit records, and balance calculations. Do not rewrite existing settlement records as part of this UI/authorization correction.
+
+
+## 10. Minimal Settle workspace and landing page
+- The Settle tab is an action workspace: prioritize who pays whom, amounts, pending confirmations, and recorded settlements. Remove the redundant Split & Settle introductory card.
+- Keep settlement status and routing information concise. Do not surface long explanations of algorithms or payment routing in the primary workspace.
+- Keep the landing page minimal and describe the product, not the authentication mechanism. Do not advertise Google sign-in or OTP login. Email verification OTP remains part of account verification and is not a login method.
+- Preserve all financial values, calculations, settlement records, and existing action handlers.
