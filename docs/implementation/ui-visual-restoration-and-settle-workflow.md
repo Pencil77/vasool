@@ -92,6 +92,7 @@ The product-owner request is to move the **Split Expenses workflow/section** fro
 - Preserve deep links or existing entry points where feasible, redirecting them to the correct Settle section rather than leaving broken controls.
 - Avoid rendering the same full split interface on both Home and Settle.
 - Home may retain a compact balance summary or a single shortcut to Settle, but must not duplicate the full split workflow.
+- The Home dashboard must not render the **Net Member Balances** chart/card; keep detailed member balance inspection within the Settle workflow.
 - Bills remains the source for the full expense list and expense-management actions.
 
 ### 3.3 Settle tab layout
@@ -106,6 +107,8 @@ Organize the Settle tab in a clear action sequence:
 6. **Settlement history:** show confirmed and historical payments, visually secondary to pending actions.
 
 On mobile, stack these sections in the same logical order. Keep the most urgent next action near the top. Use collapsible detail sections only for secondary information, not to hide the amount, recipient, or status.
+
+- Render recommended transfers as a compact, single-row list: **debtor pays creditor**, amount, and one **Settle** action. Do not show email addresses or communication actions (such as reminders/email) on each transfer row. Preserve pending-confirmation states and all existing settlement actions/permissions.
 
 ### 3.4 Avoid new redundancy
 
