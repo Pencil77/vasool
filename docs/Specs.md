@@ -149,3 +149,5 @@ For each member $m$ in a group, initialize $\text{paid}_m = 0$, $\text{owed}_m =
 - On reload, restore the selected tab after session validation and backend synchronization; startup hydration must not replace the user's selected tab with Home.
 - Supported user tabs: `dashboard` (Home), `expenses` (Bills), `groups`, and `settle`. The `admin` tab is restored only after Super Admin authorization. Internal `tests` is never restored as a user-facing tab.
 - This is client navigation state only. It must not mutate group, expense, balance, or settlement records.
+
+- Settlement records persist `settlementMode` (`direct_p2p` or `admin_hub`) so confirmation history can retain the authority applicable when the payment was recorded, even if the group later changes modes. Legacy records without this field use the recorded confirmer email/role as a best-effort fallback; no existing records are migrated or rewritten.
