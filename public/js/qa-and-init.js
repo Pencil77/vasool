@@ -842,7 +842,8 @@
       const initialTab = validTabs.includes(savedTab) ? savedTab : 'dashboard';
       switchMainTab(initialTab);
 
-      runAutomatedTestSuite(false);
+      // The QA suite is intentionally user-triggered from the Tests tab.
+      // Running it on every page load blocks the main thread during normal startup.
       switchPipelineViewer('github');
 
       const token = localStorage.getItem(AUTH_TOKEN_KEY);
