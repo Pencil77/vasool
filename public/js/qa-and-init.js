@@ -907,6 +907,10 @@
         }
       }
 
+      // Initial authentication has now resolved. Reveal only the correct top-level view.
+      window.__vasoolAuthReady = true;
+      renderTopLevelView();
+
       // Hashchange listener to guard manual URL changes
       window.addEventListener('hashchange', () => {
         const hash = (window.location.hash || '').replace('#', '').trim();
