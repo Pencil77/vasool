@@ -1037,7 +1037,6 @@
     // =========================================================================
     let adminUsersCache = [];
     let adminUsersLoaded = false;
-    let adminUsersLoading = false;
     let adminUsersRequest = null;
     let activeAdminDetailsRoot = null;
     let activeAdminDetailsUserId = null;
@@ -1182,7 +1181,6 @@
 
       const container = document.getElementById('adminUsersListContainer');
       const loadButton = document.getElementById('btnLoadAdminUsers');
-      adminUsersLoading = true;
       if (loadButton) {
         loadButton.disabled = true;
         loadButton.textContent = 'Loading...';
@@ -1228,7 +1226,6 @@
           showToast(err.message || 'Failed to fetch admin users.', 'error');
           return false;
         } finally {
-          adminUsersLoading = false;
           adminUsersRequest = null;
           const refreshButton = document.getElementById('btnLoadAdminUsers');
           if (refreshButton) {
