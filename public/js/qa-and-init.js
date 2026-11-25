@@ -868,7 +868,9 @@
             } else if (activeMainTab === 'admin' && !isSuper) {
               switchMainTab('dashboard');
             } else {
-              switchMainTab(activeMainTab || 'dashboard');
+              // Reapply the tab captured before authentication/backend sync so startup hydration
+              // cannot silently send the user back Home.
+              switchMainTab(initialTab);
             }
             await checkAndProcessPendingJoin();
           }

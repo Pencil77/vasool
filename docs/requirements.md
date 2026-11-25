@@ -59,3 +59,15 @@ This document defines the functional, user-experience, security, and operational
 | **NFR-02** | **Mobile-First Responsive Layout** | All cards, modals, admin feedback tiles, and bottom navigation bars must fit cleanly within `360px–430px` mobile viewports with zero horizontal button overflow. |
 | **NFR-03** | **Split Privacy Enforcement** | When a group's Split Visibility is set to `Personal Only` (`personal_only`), non-admin members must only see their own split share and net balance, while other members' shares are redacted on both backend and frontend. |
 | **NFR-04** | **Automated Verification Suite** | The platform must maintain a 30-case in-browser and CLI test suite covering Unit, Integration, and UI E2E assertions with `100%` pass verification. |
+
+
+### FR-07: Persistent Bottom-Tab Navigation
+- **FR-07.1 (Restore Last Selected Tab After Reload)**: For every standard bottom-navigation tab (Home, Bills, Groups, and Settle), reloading or refreshing the application must reopen the same tab that was active immediately before the reload. The selected tab must not silently reset to Home during authentication validation, backend synchronization, or initial view rendering.
+- **FR-07.2 (Admin Tab Access-Safe Restoration)**: The Admin tab may be restored after reload only after the authenticated session is validated and the user is confirmed to be a Super Admin. Non-Super Admin users must never gain access to Admin through a saved tab or URL. Hidden/internal QA tabs must not be restored as user-facing tabs.
+- **FR-07.3 (Navigation State)**: Persist the active user-facing tab locally and keep the URL hash synchronized with the selected tab. On startup, validate the restored value against the supported tabs before rendering it. Signing out or an invalid/expired session must clear the saved tab and return to the authentication/Home entry state.
+
+
+### FR-08: Minimal Settle and Sign-In Landing Content
+- **FR-08.1 (Settle-First Workspace)**: The Settle tab must prioritize actionable pending payments, confirmation requests, and recorded settlements. Remove redundant introductory/explanatory panels and keep status and routing descriptions to short labels. Preserve all transaction details, amounts, actions, and confirmation controls.
+- **FR-08.2 (Concise Settlement Status)**: Use concise labels such as Pending, Due, Confirm payments, and All settled. Do not display long technical explanations of debt routing in the main Settle workspace.
+- **FR-08.3 (Accurate Minimal Landing Page)**: The unauthenticated landing page must use concise product copy only. Do not claim Google sign-in, OTP sign-in, or any authentication method that is not a current login method. Email verification OTP may remain part of registration/verification flows without being advertised as a login method.

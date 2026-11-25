@@ -195,3 +195,27 @@ Do not perform a broad HTML rewrite or framework migration for this task.
 ## 7. Product-owner approval boundary
 
 The green-and-black theme and the relocation of the Split Expenses workflow to Settle are explicit product-owner preferences. Do not reverse either decision or introduce a silver/grey redesign without asking for approval.
+
+
+## 8. Persistent bottom-tab navigation
+- Preserve the active bottom-navigation tab across a full page reload for Home, Bills, Groups, and Settle.
+- Persist the selected tab in local storage and keep the URL hash synchronized.
+- Reapply the tab captured at startup after authentication validation and backend data synchronization so initialization cannot reset a user to Home.
+- Admin restoration is permitted only after successful Super Admin authorization; internal QA tabs are never restored as user-facing tabs.
+- Clear the saved tab on sign-out or an invalid/expired session.
+
+## 9. Settlement confirmation authority by mode
+- **Direct P2P (`adminHubSettlement: false`)**: only the receiving creditor/recipient may confirm receipt. This applies even when the payer or another group member is an Admin or Super Admin. The settlement history must display **Confirmed by Creditor** (or an equivalent receiver-confirmed label), never **Confirmed by Admin**.
+- **Admin-Hub (`adminHubSettlement: true`)**: the Group Admin may confirm payments routed through the admin. The history may display **Confirmed by Admin** when the admin actually performed the confirmation.
+- Preserve the existing pending/confirmed states, partial-confirmation amounts, audit records, and balance calculations. Do not rewrite existing settlement records as part of this UI/authorization correction.
+
+
+## 10. Minimal Settle workspace and landing page
+- The Settle tab is an action workspace: prioritize who pays whom, amounts, pending confirmations, and recorded settlements. Remove the redundant Split & Settle introductory card.
+- Keep settlement status and routing information concise. Do not surface long explanations of algorithms or payment routing in the primary workspace.
+- Keep the landing page minimal and describe the product, not the authentication mechanism. Do not advertise Google sign-in or OTP login. Email verification OTP remains part of account verification and is not a login method.
+- Preserve all financial values, calculations, settlement records, and existing action handlers.
+
+- Remove the main-workspace routing explanation banners; routing mode remains reflected in the actual suggested payment rows and confirmation permissions.
+
+- Persist the settlement mode on each new settlement record (`direct_p2p` or `admin_hub`) and use it with the recorded confirmer role when rendering history. This prevents later group-mode changes from rewriting the meaning of historical confirmations. Legacy records remain untouched and use recorded actor/role fallback.

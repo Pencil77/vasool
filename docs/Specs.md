@@ -142,3 +142,12 @@ For each member $m$ in a group, initialize $\text{paid}_m = 0$, $\text{owed}_m =
    - When `upiId !== ''`: Displays `#settleUpiSection`, hides `#settleNoUpiNotice`, renders the deterministic QR matrix SVG, and binds `#settleUpiDeepLink` to:
      `upi://pay?pa=<encodeURIComponent(upiId)>&pn=<encodeURIComponent(toName)>&am=<amount.toFixed(2)>&cu=INR&tn=Vasool%20Settlement`
    - When `upiId === ''`: Adds `.hidden` to `#settleUpiSection`, removes `.hidden` from `#settleNoUpiNotice`, clears `#settleUpiDeepLink`, and defaults `#settleMethodSelect` to `'Cash'`.
+
+
+### 2.5 Navigation State & Reload Restoration
+- The frontend persists the active user-facing bottom tab using the `vasool_active_tab` local-storage key and mirrors it in the URL hash.
+- On reload, restore the selected tab after session validation and backend synchronization; startup hydration must not replace the user's selected tab with Home.
+- Supported user tabs: `dashboard` (Home), `expenses` (Bills), `groups`, and `settle`. The `admin` tab is restored only after Super Admin authorization. Internal `tests` is never restored as a user-facing tab.
+- This is client navigation state only. It must not mutate group, expense, balance, or settlement records.
+
+- Settlement records persist `settlementMode` (`direct_p2p` or `admin_hub`) so confirmation history can retain the authority applicable when the payment was recorded, even if the group later changes modes. Legacy records without this field use the recorded confirmer email/role as a best-effort fallback; no existing records are migrated or rewritten.
