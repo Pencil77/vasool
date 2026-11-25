@@ -931,7 +931,7 @@
   <!-- ===================================================================== -->
 
   <!-- Mobile Floating Action Button (FAB) for Instant Bill/Expense Entry -->
-  <button id="mobileFabAddExpense" data-testid="mobile-fab-add-expense" onclick="openAddExpenseModal()" aria-label="Add Expense" class="md:hidden fixed bottom-20 right-4 z-40 flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-4 py-3 rounded-full shadow-lg shadow-black/40 hover:scale-105 active:scale-95 transition-all">
+  <button id="mobileFabAddExpense" data-testid="mobile-fab-add-expense" onclick="openAddExpenseModal()" aria-label="Add Expense" class="hidden md:hidden fixed bottom-20 right-4 z-40 flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-4 py-3 rounded-full shadow-lg shadow-black/40 hover:scale-105 active:scale-95 transition-all">
     <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2.6" viewBox="0 0 24 24">
       <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
     </svg>
@@ -939,7 +939,7 @@
   </button>
 
   <!-- Mobile Fixed Bottom Navigation Bar (Android Thumb-Friendly Viewport) -->
-  <nav id="mobileBottomNav" data-testid="mobile-bottom-nav" class="md:hidden fixed bottom-0 inset-x-0 bg-slate-950/85 border-t border-slate-800/80 z-40 backdrop-blur-2xl shadow-2xl pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-1.5 px-2">
+  <nav id="mobileBottomNav" data-testid="mobile-bottom-nav" class="hidden md:hidden fixed bottom-0 inset-x-0 bg-slate-950/85 border-t border-slate-800/80 z-40 backdrop-blur-2xl shadow-2xl pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-1.5 px-2">
     <div id="mobileBottomNavGrid" class="grid grid-cols-4 items-center justify-around gap-1">
       <button id="mobileNavDashboard" data-testid="mobile-nav-dashboard" onclick="switchMainTab('dashboard')" class="flex flex-col items-center justify-center py-1.5 px-1 text-emerald-400 font-bold transition-all">
         <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
