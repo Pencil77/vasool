@@ -1180,6 +1180,7 @@
       if (adminUsersLoaded && !forceRefresh) return;
 
       const container = document.getElementById('adminUsersListContainer');
+      const hadLoadedUsers = adminUsersLoaded;
       const loadButton = document.getElementById('btnLoadAdminUsers');
       if (loadButton) {
         loadButton.disabled = true;
@@ -1221,8 +1222,14 @@
           filterAdminUsers(searchVal);
           return true;
         } catch (err) {
-          adminUsersLoaded = false;
-          renderAdminUsersLoadPrompt('Could not load users: ' + (err.message || 'Please try again.'));
+          // Preserve the last successful list if an explicit refresh fails.
+          adminUsersLoaded = hadLoadedUsers;
+          if (hadLoadedUsers) {
+            const searchVal = document.getElementById('adminUserSearchInput')?.value || '';
+            filterAdminUsers(searchVal);
+          } else {
+            renderAdminUsersLoadPrompt('Could not load users: ' + (err.message || 'Please try again.'));
+          }
           showToast(err.message || 'Failed to fetch admin users.', 'error');
           return false;
         } finally {
