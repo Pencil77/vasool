@@ -217,3 +217,5 @@ The green-and-black theme and the relocation of the Split Expenses workflow to S
 - Preserve all financial values, calculations, settlement records, and existing action handlers.
 
 - Remove the main-workspace routing explanation banners; routing mode remains reflected in the actual suggested payment rows and confirmation permissions.
+
+- Persist the settlement mode on each new settlement record (`direct_p2p` or `admin_hub`) and use it with the recorded confirmer role when rendering history. This prevents later group-mode changes from rewriting the meaning of historical confirmations. Legacy records remain untouched and use recorded actor/role fallback.
