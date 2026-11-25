@@ -977,7 +977,9 @@
             if (isConfirmed) {
               // Direct P2P settlements are acknowledged by the receiving creditor.
               // Only Admin-Hub groups use the Group Admin as the confirmation authority.
-              const roleTitle = grp.adminHubSettlement ? 'Admin' : 'Creditor';
+              const groupAdminEmail = String(grp.adminEmail || grp.members?.find((m) => m.role === 'admin')?.email || '').toLowerCase().trim();
+              const confirmedByEmail = String(s.confirmedByEmail || '').toLowerCase().trim();
+              const roleTitle = grp.adminHubSettlement && (s.confirmedRole === 'admin' || (groupAdminEmail && confirmedByEmail === groupAdminEmail)) ? 'Admin' : 'Creditor';
               statusBadge = isPartial
                 ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/20 text-teal-300 border border-teal-500/40">⚖️ Partial: ${formatINR(s.amount)} Confirmed by ${roleTitle}</span>`
                 : `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">✅ Confirmed by ${roleTitle}</span>`;
