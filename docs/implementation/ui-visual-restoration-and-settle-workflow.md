@@ -215,3 +215,5 @@ The green-and-black theme and the relocation of the Split Expenses workflow to S
 - Keep settlement status and routing information concise. Do not surface long explanations of algorithms or payment routing in the primary workspace.
 - Keep the landing page minimal and describe the product, not the authentication mechanism. Do not advertise Google sign-in or OTP login. Email verification OTP remains part of account verification and is not a login method.
 - Preserve all financial values, calculations, settlement records, and existing action handlers.
+
+- Remove the main-workspace routing explanation banners; routing mode remains reflected in the actual suggested payment rows and confirmation permissions.
