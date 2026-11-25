@@ -1169,13 +1169,9 @@
       const container = document.getElementById('adminUsersListContainer');
       if (!container) return;
       container.innerHTML = `
-        <div class="text-center py-12 px-4 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-3">
-          <div class="text-sm font-semibold text-slate-200">Load platform users</div>
-          <p class="text-xs text-slate-400">${escapeHtml(message)} The database is queried only when you choose to load or refresh the list.</p>
-          <button type="button" data-testid="btn-load-admin-users" onclick="fetchAdminUsers(true)"
-            class="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold transition">
-            Load Users
-          </button>
+        <div class="text-center py-12 px-4 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-2">
+          <div class="text-sm font-semibold text-slate-200">Platform users are not loaded</div>
+          <p class="text-xs text-slate-400">${escapeHtml(message)} Use the Load Users button above when you want to query the database.</p>
         </div>`;
     }
 
