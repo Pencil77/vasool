@@ -802,8 +802,7 @@
           <div data-testid="status-fully-closed-banner" class="mb-4 p-5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center gap-3">
             <span class="text-2xl">🎉</span>
             <div>
-              <div class="text-sm font-bold text-emerald-300">All Group Debts Fully Settled & Closed!</div>
-              <div class="text-xs text-slate-400 mt-0.5">Every member transaction has been fully verified and confirmed. No pending dues or owing balances remain.</div>
+              <div class="text-sm font-bold text-emerald-300">All settled</div>
             </div>
           </div>
         `;
@@ -816,12 +815,11 @@
             <div class="flex items-center gap-2.5">
               <span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
               <div>
-                <div class="text-xs font-bold text-amber-300 uppercase tracking-wide">Status: Pending Due or Owing</div>
-                <div class="text-[11px] text-slate-400 mt-0.5">Event remains open until payees mark paid and ${isHubActive ? 'the group Admin' : 'the receiving recipient'} confirms receipt.</div>
+                <div class="text-xs font-bold text-amber-300 uppercase tracking-wide">Pending</div>
               </div>
             </div>
             <div class="flex items-center gap-2 text-xs">
-              <span class="px-2.5 py-1 rounded-lg bg-rose-500/15 text-rose-300 border border-rose-500/30 font-semibold">Remaining Due: ${formatINR(totalPendingDue)}</span>
+              <span class="px-2.5 py-1 rounded-lg bg-rose-500/15 text-rose-300 border border-rose-500/30 font-semibold">Due: ${formatINR(totalPendingDue)}</span>
               ${totalPendingApproval > 0 ? `<span class="px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-300 border border-amber-500/30 font-semibold">${isHubActive ? 'Awaiting Admin' : 'Awaiting Recipient'}: ${formatINR(totalPendingApproval)}</span>` : ''}
             </div>
           </div>
@@ -846,13 +844,10 @@
             <div class="flex items-center justify-between gap-2 flex-wrap">
               <div class="flex items-center gap-2">
                 <span class="text-lg">🤝</span>
-                <h4 class="text-sm font-bold text-amber-200">Action Required: Pending Payment Confirmations (${actionablePendingList.length})</h4>
+                <h4 class="text-sm font-bold text-amber-200">Confirm payments (${actionablePendingList.length})</h4>
               </div>
               <span class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-amber-400/25 text-amber-300 border border-amber-400/40">Dual Confirmation Handshake</span>
             </div>
-            <p class="text-xs text-slate-300">
-              Payments awaiting verification. Please verify your bank/UPI account and confirm receipt to permanently close the debt:
-            </p>
             <div class="space-y-2">
               ${actionablePendingList.map((s) => {
                 const isCreditor = s.toEmail && s.toEmail.toLowerCase().trim() === currentEmail;
@@ -896,7 +891,7 @@
           <div class="mb-3 px-3.5 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-between text-xs text-amber-300">
             <span class="flex items-center gap-2">
               <span class="text-base">👑</span>
-              <span><strong>Admin-Hub Routing Active:</strong> Everyone pays their share to the group Admin, and the Admin settles payouts to creditors.</span>
+              <span><strong>Admin-Hub</strong> · Payments route through the group Admin.</span>
             </span>
           </div>
         `;
@@ -905,7 +900,7 @@
           <div class="mb-3 px-3.5 py-2.5 rounded-xl bg-teal-500/10 border border-teal-500/30 flex items-center justify-between text-xs text-teal-300">
             <span class="flex items-center gap-2">
               <span class="text-base">🤝</span>
-              <span><strong>Direct Pair-Wise Debts Active:</strong> Calculating exact person-to-person IOUs directly between each debtor and the member who paid across all unsettled bills in this group. Minimization is OFF.</span>
+              <span><strong>Direct pair-wise</strong> · Each person pays the member they owe.</span>
             </span>
           </div>
         `;
@@ -914,7 +909,7 @@
           <div class="mb-3 px-3.5 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-between text-xs text-emerald-300">
             <span class="flex items-center gap-2">
               <span class="text-base">⚡</span>
-              <span><strong>Direct Peer-to-Peer Settlement (Standard):</strong> Fewest Transfers Active (Minimized Net Cash Flow) simplifies all unsettled bills in this group into the fewest possible direct transfers.</span>
+              <span><strong>Fewest transfers</strong> · Group dues are simplified into direct payments.</span>
             </span>
           </div>
         `;
