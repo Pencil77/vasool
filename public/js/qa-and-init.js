@@ -852,9 +852,14 @@
         try {
           // Verify the session and hydrate protected data concurrently. The workspace
           // remains hidden until /me confirms that the session is valid.
-          const [me] = await Promise.all([
+          const backendDataPromise = Promise.all([
+            apiFetch('/api/groups'),
+            apiFetch('/api/expenses'),
+            apiFetch('/api/settlements')
+          ]).then((responses) => ({ responses })).catch((error) => ({ error }));
+          const [me, backendData] = await Promise.all([
             apiFetch('/api/auth/me'),
-            syncWithBackend({ refresh: false })
+            backendDataPromise
           ]);
           if (me && me.user) {
             appState.currentUser = me.user;
@@ -863,6 +868,11 @@
             }
             showingAuthPortal = false;
             renderTopLevelView();
+            if (backendData.responses) {
+              await syncWithBackend({ refresh: false, responses: backendData.responses });
+            } else {
+              console.warn('[Sync] Startup data hydration warning:', backendData.error?.message || 'Data requests failed.');
+            }
 
             // Only navigate to admin if verified user is Super Admin AND originally requested #admin
             const isSuper = (typeof isSuperAdminUser === 'function')
