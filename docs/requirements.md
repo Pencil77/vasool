@@ -71,3 +71,11 @@ This document defines the functional, user-experience, security, and operational
 - **FR-08.1 (Settle-First Workspace)**: The Settle tab must prioritize actionable pending payments, confirmation requests, and recorded settlements. Remove redundant introductory/explanatory panels and keep status and routing descriptions to short labels. Preserve all transaction details, amounts, actions, and confirmation controls.
 - **FR-08.2 (Concise Settlement Status)**: Use concise labels such as Pending, Due, Confirm payments, and All settled. Do not display long technical explanations of debt routing in the main Settle workspace.
 - **FR-08.3 (Accurate Minimal Landing Page)**: The unauthenticated landing page must use concise product copy only. Do not claim Google sign-in, OTP sign-in, or any authentication method that is not a current login method. Email verification OTP may remain part of registration/verification flows without being advertised as a login method.
+
+
+### FR-XX — No Protected Dashboard Flash During Startup (Hard Requirement)
+- The application workspace, dashboard, bottom navigation, and other authenticated content MUST remain hidden until the initial authentication/session check has completed.
+- On a fresh visit without a valid session, show only the authentication portal after the check resolves. Never briefly render or expose dashboard content, including when stale user data exists in local storage.
+- On refresh with a valid session, keep protected content hidden while `/api/auth/me` and required startup hydration are in progress; then reveal the authenticated app and restore the previously selected tab.
+- A neutral loading state or temporarily blank protected area is preferable to flashing the wrong view.
+- This is a presentation/access-control requirement only; do not change financial data, calculations, or settlement behavior.
