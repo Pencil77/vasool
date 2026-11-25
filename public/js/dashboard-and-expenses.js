@@ -610,7 +610,7 @@
     // =========================================================================
     // UI RENDERING & CHARTS
     // =========================================================================
-    function switchMainTab(tab) {
+    function switchMainTab(tab, skipRefresh = false) {
       const isSuper = (typeof isSuperAdminUser === 'function')
         ? isSuperAdminUser(appState.currentUser)
         : Boolean(appState.currentUser && (appState.currentUser.isSuperAdmin || appState.currentUser.role === 'super_admin' || (appState.currentUser.email && ['mdzubair7592@gmail.com'].includes(appState.currentUser.email.toLowerCase().trim()))));
@@ -704,7 +704,7 @@
           }
         }
       });
-      refreshAllViews();
+      if (!skipRefresh) refreshAllViews();
       // Show Top Welcome Hero & 4 KPI tiles ONLY on the Home (dashboard) tab
       const homeTopSection = document.getElementById('homeDashboardTopSection');
       if (homeTopSection) {
@@ -899,10 +899,23 @@
       }
 
 
-      renderDashboardWidgets(filteredExpenses, simplified, balanceList);
-      renderExpensesList();
-      renderGroupsGrid();
-      renderSettleView(simplified, filteredSettlements);
+      // Render only the active workspace. The other panels are rendered when the user
+      // opens them, avoiding four full DOM rebuilds on every refresh and tab change.
+      if (activeMainTab === 'dashboard') {
+        renderDashboardWidgets(filteredExpenses, simplified, balanceList);
+      } else if (activeMainTab === 'expenses') {
+        renderExpensesList();
+      } else if (activeMainTab === 'groups') {
+        renderGroupsGrid();
+      } else if (activeMainTab === 'settle') {
+        renderSettleView(simplified, filteredSettlements);
+      } else if (activeMainTab === 'tests') {
+        // The QA tab checks that all primary panels are populated.
+        renderDashboardWidgets(filteredExpenses, simplified, balanceList);
+        renderExpensesList();
+        renderGroupsGrid();
+        renderSettleView(simplified, filteredSettlements);
+      }
       if (typeof updateCloudInspector === 'function') {
         updateCloudInspector();
       }

@@ -159,11 +159,11 @@ const STORAGE_KEY = 'vasool_clean_state_v1';
       return data;
     }
 
-    async function syncWithBackend() {
+    async function syncWithBackend({ refresh = true, responses = null } = {}) {
       const token = localStorage.getItem(AUTH_TOKEN_KEY);
       if (!token) return;
       try {
-        const [groupsRes, expRes, stlRes] = await Promise.all([
+        const [groupsRes, expRes, stlRes] = responses || await Promise.all([
           apiFetch('/api/groups'),
           apiFetch('/api/expenses'),
           apiFetch('/api/settlements')
@@ -260,9 +260,11 @@ const STORAGE_KEY = 'vasool_clean_state_v1';
           badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-400"></span> Live';
         }
         saveState();
-        refreshAllViews();
+        if (refresh) refreshAllViews();
+        return true;
       } catch (err) {
         console.warn('[Sync] Backend sync warning:', err.message);
+        return false;
       }
     }
 
