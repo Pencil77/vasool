@@ -846,7 +846,7 @@
                 <span class="text-lg">🤝</span>
                 <h4 class="text-sm font-bold text-amber-200">Confirm payments (${actionablePendingList.length})</h4>
               </div>
-              <span class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-amber-400/25 text-amber-300 border border-amber-400/40">Dual Confirmation Handshake</span>
+              
             </div>
             <div class="space-y-2">
               ${actionablePendingList.map((s) => {
