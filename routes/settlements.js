@@ -166,7 +166,9 @@ router.post('/settlements', requireAuth, async (req, res) => {
       : (isHubMode ? 'pending_admin_approval' : 'pending_confirmation');
     const confirmedAt = isDirectlyConfirmed ? new Date() : null;
     const confirmedByEmail = isDirectlyConfirmed ? requesterEmail : null;
-    const confirmedRole = isTargetCreditor ? 'creditor' : (isAdmin ? 'admin' : '');
+    const confirmedRole = isHubMode && isAdmin && cleanToEmail === requesterEmail
+      ? 'admin'
+      : (isTargetCreditor ? 'creditor' : (isAdmin ? 'admin' : ''));
     const confirmationToken = isDirectlyConfirmed ? null : crypto.randomBytes(32).toString('hex');
 
     // Rapid duplicate submission prevention (10-second window):
@@ -217,6 +219,7 @@ router.post('/settlements', requireAuth, async (req, res) => {
       referenceNote: referenceNote || '',
       utrNumber: req.body.utrNumber ? String(req.body.utrNumber).trim() : '',
       confirmedRole,
+      settlementMode: isHubMode ? 'admin_hub' : 'direct_p2p',
       recordedByEmail: requesterEmail,
       status,
       confirmedAt,
@@ -331,7 +334,9 @@ router.post('/settlements/:id/confirm', requireAuth, async (req, res) => {
     settlement.status = 'confirmed';
     settlement.confirmedAt = new Date();
     settlement.confirmedByEmail = requesterEmail;
-    settlement.confirmedRole = isTargetCreditor ? 'creditor' : 'admin';
+    settlement.confirmedRole = settlement.settlementMode === 'admin_hub' && isGroupAdmin
+      ? 'admin'
+      : (isTargetCreditor ? 'creditor' : 'admin');
     settlement.confirmationToken = null; // Invalidate token on confirm
     await settlement.save();
 
