@@ -4,12 +4,14 @@ const User = require('../models/User');
 const Group = require('../models/Group');
 const Expense = require('../models/Expense');
 const Settlement = require('../models/Settlement');
+const Notification = require('../models/Notification');
 const SystemConfig = require('../models/SystemConfig');
 const {
   requireAuth,
   isSuperAdminEmail,
   SUPER_ADMIN_EMAIL,
   storePassword,
+  signAuthToken,
   updateCachedSessionDuration,
   getCachedSessionDuration
 } = require('./auth');
@@ -130,6 +132,31 @@ router.get('/users', async (req, res) => {
   }
 });
 
+function formatAdminUserDetail(user, groupCount = 0) {
+  const isSuper = Boolean(user.isSuperAdmin || user.role === 'super_admin' || isSuperAdminEmail(user.email));
+  return {
+    id: String(user._id),
+    name: user.name || '',
+    email: user.email || '',
+    avatarUrl: user.avatarUrl || '',
+    upiId: user.upiId || '',
+    defaultCurrency: user.defaultCurrency || 'INR',
+    role: isSuper ? 'super_admin' : (user.role || 'user'),
+    isSuperAdmin: isSuper,
+    isPrimaryOwner: isSuperAdminEmail(user.email),
+    isEmailVerified: Boolean(user.isEmailVerified),
+    authProviders: Array.isArray(user.authProviders) ? user.authProviders : ['email'],
+    createdAt: user.createdAt || null,
+    updatedAt: user.updatedAt || null,
+    lastLoginAt: user.lastLoginAt || null,
+    isSuspended: Boolean(user.isSuspended),
+    suspensionReason: user.suspensionReason || '',
+    suspendedAt: user.suspendedAt || null,
+    suspendedUntil: user.suspendedUntil || null,
+    groupCount
+  };
+}
+
 /**
  * GET /api/admin/users/:userId/details
  * Returns an allowlisted, non-credential account detail payload.
@@ -149,31 +176,375 @@ router.get('/users/:userId/details', async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      user: {
-        id: String(user._id),
-        name: user.name || '',
-        email: user.email || '',
-        avatarUrl: user.avatarUrl || '',
-        upiId: user.upiId || '',
-        defaultCurrency: user.defaultCurrency || 'INR',
-        role: (user.isSuperAdmin || user.role === 'super_admin' || isSuperAdminEmail(user.email)) ? 'super_admin' : (user.role || 'user'),
-        isEmailVerified: Boolean(user.isEmailVerified),
-        authProviders: Array.isArray(user.authProviders) ? user.authProviders : ['email'],
-        createdAt: user.createdAt || null,
-        updatedAt: user.updatedAt || null,
-        lastLoginAt: user.lastLoginAt || null,
-        isSuspended: Boolean(user.isSuspended),
-        suspensionReason: user.suspensionReason || '',
-        suspendedAt: user.suspendedAt || null,
-        suspendedUntil: user.suspendedUntil || null,
-        groupCount: groupCount ? groupCount.count : 0
-      }
+      user: formatAdminUserDetail(user, groupCount ? groupCount.count : 0)
     });
   } catch (err) {
     logger.error('[admin] Failed to fetch user details:', err);
     return res.status(500).json({ error: 'Failed to retrieve user details.' });
   }
 });
+
+/**
+ * Helper: Propagate updated user email, name, or UPI ID across all related collections
+ * so group memberships, expense splits, settlements, notifications, and feedback stay linked.
+ */
+async function propagateUserIdentityChanges({ oldEmail, newEmail, oldName, newName, upiId, updateUpi }) {
+  const emailChanged = Boolean(oldEmail && newEmail && oldEmail !== newEmail);
+  const nameChanged = Boolean(newName && oldName !== newName);
+  if (!emailChanged && !nameChanged && !updateUpi) return;
+
+  const lookupEmail = oldEmail;
+  const tasks = [];
+
+  // 1. Groups: members array, createdByEmail, adminEmail, auditLog
+  if (emailChanged) {
+    tasks.push(
+      Group.updateMany({ createdByEmail: lookupEmail }, { $set: { createdByEmail: newEmail } }),
+      Group.updateMany({ adminEmail: lookupEmail }, { $set: { adminEmail: newEmail } }),
+      Group.updateMany(
+        { 'auditLog.actorEmail': lookupEmail },
+        {
+          $set: {
+            'auditLog.$[a].actorEmail': newEmail,
+            ...(nameChanged ? { 'auditLog.$[a].actorName': newName } : {})
+          }
+        },
+        { arrayFilters: [{ 'a.actorEmail': lookupEmail }] }
+      )
+    );
+  } else if (nameChanged) {
+    tasks.push(
+      Group.updateMany(
+        { 'auditLog.actorEmail': lookupEmail },
+        { $set: { 'auditLog.$[a].actorName': newName } },
+        { arrayFilters: [{ 'a.actorEmail': lookupEmail }] }
+      )
+    );
+  }
+
+  const memberSet = {};
+  if (emailChanged) memberSet['members.$[m].email'] = newEmail;
+  if (nameChanged) memberSet['members.$[m].name'] = newName;
+  if (updateUpi) memberSet['members.$[m].upiId'] = upiId || '';
+  if (Object.keys(memberSet).length > 0) {
+    tasks.push(
+      Group.updateMany(
+        { 'members.email': lookupEmail },
+        { $set: memberSet },
+        { arrayFilters: [{ 'm.email': lookupEmail }] }
+      )
+    );
+  }
+
+  // 2. Expenses: paidBy, createdBy, paidByAllocations, splits
+  if (emailChanged || nameChanged) {
+    const expPaidSet = {};
+    const expCreatedSet = {};
+    const allocSet = {};
+    const splitSet = {};
+    if (emailChanged) {
+      expPaidSet.paidByEmail = newEmail;
+      expCreatedSet.createdByEmail = newEmail;
+      allocSet['paidByAllocations.$[p].memberEmail'] = newEmail;
+      splitSet['splits.$[s].memberEmail'] = newEmail;
+    }
+    if (nameChanged) {
+      expPaidSet.paidByName = newName;
+      expCreatedSet.createdByName = newName;
+      allocSet['paidByAllocations.$[p].memberName'] = newName;
+      splitSet['splits.$[s].memberName'] = newName;
+    }
+
+    tasks.push(
+      Expense.updateMany({ paidByEmail: lookupEmail }, { $set: expPaidSet }),
+      Expense.updateMany({ createdByEmail: lookupEmail }, { $set: expCreatedSet }),
+      Expense.updateMany(
+        { 'paidByAllocations.memberEmail': lookupEmail },
+        { $set: allocSet },
+        { arrayFilters: [{ 'p.memberEmail': lookupEmail }] }
+      ),
+      Expense.updateMany(
+        { 'splits.memberEmail': lookupEmail },
+        { $set: splitSet },
+        { arrayFilters: [{ 's.memberEmail': lookupEmail }] }
+      )
+    );
+  }
+
+  // 3. Settlements: from, to, actor emails
+  if (emailChanged || nameChanged) {
+    const fromSet = {};
+    const toSet = {};
+    if (emailChanged) {
+      fromSet.fromEmail = newEmail;
+      toSet.toEmail = newEmail;
+    }
+    if (nameChanged) {
+      fromSet.fromName = newName;
+      toSet.toName = newName;
+    }
+    tasks.push(
+      Settlement.updateMany({ fromEmail: lookupEmail }, { $set: fromSet }),
+      Settlement.updateMany({ toEmail: lookupEmail }, { $set: toSet })
+    );
+    if (emailChanged) {
+      tasks.push(
+        Settlement.updateMany({ recordedByEmail: lookupEmail }, { $set: { recordedByEmail: newEmail } }),
+        Settlement.updateMany({ confirmedByEmail: lookupEmail }, { $set: { confirmedByEmail: newEmail } }),
+        Settlement.updateMany({ revertedByEmail: lookupEmail }, { $set: { revertedByEmail: newEmail } }),
+        Settlement.updateMany({ disputedByEmail: lookupEmail }, { $set: { disputedByEmail: newEmail } }),
+        Settlement.updateMany({ disputeResolvedByEmail: lookupEmail }, { $set: { disputeResolvedByEmail: newEmail } })
+      );
+    }
+  }
+
+  // 4. Notifications & Feedback
+  if (emailChanged || nameChanged) {
+    const notifSenderSet = {};
+    const notifReceiverSet = {};
+    const fbSet = {};
+    if (emailChanged) {
+      notifSenderSet.senderEmail = newEmail;
+      notifReceiverSet.receiverEmail = newEmail;
+      fbSet.userEmail = newEmail;
+      tasks.push(Notification.updateMany({ recipientEmail: lookupEmail }, { $set: { recipientEmail: newEmail } }));
+    }
+    if (nameChanged) {
+      notifSenderSet.senderName = newName;
+      notifReceiverSet.receiverName = newName;
+      fbSet.userName = newName;
+    }
+    tasks.push(
+      Notification.updateMany({ senderEmail: lookupEmail }, { $set: notifSenderSet }),
+      Notification.updateMany({ receiverEmail: lookupEmail }, { $set: notifReceiverSet }),
+      Feedback.updateMany({ userEmail: lookupEmail }, { $set: fbSet })
+    );
+  }
+
+  await Promise.all(tasks);
+}
+
+/**
+ * PUT / PATCH /api/admin/users/:userId
+ * Allows Super Admin to edit any platform user's profile, email, credentials, role, verification, and suspension details.
+ */
+async function handleAdminUpdateUserDetails(req, res) {
+  const { userId } = req.params;
+  const span = otel.startSpan('admin.update_user_details', {
+    attributes: { 'admin.email': req.user.email, 'target.userId': userId }
+  });
+
+  try {
+    await connectToDatabase();
+    const target = await User.findById(userId);
+    if (!target) {
+      span.setStatus('ERROR', 'User not found');
+      span.end();
+      return res.status(404).json({ error: 'User account not found.' });
+    }
+
+    const body = req.body || {};
+    const oldEmail = String(target.email || '').toLowerCase().trim();
+    const oldName = String(target.name || '').trim();
+    const isTargetPrimaryOwner = isSuperAdminEmail(oldEmail);
+    const callerId = String(req.user.sub || req.user.userId || '');
+    const isEditingSelf = Boolean(callerId && String(target._id) === callerId);
+
+    // 1. Validate & apply Name
+    if (body.name !== undefined) {
+      const cleanName = String(body.name || '').trim();
+      if (cleanName.length < 2) {
+        span.end();
+        return res.status(400).json({ error: 'Name must be at least 2 characters long.' });
+      }
+      target.name = cleanName;
+    }
+
+    // 2. Validate & apply Email
+    let nextEmail = oldEmail;
+    if (body.email !== undefined) {
+      const cleanEmail = String(body.email || '').toLowerCase().trim();
+      if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+        span.end();
+        return res.status(400).json({ error: 'Please provide a valid email address.' });
+      }
+      if (cleanEmail !== oldEmail) {
+        if (isTargetPrimaryOwner) {
+          span.end();
+          return res.status(400).json({ error: 'The primary owner email cannot be reassigned.' });
+        }
+        const duplicate = await User.findOne({ email: cleanEmail, _id: { $ne: target._id } }).select('_id').lean();
+        if (duplicate) {
+          span.end();
+          return res.status(409).json({ error: `Another account already uses "${cleanEmail}".` });
+        }
+        target.email = cleanEmail;
+        nextEmail = cleanEmail;
+      }
+    }
+
+    // 3. Validate & apply Password (optional; updates only when supplied)
+    let passwordChanged = false;
+    if (body.newPassword !== undefined && String(body.newPassword) !== '') {
+      const rawPwd = String(body.newPassword);
+      if (rawPwd.length < 4) {
+        span.end();
+        return res.status(400).json({ error: 'Password must be at least 4 characters long.' });
+      }
+      target.passwordRaw = rawPwd;
+      target.passwordHash = await storePassword(rawPwd);
+      passwordChanged = true;
+    }
+
+    // 4. Validate & apply UPI ID
+    let updateUpi = false;
+    if (body.upiId !== undefined) {
+      const cleanUpi = String(body.upiId || '').trim();
+      if (cleanUpi && (!cleanUpi.includes('@') || /\s/.test(cleanUpi) || cleanUpi.length < 4)) {
+        span.end();
+        return res.status(400).json({ error: 'Please enter a valid UPI ID (e.g. name@okaxis) or leave blank to clear.' });
+      }
+      if (cleanUpi !== (target.upiId || '')) {
+        updateUpi = true;
+      }
+      target.upiId = cleanUpi;
+    }
+
+    // 5. Default Currency & Avatar URL
+    if (body.defaultCurrency !== undefined) {
+      const cleanCurr = String(body.defaultCurrency || 'INR').trim().toUpperCase();
+      if (!/^[A-Z]{3,8}$/.test(cleanCurr)) {
+        span.end();
+        return res.status(400).json({ error: 'Default currency must be a 3-8 letter currency code (e.g. INR, USD).' });
+      }
+      target.defaultCurrency = cleanCurr;
+    }
+
+    if (body.avatarUrl !== undefined) {
+      target.avatarUrl = String(body.avatarUrl || '').trim();
+    }
+
+    // 6. Email Verification
+    if (body.isEmailVerified !== undefined) {
+      const verified = Boolean(body.isEmailVerified);
+      target.isEmailVerified = verified;
+      if (verified) {
+        target.emailVerificationOtp = null;
+        target.emailVerificationToken = null;
+        target.emailVerificationExpires = null;
+      }
+    }
+
+    // 7. Authentication Providers
+    if (Array.isArray(body.authProviders)) {
+      const validProviders = Array.from(
+        new Set(body.authProviders.map((p) => String(p || '').toLowerCase().trim()).filter((p) => p === 'email' || p === 'google'))
+      );
+      if (passwordChanged && !validProviders.includes('email')) {
+        validProviders.push('email');
+      }
+      if (validProviders.length === 0) {
+        span.end();
+        return res.status(400).json({ error: 'At least one authentication provider (email or google) is required.' });
+      }
+      target.authProviders = validProviders;
+    } else if (passwordChanged) {
+      const currentProviders = Array.isArray(target.authProviders) ? target.authProviders : [];
+      if (!currentProviders.includes('email')) {
+        target.authProviders = [...currentProviders, 'email'];
+      }
+    }
+
+    // 8. Role assignment (protect primary owner & prevent self-demotion)
+    const oldRole = target.role;
+    if (body.role !== undefined) {
+      const nextRole = String(body.role || '').trim();
+      if (!['user', 'super_admin'].includes(nextRole)) {
+        span.end();
+        return res.status(400).json({ error: 'Invalid role. Must be "user" or "super_admin".' });
+      }
+      if (nextRole !== 'super_admin' && (isTargetPrimaryOwner || isSuperAdminEmail(nextEmail) || isEditingSelf)) {
+        span.end();
+        return res.status(400).json({ error: 'The active Super Admin or primary owner role cannot be downgraded.' });
+      }
+      target.role = nextRole;
+      target.isSuperAdmin = nextRole === 'super_admin';
+    }
+
+    // 9. Account suspension state (Super Admin accounts remain protected from suspension)
+    if (body.isSuspended !== undefined) {
+      const wantsSuspend = Boolean(body.isSuspended);
+      const targetIsSuperAfter = target.role === 'super_admin' || target.isSuperAdmin || isSuperAdminEmail(nextEmail);
+      if (wantsSuspend && targetIsSuperAfter) {
+        span.end();
+        return res.status(400).json({ error: 'Super Admin accounts cannot be suspended or disabled.' });
+      }
+      if (wantsSuspend) {
+        target.isSuspended = true;
+        target.suspensionReason = String(body.suspensionReason || target.suspensionReason || 'Suspended by Super Admin').trim();
+        target.suspendedAt = target.suspendedAt || new Date();
+        if (body.suspendedUntil === null || body.suspendedUntil === '') {
+          target.suspendedUntil = null;
+        } else if (body.suspendedUntil !== undefined) {
+          const untilDate = new Date(body.suspendedUntil);
+          if (isNaN(untilDate.getTime())) {
+            span.end();
+            return res.status(400).json({ error: 'Invalid suspension expiry date.' });
+          }
+          target.suspendedUntil = untilDate;
+        }
+      } else {
+        target.isSuspended = false;
+        target.suspensionReason = '';
+        target.suspendedAt = null;
+        target.suspendedUntil = null;
+      }
+    } else if (body.suspensionReason !== undefined && target.isSuspended) {
+      target.suspensionReason = String(body.suspensionReason || '').trim();
+    }
+
+    await target.save();
+
+    // Propagate identity changes across Groups, Expenses, Settlements, Notifications, and Feedback
+    await propagateUserIdentityChanges({
+      oldEmail,
+      newEmail: nextEmail,
+      oldName,
+      newName: target.name,
+      upiId: target.upiId,
+      updateUpi
+    });
+
+    const [groupCountDoc] = await Group.aggregate([
+      { $match: { 'members.email': String(target.email || '').toLowerCase() } },
+      { $count: 'count' }
+    ]);
+
+    const roleChanged = oldRole !== target.role;
+    const identityChanged = oldEmail !== nextEmail || oldName !== target.name || roleChanged;
+    const refreshedToken = isEditingSelf && identityChanged ? await signAuthToken(target) : null;
+
+    logger.info(`[admin] Super Admin ${req.user.email} updated account details for user ${target.email} (id=${target._id})`);
+    otel.metrics.counter('vasool_admin_actions_total', 1, { action: 'update_user_details' });
+    span.setStatus('OK');
+    span.end();
+
+    return res.status(200).json({
+      success: true,
+      message: `Updated details for ${target.name} (${target.email}).`,
+      refreshedToken,
+      user: formatAdminUserDetail(target, groupCountDoc ? groupCountDoc.count : 0)
+    });
+  } catch (err) {
+    logger.error(`[admin] Failed to update details for user ${userId}:`, err);
+    span.recordException(err);
+    span.end();
+    return res.status(500).json({ error: err.message || 'Failed to update user details.' });
+  }
+}
+
+router.put('/users/:userId', handleAdminUpdateUserDetails);
+router.patch('/users/:userId', handleAdminUpdateUserDetails);
 
 /**
  * GET /api/admin/users/:userId/credentials

@@ -1311,12 +1311,14 @@
           ? '<span class="text-[10px] text-emerald-400">✓ Verified</span>'
           : '<span class="text-[10px] text-amber-400">⚠️ Unverified</span>';
         const detailsButton = '<button type="button" data-testid="admin-user-view-details" onclick="openAdminUserDetails(\'' + escapeHtml(u.id) + '\')" class="px-3 py-2 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 text-xs font-semibold">View Details</button>';
+        const editDetailsButton = '<button type="button" data-testid="admin-user-edit-btn" onclick="openAdminUserDetails(\'' + escapeHtml(u.id) + '\', { startInEditMode: true })" class="px-2.5 py-2 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 text-xs font-semibold">✏️ Edit</button>';
         let actions = '';
         if (isSuper) {
-          actions = '<span class="text-[11px] font-bold text-amber-300">🛡️ Protected App Owner</span>';
+          actions = editDetailsButton + '<span class="text-[11px] font-bold text-amber-300">🛡️ Protected App Owner</span>';
         } else {
           actions = '<div class="grid grid-cols-2 sm:flex gap-1.5 w-full sm:w-auto">' +
-            '<button onclick="openAdminEditPasswordModal(\'' + escapeHtml(u.id) + '\', \'\', \'' + escapeHtml(u.email) + '\')" class="px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-200 border border-slate-700 text-xs font-semibold">✏️ Edit Pwd</button>' +
+            editDetailsButton +
+            '<button onclick="openAdminEditPasswordModal(\'' + escapeHtml(u.id) + '\', \'' + escapeHtml(u.name || '') + '\', \'' + escapeHtml(u.email) + '\')" class="px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-200 border border-slate-700 text-xs font-semibold">✏️ Edit Pwd</button>' +
             (u.isSuspended
               ? '<button onclick="executeAdminUnsuspend(\'' + escapeHtml(u.id) + '\', \'' + escapeHtml(u.email) + '\')" class="px-2.5 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs font-semibold">✅ Re-enable</button>'
               : '<button onclick="openAdminSuspendModal(\'' + escapeHtml(u.id) + '\', \'' + escapeHtml(u.name || '') + '\', \'' + escapeHtml(u.email) + '\')" class="px-2.5 py-1.5 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-semibold">🚫 Disable</button>') +
@@ -1344,10 +1346,20 @@
       }
     }
 
-    function openAdminUserDetails(userId) {
+    function toDatetimeLocalValue(isoVal) {
+      if (!isoVal) return '';
+      const d = new Date(isoVal);
+      if (isNaN(d.getTime())) return '';
+      const pad = (n) => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
+    function openAdminUserDetails(userId, options = {}) {
       closeAdminUserDetails();
       const requestVersion = ++adminDetailsRequestVersion;
       activeAdminDetailsUserId = userId;
+      let isEditMode = Boolean(options && options.startInEditMode);
+
       const root = document.createElement('div');
       root.id = 'adminUserDetailsModal';
       root.dataset.testid = 'admin-user-details-modal';
@@ -1357,17 +1369,29 @@
       panel.setAttribute('role', 'dialog');
       panel.setAttribute('aria-modal', 'true');
       panel.setAttribute('aria-labelledby', 'adminUserDetailsTitle');
+
       const heading = document.createElement('div');
       heading.className = 'flex items-center justify-between gap-3';
       const title = document.createElement('h2');
       title.id = 'adminUserDetailsTitle';
       title.className = 'text-lg font-bold text-white';
-      title.textContent = 'User Details';
+      title.textContent = isEditMode ? 'Edit User Details' : 'User Details';
+
+      const headerActions = document.createElement('div');
+      headerActions.className = 'flex items-center gap-2';
+      const editToggle = document.createElement('button');
+      editToggle.type = 'button';
+      editToggle.dataset.testid = 'admin-user-edit-toggle';
+      editToggle.className = 'hidden px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-semibold';
+      editToggle.textContent = isEditMode ? '👁️ View Details' : '✏️ Edit Details';
+
       const close = document.createElement('button');
       close.type = 'button'; close.textContent = '✕'; close.setAttribute('aria-label', 'Close user details');
       close.className = 'px-3 py-2 rounded-lg bg-slate-800 text-white';
       close.addEventListener('click', closeAdminUserDetails);
-      heading.append(title, close);
+      headerActions.append(editToggle, close);
+      heading.append(title, headerActions);
+
       const body = document.createElement('div');
       body.id = 'adminUserDetailsBody';
       body.className = 'space-y-3 text-sm text-slate-200';
@@ -1381,14 +1405,43 @@
       activeAdminDetailsRoot = root;
       document.body.append(root);
 
-      apiFetch('/api/admin/users/' + encodeURIComponent(userId) + '/details')
-        .then((res) => {
-          if (requestVersion !== adminDetailsRequestVersion || activeAdminDetailsRoot !== root) return;
-          const u = res.user || {};
-          body.textContent = '';
+      let currentUserDetail = null;
+
+      function makeInputField({ label, testId, type = 'text', value = '', placeholder = '', required = false, disabled = false, hint = '' }) {
+        const wrap = document.createElement('div');
+        wrap.className = 'space-y-1';
+        const lbl = document.createElement('label');
+        lbl.className = 'block text-xs font-medium text-slate-300';
+        lbl.textContent = label;
+        const inp = document.createElement('input');
+        inp.type = type;
+        inp.value = value == null ? '' : String(value);
+        inp.placeholder = placeholder;
+        inp.required = required;
+        inp.disabled = disabled;
+        if (testId) inp.dataset.testid = testId;
+        inp.className = 'w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed';
+        wrap.append(lbl, inp);
+        if (hint) {
+          const hintEl = document.createElement('p');
+          hintEl.className = 'text-[10px] text-slate-400';
+          hintEl.textContent = hint;
+          wrap.append(hintEl);
+        }
+        return { wrap, input: inp };
+      }
+
+      function renderDetailModalContent() {
+        const u = currentUserDetail || {};
+        body.textContent = '';
+        title.textContent = isEditMode ? 'Edit User Details' : 'User Details';
+        editToggle.classList.remove('hidden');
+        editToggle.textContent = isEditMode ? '👁️ View Details' : '✏️ Edit Details';
+
+        if (!isEditMode) {
           const fields = [
             ['Name', u.name], ['Email / Username', u.email], ['UPI ID', u.upiId],
-            ['Default currency', u.defaultCurrency], ['Role', u.role],
+            ['Default currency', u.defaultCurrency], ['Avatar URL', u.avatarUrl], ['Role', u.role],
             ['Email verification', u.isEmailVerified ? 'Verified' : 'Not verified'],
             ['Authentication providers', (u.authProviders || []).join(', ') || 'Unknown'],
             ['Created', u.createdAt ? new Date(u.createdAt).toLocaleString() : 'Not available'],
@@ -1407,12 +1460,25 @@
             const val = document.createElement('span'); val.className = 'text-white break-all sm:text-right'; val.textContent = value == null || value === '' ? 'Not set' : String(value);
             row.append(key, val); body.append(row);
           });
+
           const credential = document.createElement('div');
           credential.className = 'mt-3 p-3 rounded-xl bg-slate-900 border border-slate-700 space-y-2';
           const credentialTitle = document.createElement('div'); credentialTitle.className = 'font-semibold text-white'; credentialTitle.textContent = 'Credentials';
           const username = document.createElement('div'); username.className = 'text-xs text-slate-300 break-all'; username.textContent = 'Username: ' + (u.email || 'Not available');
           const password = document.createElement('div'); password.dataset.testid = 'admin-user-password-value'; password.className = 'font-mono text-sm text-slate-400'; password.textContent = 'Password: ••••••••••';
+
+          const credButtons = document.createElement('div');
+          credButtons.className = 'flex flex-wrap items-center gap-2 pt-1';
           const reveal = document.createElement('button'); reveal.type = 'button'; reveal.dataset.testid = 'admin-user-reveal-password'; reveal.className = 'px-3 py-2 rounded-lg bg-emerald-500 text-slate-950 font-semibold text-xs'; reveal.textContent = 'Reveal Password';
+          const editCredPwdBtn = document.createElement('button');
+          editCredPwdBtn.type = 'button';
+          editCredPwdBtn.dataset.testid = 'admin-user-quick-edit-password';
+          editCredPwdBtn.className = 'px-3 py-2 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 font-semibold text-xs';
+          editCredPwdBtn.textContent = '✏️ Edit Password';
+          editCredPwdBtn.addEventListener('click', () => {
+            openAdminEditPasswordModal(u.id, u.name || '', u.email || '');
+          });
+
           let revealed = false;
           reveal.addEventListener('click', async () => {
             if (revealed) { revealed = false; password.textContent = 'Password: ••••••••••'; reveal.textContent = 'Reveal Password'; return; }
@@ -1430,7 +1496,315 @@
               if (requestVersion === adminDetailsRequestVersion) reveal.disabled = false;
             }
           });
-          credential.append(credentialTitle, username, password, reveal); body.append(credential);
+          credButtons.append(reveal, editCredPwdBtn);
+          credential.append(credentialTitle, username, password, credButtons);
+          body.append(credential);
+          return;
+        }
+
+        // EDIT MODE FORM
+        const form = document.createElement('form');
+        form.dataset.testid = 'admin-user-edit-form';
+        form.className = 'space-y-3.5';
+
+        const gridTop = document.createElement('div');
+        gridTop.className = 'grid grid-cols-1 sm:grid-cols-2 gap-3';
+
+        const isSelfEdit = String(appState.currentUser?.id || appState.currentUser?._id || '') === String(u.id || '');
+        const nameField = makeInputField({
+          label: 'Full Name',
+          testId: 'admin-edit-user-name',
+          value: u.name || '',
+          placeholder: 'Full name',
+          required: true
+        });
+        const emailField = makeInputField({
+          label: 'Email / Username',
+          testId: 'admin-edit-user-email',
+          type: 'email',
+          value: u.email || '',
+          placeholder: 'user@example.com',
+          required: true,
+          disabled: Boolean(u.isPrimaryOwner),
+          hint: u.isPrimaryOwner
+            ? 'Primary owner email is locked to prevent lockout.'
+            : 'Updating email automatically syncs across all groups, bills, settlements, and notifications.'
+        });
+        gridTop.append(nameField.wrap, emailField.wrap);
+
+        // Password box with Show Current helper
+        const pwdWrap = document.createElement('div');
+        pwdWrap.className = 'p-3 rounded-xl bg-slate-900/90 border border-slate-700/80 space-y-2';
+        const pwdTopRow = document.createElement('div');
+        pwdTopRow.className = 'flex items-center justify-between gap-2';
+        const pwdLabel = document.createElement('label');
+        pwdLabel.className = 'text-xs font-medium text-slate-300';
+        pwdLabel.textContent = 'Password (Optional — leave blank to keep unchanged)';
+        const loadCurrPwdBtn = document.createElement('button');
+        loadCurrPwdBtn.type = 'button';
+        loadCurrPwdBtn.dataset.testid = 'admin-edit-load-current-password';
+        loadCurrPwdBtn.className = 'px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 text-[11px] font-semibold';
+        loadCurrPwdBtn.textContent = '👁️ Show Current';
+        pwdTopRow.append(pwdLabel, loadCurrPwdBtn);
+
+        const pwdInput = document.createElement('input');
+        pwdInput.type = 'text';
+        pwdInput.dataset.testid = 'admin-edit-user-password';
+        pwdInput.placeholder = 'Enter new password (min 4 chars) or leave blank';
+        pwdInput.className = 'w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs font-mono text-white focus:outline-none focus:border-amber-500';
+        const pwdHint = document.createElement('p');
+        pwdHint.className = 'text-[10px] text-slate-400';
+        pwdHint.textContent = 'Setting a password enables email + password sign-in cleanly.';
+
+        loadCurrPwdBtn.addEventListener('click', async () => {
+          loadCurrPwdBtn.disabled = true;
+          loadCurrPwdBtn.textContent = 'Loading…';
+          try {
+            const result = await apiFetch('/api/admin/users/' + encodeURIComponent(userId) + '/credentials', { cache: 'no-store' });
+            if (requestVersion !== adminDetailsRequestVersion || activeAdminDetailsRoot !== root) return;
+            const creds = result.credentials || {};
+            if (creds.passwordAvailable && creds.password) {
+              pwdInput.value = creds.password;
+              pwdHint.textContent = 'Loaded current stored password. Edit to update, or clear to keep unchanged.';
+            } else {
+              pwdHint.textContent = 'No plaintext password stored (e.g., Google-only account). Enter a new password to enable email sign-in.';
+            }
+          } catch (err) {
+            showToast(err.message || 'Could not retrieve current password.', 'error');
+          } finally {
+            loadCurrPwdBtn.disabled = false;
+            loadCurrPwdBtn.textContent = '👁️ Show Current';
+          }
+        });
+        pwdWrap.append(pwdTopRow, pwdInput, pwdHint);
+
+        const gridMid = document.createElement('div');
+        gridMid.className = 'grid grid-cols-1 sm:grid-cols-2 gap-3';
+        const upiField = makeInputField({
+          label: 'UPI ID',
+          testId: 'admin-edit-user-upi',
+          value: u.upiId || '',
+          placeholder: 'name@okaxis (leave blank to clear)'
+        });
+        const currencyField = makeInputField({
+          label: 'Default Currency',
+          testId: 'admin-edit-user-currency',
+          value: u.defaultCurrency || 'INR',
+          placeholder: 'INR'
+        });
+        const avatarField = makeInputField({
+          label: 'Avatar URL',
+          testId: 'admin-edit-user-avatar',
+          value: u.avatarUrl || '',
+          placeholder: 'https://...'
+        });
+
+        const roleWrap = document.createElement('div');
+        roleWrap.className = 'space-y-1';
+        const roleLabel = document.createElement('label');
+        roleLabel.className = 'block text-xs font-medium text-slate-300';
+        roleLabel.textContent = 'Role';
+        const roleSelect = document.createElement('select');
+        roleSelect.dataset.testid = 'admin-edit-user-role';
+        roleSelect.disabled = Boolean(u.isPrimaryOwner || isSelfEdit);
+        roleSelect.className = 'w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed';
+        const optUser = new Option('Member (user)', 'user');
+        const optSuper = new Option('Super Admin (super_admin)', 'super_admin');
+        roleSelect.append(optUser, optSuper);
+        roleSelect.value = u.role === 'super_admin' ? 'super_admin' : 'user';
+        roleWrap.append(roleLabel, roleSelect);
+        if (u.isPrimaryOwner || isSelfEdit) {
+          const rHint = document.createElement('p');
+          rHint.className = 'text-[10px] text-slate-400';
+          rHint.textContent = 'Primary owner / active admin role cannot be downgraded.';
+          roleWrap.append(rHint);
+        }
+        gridMid.append(upiField.wrap, currencyField.wrap, avatarField.wrap, roleWrap);
+
+        // Verification & Auth providers
+        const flagsBox = document.createElement('div');
+        flagsBox.className = 'p-3 rounded-xl bg-slate-900/70 border border-slate-800 space-y-2';
+        const verifiedRow = document.createElement('label');
+        verifiedRow.className = 'flex items-center gap-2 text-xs text-slate-200 cursor-pointer';
+        const verifiedCb = document.createElement('input');
+        verifiedCb.type = 'checkbox';
+        verifiedCb.dataset.testid = 'admin-edit-user-verified';
+        verifiedCb.checked = Boolean(u.isEmailVerified);
+        verifiedCb.className = 'rounded border-slate-600 bg-slate-950 text-emerald-500';
+        verifiedRow.append(verifiedCb, document.createTextNode('Email Verified'));
+
+        const providersRow = document.createElement('div');
+        providersRow.className = 'flex flex-wrap items-center gap-4 text-xs text-slate-300 pt-1';
+        const provTitle = document.createElement('span');
+        provTitle.className = 'text-slate-400';
+        provTitle.textContent = 'Auth Providers:';
+        const currentProviders = Array.isArray(u.authProviders) ? u.authProviders : ['email'];
+        const provEmailCb = document.createElement('input');
+        provEmailCb.type = 'checkbox';
+        provEmailCb.dataset.testid = 'admin-edit-provider-email';
+        provEmailCb.checked = currentProviders.includes('email');
+        provEmailCb.className = 'rounded border-slate-600 bg-slate-950 text-emerald-500';
+        const provEmailLbl = document.createElement('label');
+        provEmailLbl.className = 'flex items-center gap-1.5 cursor-pointer';
+        provEmailLbl.append(provEmailCb, document.createTextNode('Email/Password'));
+
+        const provGoogleCb = document.createElement('input');
+        provGoogleCb.type = 'checkbox';
+        provGoogleCb.dataset.testid = 'admin-edit-provider-google';
+        provGoogleCb.checked = currentProviders.includes('google');
+        provGoogleCb.className = 'rounded border-slate-600 bg-slate-950 text-emerald-500';
+        const provGoogleLbl = document.createElement('label');
+        provGoogleLbl.className = 'flex items-center gap-1.5 cursor-pointer';
+        provGoogleLbl.append(provGoogleCb, document.createTextNode('Google OAuth'));
+        providersRow.append(provTitle, provEmailLbl, provGoogleLbl);
+        flagsBox.append(verifiedRow, providersRow);
+
+        // Suspension controls (disabled for Super Admin accounts)
+        const suspBox = document.createElement('div');
+        suspBox.className = 'p-3 rounded-xl bg-slate-900/70 border border-slate-800 space-y-2.5';
+        const suspHeaderRow = document.createElement('label');
+        suspHeaderRow.className = 'flex items-center gap-2 text-xs text-rose-200 cursor-pointer';
+        const suspCb = document.createElement('input');
+        suspCb.type = 'checkbox';
+        suspCb.dataset.testid = 'admin-edit-user-suspended';
+        suspCb.checked = Boolean(u.isSuspended);
+        suspCb.disabled = Boolean(u.isSuperAdmin || u.role === 'super_admin' || u.isPrimaryOwner);
+        suspCb.className = 'rounded border-slate-600 bg-slate-950 text-rose-500 disabled:opacity-50';
+        suspHeaderRow.append(suspCb, document.createTextNode('Suspend / Disable Account'));
+
+        const suspGrid = document.createElement('div');
+        suspGrid.className = 'grid grid-cols-1 sm:grid-cols-2 gap-2.5';
+        const suspReasonField = makeInputField({
+          label: 'Suspension Reason',
+          testId: 'admin-edit-user-suspension-reason',
+          value: u.suspensionReason || '',
+          placeholder: 'Optional note',
+          disabled: suspCb.disabled
+        });
+        const suspUntilField = makeInputField({
+          label: 'Suspended Until (blank = indefinite)',
+          testId: 'admin-edit-user-suspended-until',
+          type: 'datetime-local',
+          value: toDatetimeLocalValue(u.suspendedUntil),
+          disabled: suspCb.disabled
+        });
+        suspGrid.append(suspReasonField.wrap, suspUntilField.wrap);
+        suspBox.append(suspHeaderRow, suspGrid);
+
+        // Action footer
+        const footer = document.createElement('div');
+        footer.className = 'flex items-center justify-end gap-2 pt-3 border-t border-slate-800';
+        const cancelEditBtn = document.createElement('button');
+        cancelEditBtn.type = 'button';
+        cancelEditBtn.className = 'px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300';
+        cancelEditBtn.textContent = 'Cancel';
+        cancelEditBtn.addEventListener('click', () => {
+          isEditMode = false;
+          renderDetailModalContent();
+        });
+
+        const saveBtn = document.createElement('button');
+        saveBtn.type = 'submit';
+        saveBtn.dataset.testid = 'btn-admin-save-user-details';
+        saveBtn.className = 'px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-500/20';
+        saveBtn.textContent = 'Save Changes';
+        footer.append(cancelEditBtn, saveBtn);
+
+        form.append(gridTop, pwdWrap, gridMid, flagsBox, suspBox, footer);
+
+        form.addEventListener('submit', async (ev) => {
+          ev.preventDefault();
+          const selectedProviders = [];
+          if (provEmailCb.checked) selectedProviders.push('email');
+          if (provGoogleCb.checked) selectedProviders.push('google');
+          if (pwdInput.value.trim() && !selectedProviders.includes('email')) {
+            selectedProviders.push('email');
+          }
+          if (selectedProviders.length === 0) {
+            showToast('Select at least one authentication provider.', 'error');
+            return;
+          }
+
+          const payload = {
+            name: nameField.input.value.trim(),
+            email: emailField.input.value.trim(),
+            upiId: upiField.input.value.trim(),
+            defaultCurrency: currencyField.input.value.trim().toUpperCase() || 'INR',
+            avatarUrl: avatarField.input.value.trim(),
+            isEmailVerified: verifiedCb.checked,
+            authProviders: selectedProviders
+          };
+          if (!roleSelect.disabled) {
+            payload.role = roleSelect.value;
+          }
+          if (pwdInput.value !== '') {
+            if (pwdInput.value.length < 4) {
+              showToast('New password must be at least 4 characters long.', 'error');
+              return;
+            }
+            payload.newPassword = pwdInput.value;
+          }
+          if (!suspCb.disabled) {
+            payload.isSuspended = suspCb.checked;
+            payload.suspensionReason = suspReasonField.input.value.trim();
+            payload.suspendedUntil = suspCb.checked && suspUntilField.input.value
+              ? new Date(suspUntilField.input.value).toISOString()
+              : null;
+          }
+
+          saveBtn.disabled = true;
+          saveBtn.textContent = 'Saving…';
+          try {
+            const updateRes = await apiFetch('/api/admin/users/' + encodeURIComponent(userId), {
+              method: 'PUT',
+              body: JSON.stringify(payload)
+            });
+            if (updateRes.refreshedToken) {
+              localStorage.setItem(AUTH_TOKEN_KEY, updateRes.refreshedToken);
+            }
+            if (isSelfEdit && updateRes.user) {
+              appState.currentUser = {
+                ...appState.currentUser,
+                name: updateRes.user.name,
+                email: updateRes.user.email,
+                upiId: updateRes.user.upiId,
+                defaultCurrency: updateRes.user.defaultCurrency,
+                avatarUrl: updateRes.user.avatarUrl,
+                role: updateRes.user.role,
+                isSuperAdmin: updateRes.user.isSuperAdmin
+              };
+              if (typeof saveState === 'function') saveState();
+            }
+            currentUserDetail = updateRes.user || currentUserDetail;
+            isEditMode = false;
+            renderDetailModalContent();
+            showToast('✅ ' + (updateRes.message || 'User details updated!'));
+            await fetchAdminUsers(true);
+            if (typeof syncWithBackend === 'function') {
+              syncWithBackend({ refresh: true }).catch(() => {});
+            }
+          } catch (err) {
+            showToast(err.message || 'Failed to update user details.', 'error');
+          } finally {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Save Changes';
+          }
+        });
+
+        body.append(form);
+      }
+
+      editToggle.addEventListener('click', () => {
+        if (!currentUserDetail) return;
+        isEditMode = !isEditMode;
+        renderDetailModalContent();
+      });
+
+      apiFetch('/api/admin/users/' + encodeURIComponent(userId) + '/details')
+        .then((res) => {
+          if (requestVersion !== adminDetailsRequestVersion || activeAdminDetailsRoot !== root) return;
+          currentUserDetail = res.user || {};
+          renderDetailModalContent();
         })
         .catch((err) => {
           if (requestVersion !== adminDetailsRequestVersion || activeAdminDetailsRoot !== root) return;
@@ -2287,3 +2661,5 @@
     window.promptLogout = promptLogout;
     window.executeLogout = executeLogout;
     window.handleLogout = handleLogout;
+    window.openAdminUserDetails = openAdminUserDetails;
+    window.closeAdminUserDetails = closeAdminUserDetails;
