@@ -159,10 +159,27 @@ const STORAGE_KEY = 'vasool_clean_state_v1';
       return data;
     }
 
+    let serverClockOffsetMs = 0;
+
+    function updateServerClockOffset(serverNowIso) {
+      if (!serverNowIso) return;
+      const parsed = new Date(serverNowIso).getTime();
+      if (Number.isFinite(parsed)) {
+        serverClockOffsetMs = parsed - Date.now();
+      }
+    }
+
+    function getServerNowMs() {
+      return Date.now() + serverClockOffsetMs;
+    }
+
     async function syncWithBackend({ refresh = true, responses = null, bootstrapData = null } = {}) {
       const token = localStorage.getItem(AUTH_TOKEN_KEY);
       if (!token) return;
       try {
+        if (bootstrapData && bootstrapData.serverNow) {
+          updateServerClockOffset(bootstrapData.serverNow);
+        }
         const [groupsRes, expRes, stlRes] = bootstrapData
           ? [
               { groups: bootstrapData.groups || [] },
@@ -174,6 +191,10 @@ const STORAGE_KEY = 'vasool_clean_state_v1';
               apiFetch('/api/expenses'),
               apiFetch('/api/settlements')
             ]));
+
+        if (stlRes && stlRes.serverNow) {
+          updateServerClockOffset(stlRes.serverNow);
+        }
 
         if (groupsRes && Array.isArray(groupsRes.groups)) {
           appState.groups = groupsRes.groups.map((g) => ({
@@ -249,15 +270,51 @@ const STORAGE_KEY = 'vasool_clean_state_v1';
             toEmail: s.toEmail,
             toName: s.toName,
             amount: s.amount,
+            originalClaimedAmount: s.originalClaimedAmount || null,
             currency: s.currency || 'INR',
             method: s.method,
             referenceNote: s.referenceNote,
+            utrNumber: s.utrNumber || '',
+            adminNote: s.adminNote || '',
+            confirmedRole: s.confirmedRole || '',
+            settlementMode: s.settlementMode || null,
+            recordedByEmail: s.recordedByEmail || null,
             status: s.status || 'pending_admin_approval',
+            workflowVersion: s.workflowVersion || 1,
+            verificationStage: s.verificationStage || 'legacy',
+            confirmationSource: s.confirmationSource || '',
+            acknowledgedAt: s.acknowledgedAt || s.createdAt || null,
+            notifyAfterAt: s.notifyAfterAt || null,
+            receiverNotifiedAt: s.receiverNotifiedAt || null,
+            receiverUpiIdSnapshot: s.receiverUpiIdSnapshot || '',
+            gracePeriodStartedAt: s.gracePeriodStartedAt || null,
+            gracePeriodEndsAt: s.gracePeriodEndsAt || null,
+            autoConfirmedAt: s.autoConfirmedAt || null,
+            disputedAt: s.disputedAt || null,
+            disputedByEmail: s.disputedByEmail || null,
+            disputeReason: s.disputeReason || '',
+            disputeResolvedAt: s.disputeResolvedAt || null,
+            disputeResolvedByEmail: s.disputeResolvedByEmail || null,
+            disputeResolutionNote: s.disputeResolutionNote || '',
             confirmedAt: s.confirmedAt,
             confirmedByEmail: s.confirmedByEmail,
             rejectedReason: s.rejectedReason,
-            settledAt: s.settledAt ? s.settledAt.slice(0, 10) : new Date().toISOString().slice(0, 10)
+            revertedAt: s.revertedAt || null,
+            revertedByEmail: s.revertedByEmail || null,
+            settledAt: s.settledAt ? String(s.settledAt).slice(0, 10) : new Date().toISOString().slice(0, 10)
           }));
+        }
+
+        if (bootstrapData && Array.isArray(bootstrapData.notifications)) {
+          appState.notifications = bootstrapData.notifications.map((n) => ({
+            ...n,
+            id: n._id ? n._id.toString() : n.id,
+            groupId: n.groupId ? n.groupId.toString() : null,
+            settlementId: n.settlementId ? n.settlementId.toString() : null
+          }));
+          if (typeof bootstrapData.unreadNotificationCount === 'number') {
+            appState.unreadNotificationCount = bootstrapData.unreadNotificationCount;
+          }
         }
 
         const badge = document.getElementById('dbStatusBadge');
@@ -389,7 +446,9 @@ exec node server.js`
         users: [],
         groups: [],
         expenses: [],
-        settlements: []
+        settlements: [],
+        notifications: [],
+        unreadNotificationCount: 0
       };
     }
 

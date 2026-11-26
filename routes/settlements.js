@@ -6,10 +6,18 @@ const Expense = require('../models/Expense');
 const Settlement = require('../models/Settlement');
 const User = require('../models/User');
 const Feedback = require('../models/Feedback');
-const { requireAuth } = require('./auth');
-const { sendGroupInviteEmail, sendPaymentConfirmationRequestEmail } = require('../lib/mailer');
+const { requireAuth, verifyAuthToken } = require('./auth');
 const logger = require('../lib/logger');
 const otel = require('../lib/otel');
+const {
+  NOTIFICATION_DELAY_MS,
+  GRACE_PERIOD_MS,
+  createNotificationIdempotent,
+  resolveReceiverUpiSnapshot,
+  processDueSettlementJobs,
+  maybeRunScheduledSettlementCatchup,
+  notifyDisputeParties
+} = require('../lib/settlement-scheduler');
 const {
   SUPER_ADMIN_EMAIL,
   isSuperAdminUser,
@@ -28,6 +36,7 @@ const router = express.Router();
 router.get('/balances', requireAuth, async (req, res) => {
   try {
     await connectToDatabase();
+    await maybeRunScheduledSettlementCatchup();
     const groupFilter = req.query.groupId
       ? { _id: req.query.groupId }
       : { 'members.email': req.user.email };
@@ -153,23 +162,27 @@ router.post('/settlements', requireAuth, async (req, res) => {
     const cleanToEmail = String(toEmail).toLowerCase().trim();
     const roundedAmount = Math.round(Number(amount) * 100) / 100;
 
+    const now = new Date();
     const isTargetCreditor = cleanToEmail === requesterEmail;
     const isHubMode = Boolean(group.adminHubSettlement);
 
     // Direct Confirmation Rule:
     // In Direct P2P mode (!isHubMode): ONLY the receiving creditor can auto-confirm upon recording.
-    // If the payer (even group admin) records it, it remains PENDING confirmation by the recipient.
+    // If the payer (even group admin) records it, it enters Workflow v2 (10-minute notification delay -> 48h grace period).
     // In Admin-Hub mode (isHubMode): All funds route through admin, so admin receiving funds can auto-confirm.
     const isDirectlyConfirmed = isTargetCreditor || (isHubMode && isAdmin && cleanToEmail === requesterEmail);
     const status = isDirectlyConfirmed
       ? 'confirmed'
       : (isHubMode ? 'pending_admin_approval' : 'pending_confirmation');
-    const confirmedAt = isDirectlyConfirmed ? new Date() : null;
+    const confirmedAt = isDirectlyConfirmed ? now : null;
     const confirmedByEmail = isDirectlyConfirmed ? requesterEmail : null;
     const confirmedRole = isHubMode && isAdmin && cleanToEmail === requesterEmail
       ? 'admin'
       : (isTargetCreditor ? 'creditor' : (isAdmin ? 'admin' : ''));
     const confirmationToken = isDirectlyConfirmed ? null : crypto.randomBytes(32).toString('hex');
+    const disputeToken = isDirectlyConfirmed ? null : crypto.randomBytes(32).toString('hex');
+    const notifyAfterAt = isDirectlyConfirmed ? null : new Date(now.getTime() + NOTIFICATION_DELAY_MS);
+    const provisionalGraceEnd = notifyAfterAt ? new Date(notifyAfterAt.getTime() + GRACE_PERIOD_MS) : null;
 
     // Rapid duplicate submission prevention (10-second window):
     // Guards against rapid multi-clicks, touch unresponsiveness, or network re-transmissions.
@@ -207,6 +220,8 @@ router.post('/settlements', requireAuth, async (req, res) => {
       });
     }
 
+    const receiverUpiSnapshot = isDirectlyConfirmed ? '' : await resolveReceiverUpiSnapshot(cleanToEmail, group);
+
     const settlement = await Settlement.create({
       groupId,
       fromEmail: cleanFromEmail,
@@ -222,31 +237,26 @@ router.post('/settlements', requireAuth, async (req, res) => {
       settlementMode: isHubMode ? 'admin_hub' : 'direct_p2p',
       recordedByEmail: requesterEmail,
       status,
+      workflowVersion: 2,
+      verificationStage: isDirectlyConfirmed ? 'confirmed_by_receiver' : 'notification_pending',
+      confirmationSource: isDirectlyConfirmed ? 'direct_recorder' : '',
+      acknowledgedAt: now,
+      notifyAfterAt,
+      receiverUpiIdSnapshot: receiverUpiSnapshot,
+      gracePeriodEndsAt: provisionalGraceEnd,
+      emailDeliveryStatus: isDirectlyConfirmed ? 'not_required' : 'pending',
       confirmedAt,
       confirmedByEmail,
-      confirmationToken
+      confirmationToken,
+      disputeToken
     });
 
-    // Send email notification to recipient with 1-click confirmation hyperlink
-    if (!isDirectlyConfirmed && confirmationToken) {
-      try {
-        sendPaymentConfirmationRequestEmail({
-          settlement,
-          group,
-          confirmToken: confirmationToken
-        }).catch((emailErr) => {
-          logger.error('[settlements] Async payment confirmation email error:', emailErr);
-        });
-      } catch (emailErr) {
-        logger.error('[settlements] Failed to dispatch payment confirmation email:', emailErr);
-      }
-    }
+    // Note: Do NOT notify receiver immediately when sender acknowledges payment!
+    // Notification (Email + In-App) is scheduled reliably after the 10-minute delay via settlement-scheduler.
 
     const message = isDirectlyConfirmed
       ? `Settlement recorded and confirmed by ${isTargetCreditor ? 'receiving creditor' : 'group admin'}.`
-      : (isHubMode
-          ? 'Payment marked as settled by payer. Awaiting group admin confirmation.'
-          : `Payment marked as settled. Confirmation email sent to ${settlement.toName || settlement.toEmail} to acknowledge receipt.`);
+      : `Payment marked as sent. Receiver will be notified after 10 minutes with a 48-hour verification window; you can revert anytime during this period.`;
 
     otel.metrics.counter('vasool_settlements_created_total', 1, {
       method: settlement.method,
@@ -256,7 +266,7 @@ router.post('/settlements', requireAuth, async (req, res) => {
       method: settlement.method
     });
 
-    return res.status(201).json({ settlement, message });
+    return res.status(201).json({ settlement, message, serverNow: now.toISOString() });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
@@ -314,55 +324,390 @@ router.post('/settlements/:id/confirm', requireAuth, async (req, res) => {
       });
     }
 
+    if (settlement.status === 'disputed') {
+      return res.status(409).json({
+        error: 'This payment was reported as not received and is currently disputed. Please resolve the dispute instead.',
+        settlement
+      });
+    }
+
+    if (settlement.status === 'rejected' || settlement.status === 'reverted') {
+      return res.status(409).json({
+        error: `Cannot confirm a settlement that has already been ${settlement.status}.`,
+        settlement
+      });
+    }
+
+    const now = new Date();
     const { receivedAmount, adminNote } = req.body || {};
     const claimedAmt = Number(settlement.amount);
     let isPartial = false;
+    let finalAmount = claimedAmt;
 
     if (receivedAmount !== undefined && receivedAmount !== null && Number(receivedAmount) > 0) {
       const parsedReceived = Math.round(Number(receivedAmount) * 100) / 100;
       if (parsedReceived < claimedAmt) {
-        settlement.originalClaimedAmount = claimedAmt;
-        settlement.amount = parsedReceived;
+        finalAmount = parsedReceived;
         isPartial = true;
       }
     }
 
-    if (adminNote !== undefined) {
-      settlement.adminNote = String(adminNote || '').trim();
-    }
-
-    settlement.status = 'confirmed';
-    settlement.confirmedAt = new Date();
-    settlement.confirmedByEmail = requesterEmail;
-    settlement.confirmedRole = settlement.settlementMode === 'admin_hub' && isGroupAdmin
+    const resolvedRole = settlement.settlementMode === 'admin_hub' && isGroupAdmin
       ? 'admin'
       : (isTargetCreditor ? 'creditor' : 'admin');
-    settlement.confirmationToken = null; // Invalidate token on confirm
-    await settlement.save();
+
+    const updateSet = {
+      status: 'confirmed',
+      verificationStage: 'confirmed_by_receiver',
+      confirmationSource: isTargetCreditor ? 'receiver_app' : 'admin_hub',
+      confirmedAt: now,
+      confirmedByEmail: requesterEmail,
+      confirmedRole: resolvedRole,
+      confirmationToken: null,
+      disputeToken: null,
+      notificationProcessingLockUntil: null
+    };
+    if (isPartial) {
+      updateSet.originalClaimedAmount = claimedAmt;
+      updateSet.amount = finalAmount;
+    }
+    if (adminNote !== undefined) {
+      updateSet.adminNote = String(adminNote || '').trim();
+    }
+
+    const updated = await Settlement.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        status: { $in: ['pending_admin_approval', 'pending_confirmation'] }
+      },
+      { $set: updateSet },
+      { new: true }
+    );
+
+    if (!updated) {
+      const latest = await Settlement.findById(req.params.id).lean();
+      if (latest && latest.status === 'confirmed') {
+        return res.status(200).json({ settlement: latest, message: 'Settlement was already confirmed.', alreadyConfirmed: true });
+      }
+      return res.status(409).json({ error: 'Settlement state changed concurrently and could not be confirmed.', settlement: latest });
+    }
 
     appendGroupAuditLog(group, {
       action: isPartial ? 'settlement_partial_confirmed' : 'settlement_confirmed',
       actorEmail: requesterEmail,
       actorName: req.user.name || requesterEmail,
       summary: isPartial
-        ? `${req.user.name || requesterEmail} confirmed partial receipt of ₹${settlement.amount} (of ₹${claimedAmt} claimed) from ${settlement.fromName} to ${settlement.toName}`
-        : `${req.user.name || requesterEmail} confirmed ₹${settlement.amount} payment from ${settlement.fromName} to ${settlement.toName}`,
-      details: `${settlement.method}${settlement.utrNumber ? ' · UTR: ' + settlement.utrNumber : ''}${settlement.adminNote ? ' · Note: ' + settlement.adminNote : ''}`
+        ? `${req.user.name || requesterEmail} confirmed partial receipt of ₹${updated.amount} (of ₹${claimedAmt} claimed) from ${updated.fromName} to ${updated.toName}`
+        : `${req.user.name || requesterEmail} confirmed ₹${updated.amount} payment from ${updated.fromName} to ${updated.toName}`,
+      details: `${updated.method}${updated.utrNumber ? ' · UTR: ' + updated.utrNumber : ''}${updated.adminNote ? ' · Note: ' + updated.adminNote : ''}`
     });
     await group.save();
 
+    await createNotificationIdempotent({
+      eventKey: `payment_confirmed:${updated._id}:${updated.fromEmail}`,
+      recipientEmail: updated.fromEmail,
+      type: 'payment_confirmed',
+      title: `₹${Number(updated.amount).toFixed(2)} confirmed by ${req.user.name || updated.toName}`,
+      message: `${req.user.name || updated.toName} confirmed receipt of your ₹${Number(updated.amount).toFixed(2)} settlement in "${group.name}".`,
+      groupId: updated.groupId,
+      groupName: group.name,
+      settlementId: updated._id,
+      amount: updated.amount,
+      currency: updated.currency || 'INR',
+      senderEmail: updated.fromEmail,
+      senderName: updated.fromName,
+      receiverEmail: updated.toEmail,
+      receiverName: updated.toName,
+      targetTab: 'settle'
+    });
+
     otel.metrics.counter('vasool_settlements_confirmed_total', 1, {
-      confirmed_role: settlement.confirmedRole,
+      confirmed_role: updated.confirmedRole,
       partial: String(isPartial)
     });
 
     return res.status(200).json({
       message: isPartial
-        ? `Partial payment of ₹${settlement.amount} (of ₹${claimedAmt}) confirmed by ${isTargetCreditor ? 'creditor' : 'group admin'}. Remaining ₹${Math.round((claimedAmt - settlement.amount) * 100) / 100} stays open.`
-        : `Payment of ₹${settlement.amount} confirmed by ${isTargetCreditor ? 'creditor' : 'group admin'}. Transaction is now settled.`,
-      settlement,
-      isPartial
+        ? `Partial payment of ₹${updated.amount} (of ₹${claimedAmt}) confirmed by ${isTargetCreditor ? 'creditor' : 'group admin'}. Remaining ₹${Math.round((claimedAmt - updated.amount) * 100) / 100} stays open.`
+        : `Payment of ₹${updated.amount} confirmed by ${isTargetCreditor ? 'creditor' : 'group admin'}. Transaction is now settled.`,
+      settlement: updated,
+      isPartial,
+      serverNow: now.toISOString()
     });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/settlements/:id/report-not-received - Receiver reports non-receipt within the 48-hour grace period
+router.post('/settlements/:id/report-not-received', requireAuth, async (req, res) => {
+  try {
+    await connectToDatabase();
+    const now = new Date();
+    const settlement = await Settlement.findById(req.params.id);
+    if (!settlement) {
+      return res.status(404).json({ error: 'Settlement not found.' });
+    }
+
+    const group = await Group.findById(settlement.groupId);
+    if (!group) {
+      return res.status(404).json({ error: 'Group not found.' });
+    }
+
+    const requesterEmail = req.user.email.toLowerCase().trim();
+    const adminMember = group.members.find((m) => m.role === 'admin' || m.role === 'owner') ||
+      (group.adminEmail ? group.members.find((m) => m.email.toLowerCase() === group.adminEmail.toLowerCase()) : null) ||
+      group.members[0];
+
+    const isGroupAdmin = (adminMember && adminMember.email.toLowerCase().trim() === requesterEmail) ||
+      (group.adminEmail && group.adminEmail.toLowerCase().trim() === requesterEmail) ||
+      (group.createdByEmail && group.createdByEmail.toLowerCase().trim() === requesterEmail);
+    const isSuperAdmin = isSuperAdminUser(req.user);
+    const isTargetCreditor = settlement.toEmail && settlement.toEmail.toLowerCase().trim() === requesterEmail;
+    const isHub = Boolean(group.adminHubSettlement);
+
+    const canDispute = isTargetCreditor || (isHub && (isGroupAdmin || isSuperAdmin)) || isSuperAdmin;
+    if (!canDispute) {
+      return res.status(403).json({
+        error: isHub
+          ? 'Only the receiving creditor or group admin can report non-receipt.'
+          : 'In Direct P2P mode, only the receiving recipient can report non-receipt of this payment.'
+      });
+    }
+
+    if (settlement.status === 'disputed') {
+      return res.status(200).json({
+        settlement,
+        message: 'This payment has already been reported as not received.',
+        alreadyDisputed: true,
+        serverNow: now.toISOString()
+      });
+    }
+
+    if (settlement.status === 'confirmed') {
+      return res.status(409).json({
+        error: 'The verification period has ended and this payment is already confirmed.',
+        settlement,
+        serverNow: now.toISOString()
+      });
+    }
+
+    if (settlement.status === 'rejected' || settlement.status === 'reverted') {
+      return res.status(409).json({
+        error: `Cannot report a settlement that is already ${settlement.status}.`,
+        settlement
+      });
+    }
+
+    // Strict server-side 48-hour grace period check
+    if (settlement.workflowVersion === 2 && settlement.gracePeriodEndsAt && now > new Date(settlement.gracePeriodEndsAt)) {
+      await maybeRunScheduledSettlementCatchup({ force: true });
+      const refreshed = await Settlement.findById(req.params.id).lean();
+      return res.status(409).json({
+        error: 'The 48-hour verification grace period has expired. This payment has been automatically confirmed.',
+        settlement: refreshed,
+        graceExpired: true,
+        serverNow: now.toISOString()
+      });
+    }
+
+    const disputeReason = String(req.body?.reason || 'Payment not received in bank/UPI account').trim().slice(0, 500);
+
+    // Atomic conditional transition: prevents concurrent race with 48h auto-confirm or sender revert
+    const updated = await Settlement.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        status: { $in: ['pending_admin_approval', 'pending_confirmation'] },
+        $or: [{ gracePeriodEndsAt: null }, { gracePeriodEndsAt: { $gt: now } }]
+      },
+      {
+        $set: {
+          status: 'disputed',
+          verificationStage: 'disputed',
+          disputedAt: now,
+          disputedByEmail: requesterEmail,
+          disputeReason,
+          confirmationToken: null,
+          disputeToken: null,
+          notificationProcessingLockUntil: null
+        }
+      },
+      { new: true }
+    );
+
+    if (!updated) {
+      await maybeRunScheduledSettlementCatchup({ force: true });
+      const latest = await Settlement.findById(req.params.id).lean();
+      return res.status(409).json({
+        error: latest?.status === 'confirmed'
+          ? 'The 48-hour verification grace period expired before the report could be recorded.'
+          : 'Settlement state changed concurrently. Please refresh and check the latest status.',
+        settlement: latest,
+        serverNow: now.toISOString()
+      });
+    }
+
+    appendGroupAuditLog(group, {
+      action: 'settlement_disputed',
+      actorEmail: requesterEmail,
+      actorName: req.user.name || requesterEmail,
+      summary: `${req.user.name || requesterEmail} reported ₹${updated.amount} payment from ${updated.fromName} as NOT received`,
+      details: disputeReason
+    });
+    await group.save();
+
+    await notifyDisputeParties({
+      settlement: updated,
+      group,
+      reporterName: req.user.name || updated.toName || requesterEmail,
+      disputeReason
+    });
+
+    otel.metrics.counter('vasool_settlements_disputed_total', 1);
+
+    return res.status(200).json({
+      message: 'Payment reported as not received. The sender and group admin(s) have been notified via email and in-app alerts.',
+      settlement: updated,
+      serverNow: now.toISOString()
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/settlements/:id/resolve-dispute - Resolve a disputed settlement via confirm or revert
+router.post('/settlements/:id/resolve-dispute', requireAuth, async (req, res) => {
+  try {
+    await connectToDatabase();
+    const { action, note } = req.body || {};
+    if (action !== 'confirm' && action !== 'revert') {
+      return res.status(400).json({ error: 'Valid resolution action ("confirm" or "revert") is required.' });
+    }
+
+    const settlement = await Settlement.findById(req.params.id);
+    if (!settlement) {
+      return res.status(404).json({ error: 'Settlement not found.' });
+    }
+    if (settlement.status !== 'disputed') {
+      return res.status(409).json({ error: 'Only disputed settlements can be resolved via this endpoint.', settlement });
+    }
+
+    const group = await Group.findById(settlement.groupId);
+    if (!group) {
+      return res.status(404).json({ error: 'Group not found.' });
+    }
+
+    const requesterEmail = req.user.email.toLowerCase().trim();
+    const adminMember = group.members.find((m) => m.role === 'admin' || m.role === 'owner') ||
+      (group.adminEmail ? group.members.find((m) => m.email.toLowerCase() === group.adminEmail.toLowerCase()) : null) ||
+      group.members[0];
+    const isGroupAdmin = (adminMember && adminMember.email.toLowerCase().trim() === requesterEmail) ||
+      (group.adminEmail && group.adminEmail.toLowerCase().trim() === requesterEmail) ||
+      (group.createdByEmail && group.createdByEmail.toLowerCase().trim() === requesterEmail);
+    const isSuperAdmin = isSuperAdminUser(req.user);
+    const isPayer = settlement.fromEmail && settlement.fromEmail.toLowerCase().trim() === requesterEmail;
+    const isTargetCreditor = settlement.toEmail && settlement.toEmail.toLowerCase().trim() === requesterEmail;
+    const isRecorder = settlement.recordedByEmail && settlement.recordedByEmail.toLowerCase().trim() === requesterEmail;
+    const now = new Date();
+    const resolutionNote = String(note || '').trim().slice(0, 500);
+
+    if (action === 'confirm') {
+      if (!isTargetCreditor && !isGroupAdmin && !isSuperAdmin) {
+        return res.status(403).json({ error: 'Only the receiving creditor or group admin can resolve a dispute by confirming receipt.' });
+      }
+      const updated = await Settlement.findOneAndUpdate(
+        { _id: req.params.id, status: 'disputed' },
+        {
+          $set: {
+            status: 'confirmed',
+            verificationStage: 'confirmed_by_receiver',
+            confirmationSource: isTargetCreditor ? 'receiver_app' : 'admin_hub',
+            confirmedAt: now,
+            confirmedByEmail: requesterEmail,
+            confirmedRole: isTargetCreditor ? 'creditor' : 'admin',
+            disputeResolvedAt: now,
+            disputeResolvedByEmail: requesterEmail,
+            disputeResolutionNote: resolutionNote || 'Confirmed received during dispute resolution'
+          }
+        },
+        { new: true }
+      );
+      if (!updated) return res.status(409).json({ error: 'Dispute already resolved concurrently.' });
+
+      appendGroupAuditLog(group, {
+        action: 'settlement_dispute_confirmed',
+        actorEmail: requesterEmail,
+        actorName: req.user.name || requesterEmail,
+        summary: `${req.user.name || requesterEmail} resolved dispute on ₹${updated.amount} by confirming receipt`,
+        details: resolutionNote || updated.method
+      });
+      await group.save();
+
+      for (const em of new Set([updated.fromEmail, updated.toEmail].filter((e) => e && e !== requesterEmail))) {
+        await createNotificationIdempotent({
+          eventKey: `dispute_resolved_confirm:${updated._id}:${em}:${now.getTime()}`,
+          recipientEmail: em,
+          type: 'dispute_resolved',
+          title: `Dispute Resolved: ₹${Number(updated.amount).toFixed(2)} confirmed`,
+          message: `${req.user.name || requesterEmail} resolved the dispute in "${group.name}" by confirming receipt of ₹${Number(updated.amount).toFixed(2)}.`,
+          groupId: updated.groupId,
+          groupName: group.name,
+          settlementId: updated._id,
+          amount: updated.amount,
+          targetTab: 'settle'
+        });
+      }
+
+      return res.status(200).json({ message: 'Dispute resolved: payment marked as confirmed.', settlement: updated, serverNow: now.toISOString() });
+    }
+
+    // action === 'revert'
+    if (!isPayer && !isTargetCreditor && !isRecorder && !isGroupAdmin && !isSuperAdmin) {
+      return res.status(403).json({ error: 'Unauthorized to cancel/revert this disputed settlement.' });
+    }
+
+    const updated = await Settlement.findOneAndUpdate(
+      { _id: req.params.id, status: 'disputed' },
+      {
+        $set: {
+          status: 'reverted',
+          verificationStage: 'reverted',
+          revertedAt: now,
+          revertedByEmail: requesterEmail,
+          disputeResolvedAt: now,
+          disputeResolvedByEmail: requesterEmail,
+          disputeResolutionNote: resolutionNote || 'Reverted disputed settlement back to open debt'
+        }
+      },
+      { new: true }
+    );
+    if (!updated) return res.status(409).json({ error: 'Dispute already resolved concurrently.' });
+
+    appendGroupAuditLog(group, {
+      action: 'settlement_dispute_reverted',
+      actorEmail: requesterEmail,
+      actorName: req.user.name || requesterEmail,
+      summary: `${req.user.name || requesterEmail} resolved dispute by reverting ₹${updated.amount} settlement to open debt`,
+      details: resolutionNote || updated.method
+    });
+    await group.save();
+
+    for (const em of new Set([updated.fromEmail, updated.toEmail].filter((e) => e && e !== requesterEmail))) {
+      await createNotificationIdempotent({
+        eventKey: `dispute_resolved_revert:${updated._id}:${em}:${now.getTime()}`,
+        recipientEmail: em,
+        type: 'dispute_resolved',
+        title: `Dispute Resolved: ₹${Number(updated.amount).toFixed(2)} debt restored`,
+        message: `${req.user.name || requesterEmail} reverted the disputed ₹${Number(updated.amount).toFixed(2)} entry in "${group.name}". The balance is open again.`,
+        groupId: updated.groupId,
+        groupName: group.name,
+        settlementId: updated._id,
+        amount: updated.amount,
+        targetTab: 'settle'
+      });
+    }
+
+    return res.status(200).json({ message: 'Dispute resolved: settlement reverted and debt reopened.', settlement: updated, serverNow: now.toISOString() });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
@@ -419,16 +764,31 @@ router.post('/settlements/:id/reject', requireAuth, async (req, res) => {
       });
     }
 
-    settlement.status = 'rejected';
-    settlement.rejectedReason = reason || `Payment claim rejected by ${isTargetCreditor ? 'creditor' : 'group admin'}.`;
-    settlement.confirmationToken = null; // Invalidate token on reject
-    await settlement.save();
+    const updated = await Settlement.findOneAndUpdate(
+      { _id: req.params.id, status: { $in: ['pending_admin_approval', 'pending_confirmation'] } },
+      {
+        $set: {
+          status: 'rejected',
+          verificationStage: 'rejected',
+          rejectedReason: reason || `Payment claim rejected by ${isTargetCreditor ? 'creditor' : 'group admin'}.`,
+          confirmationToken: null,
+          disputeToken: null,
+          notificationProcessingLockUntil: null
+        }
+      },
+      { new: true }
+    );
+
+    if (!updated) {
+      const latest = await Settlement.findById(req.params.id).lean();
+      return res.status(409).json({ error: 'Settlement state changed concurrently.', settlement: latest });
+    }
 
     otel.metrics.counter('vasool_settlements_rejected_total', 1);
 
     return res.status(200).json({
       message: 'Settlement payment claim rejected.',
-      settlement
+      settlement: updated
     });
   } catch (err) {
     return res.status(500).json({ error: err.message });
@@ -438,7 +798,7 @@ router.post('/settlements/:id/reject', requireAuth, async (req, res) => {
 /**
  * POST /api/settlements/:id/revert
  * Reverts a recorded/acknowledged settlement back to an open debt.
- * Allowed for the payer, the recipient, or the person who recorded it.
+ * Allowed for the payer, the recipient, the person who recorded it, or group admin (on disputed).
  * The record is kept for audit purposes with status "reverted" and is
  * excluded from balance and settlement calculations.
  */
@@ -456,7 +816,17 @@ router.post('/settlements/:id/revert', requireAuth, async (req, res) => {
     const isRecorder = settlement.recordedByEmail && settlement.recordedByEmail.toLowerCase().trim() === requesterEmail;
     const isSuperAdmin = isSuperAdminUser(req.user);
 
-    if (!isPayer && !isRecipient && !isRecorder && !isSuperAdmin) {
+    const group = await Group.findById(settlement.groupId);
+    const adminMember = group && (group.members.find((m) => m.role === 'admin' || m.role === 'owner') ||
+      (group.adminEmail ? group.members.find((m) => m.email.toLowerCase() === group.adminEmail.toLowerCase()) : null) ||
+      group.members[0]);
+    const isGroupAdmin = group && (
+      (adminMember && adminMember.email.toLowerCase().trim() === requesterEmail) ||
+      (group.adminEmail && group.adminEmail.toLowerCase().trim() === requesterEmail) ||
+      (group.createdByEmail && group.createdByEmail.toLowerCase().trim() === requesterEmail)
+    );
+
+    if (!isPayer && !isRecipient && !isRecorder && !isSuperAdmin && !(settlement.status === 'disputed' && isGroupAdmin)) {
       return res.status(403).json({
         error: 'Only the payer, the recipient, or the person who recorded this settlement can revert it.'
       });
@@ -476,29 +846,71 @@ router.post('/settlements/:id/revert', requireAuth, async (req, res) => {
       });
     }
 
-    settlement.status = 'reverted';
-    settlement.revertedAt = new Date();
-    settlement.revertedByEmail = requesterEmail;
-    settlement.confirmationToken = null; // Invalidate any pending confirmation link
-    await settlement.save();
+    const now = new Date();
+    const updated = await Settlement.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        status: { $nin: ['rejected', 'reverted'] }
+      },
+      {
+        $set: {
+          status: 'reverted',
+          verificationStage: 'reverted',
+          revertedAt: now,
+          revertedByEmail: requesterEmail,
+          confirmationToken: null,
+          disputeToken: null,
+          notificationProcessingLockUntil: null
+        }
+      },
+      { new: true }
+    );
 
-    const group = await Group.findById(settlement.groupId);
+    if (!updated) {
+      const latest = await Settlement.findById(req.params.id).lean();
+      if (latest && latest.status === 'reverted') {
+        return res.status(200).json({ settlement: latest, message: 'Settlement was already reverted.', alreadyReverted: true });
+      }
+      return res.status(409).json({ error: 'Settlement state changed concurrently.', settlement: latest });
+    }
+
     if (group) {
       appendGroupAuditLog(group, {
         action: 'settlement_reverted',
         actorEmail: requesterEmail,
         actorName: req.user.name || requesterEmail,
-        summary: `${req.user.name || requesterEmail} reverted ₹${settlement.amount} settlement from ${settlement.fromName} to ${settlement.toName}`,
-        details: `${settlement.method}${settlement.utrNumber ? ' · UTR: ' + settlement.utrNumber : ''}`
+        summary: `${req.user.name || requesterEmail} reverted ₹${updated.amount} settlement from ${updated.fromName} to ${updated.toName}`,
+        details: `${updated.method}${updated.utrNumber ? ' · UTR: ' + updated.utrNumber : ''}`
       });
       await group.save();
+
+      // If receiver had already been notified, let them know cleanly in-app that the sender reverted it
+      if (settlement.receiverNotifiedAt && updated.toEmail && requesterEmail !== updated.toEmail) {
+        await createNotificationIdempotent({
+          eventKey: `payment_reverted:${updated._id}:${updated.toEmail}`,
+          recipientEmail: updated.toEmail,
+          type: 'payment_reverted',
+          title: `Payment Reverted: ₹${Number(updated.amount).toFixed(2)} reopened`,
+          message: `${req.user.name || updated.fromName} reverted their ₹${Number(updated.amount).toFixed(2)} payment claim in "${group.name}". The balance is open again.`,
+          groupId: updated.groupId,
+          groupName: group.name,
+          settlementId: updated._id,
+          amount: updated.amount,
+          senderEmail: updated.fromEmail,
+          senderName: updated.fromName,
+          receiverEmail: updated.toEmail,
+          receiverName: updated.toName,
+          targetTab: 'settle'
+        });
+      }
     }
 
     otel.metrics.counter('vasool_settlements_reverted_total', 1);
 
     return res.status(200).json({
-      message: `Settlement of ₹${settlement.amount} reverted. The amount is due again.`,
-      settlement
+      message: `Settlement of ₹${updated.amount} reverted. The amount is due again.`,
+      settlement: updated,
+      serverNow: now.toISOString()
     });
   } catch (err) {
     return res.status(500).json({ error: err.message });
@@ -544,35 +956,76 @@ router.get('/settlements/ack', async (req, res) => {
       }));
     }
 
-    // Secure timing-safe token verification
-    if (!settlement.confirmationToken || settlement.confirmationToken !== token) {
-      return res.status(403).send(renderAckResultPage({
+    if (settlement.status === 'disputed') {
+      return res.status(409).send(renderAckResultPage({
         success: false,
-        title: 'Link Expired or Invalid',
-        message: 'This confirmation link is invalid or has already been used.',
+        title: 'Payment Already Disputed',
+        message: 'This payment was previously reported as not received. Please resolve it inside Vasool.',
+        settlement,
         alreadyConfirmed: false
       }));
     }
 
-    // Confirm settlement
-    settlement.status = 'confirmed';
-    settlement.confirmedAt = new Date();
-    settlement.confirmedByEmail = settlement.toEmail;
-    settlement.confirmedRole = 'creditor';
-    settlement.confirmationToken = null; // Invalidate token to prevent reuse
-    await settlement.save();
+    // Secure atomic token verification + confirmation
+    const now = new Date();
+    const updated = await Settlement.findOneAndUpdate(
+      {
+        _id: id,
+        confirmationToken: token,
+        status: { $in: ['pending_admin_approval', 'pending_confirmation'] }
+      },
+      {
+        $set: {
+          status: 'confirmed',
+          verificationStage: 'confirmed_by_receiver',
+          confirmationSource: 'receiver_email',
+          confirmedAt: now,
+          confirmedByEmail: settlement.toEmail,
+          confirmedRole: 'creditor',
+          confirmationToken: null,
+          disputeToken: null,
+          notificationProcessingLockUntil: null
+        }
+      },
+      { new: true }
+    );
 
-    // Group audit log
-    const group = await Group.findById(settlement.groupId);
+    if (!updated) {
+      return res.status(403).send(renderAckResultPage({
+        success: false,
+        title: 'Link Expired or Invalid',
+        message: 'This confirmation link is invalid, expired, or has already been used.',
+        alreadyConfirmed: false
+      }));
+    }
+
+    const group = await Group.findById(updated.groupId);
     if (group) {
       appendGroupAuditLog(group, {
         action: 'settlement_confirmed_email',
-        actorEmail: settlement.toEmail,
-        actorName: settlement.toName || settlement.toEmail,
-        summary: `${settlement.toName || settlement.toEmail} acknowledged receipt of ₹${settlement.amount} from ${settlement.fromName} via email confirmation`,
-        details: `${settlement.method}${settlement.utrNumber ? ' · UTR: ' + settlement.utrNumber : ''}`
+        actorEmail: updated.toEmail,
+        actorName: updated.toName || updated.toEmail,
+        summary: `${updated.toName || updated.toEmail} acknowledged receipt of ₹${updated.amount} from ${updated.fromName} via email confirmation`,
+        details: `${updated.method}${updated.utrNumber ? ' · UTR: ' + updated.utrNumber : ''}`
       });
       await group.save();
+
+      await createNotificationIdempotent({
+        eventKey: `payment_confirmed:${updated._id}:${updated.fromEmail}`,
+        recipientEmail: updated.fromEmail,
+        type: 'payment_confirmed',
+        title: `₹${Number(updated.amount).toFixed(2)} confirmed by ${updated.toName || updated.toEmail}`,
+        message: `${updated.toName || updated.toEmail} confirmed receipt of your ₹${Number(updated.amount).toFixed(2)} settlement in "${group.name}".`,
+        groupId: updated.groupId,
+        groupName: group.name,
+        settlementId: updated._id,
+        amount: updated.amount,
+        senderEmail: updated.fromEmail,
+        senderName: updated.fromName,
+        receiverEmail: updated.toEmail,
+        receiverName: updated.toName,
+        targetTab: 'settle'
+      });
     }
 
     otel.metrics.counter('vasool_settlements_confirmed_total', 1, {
@@ -583,8 +1036,8 @@ router.get('/settlements/ack', async (req, res) => {
     return res.status(200).send(renderAckResultPage({
       success: true,
       title: 'Payment Confirmed Successfully! 🎉',
-      message: `You have successfully acknowledged receipt of ₹${settlement.amount} from ${settlement.fromName}. The group balance has been updated and the debt is closed.`,
-      settlement,
+      message: `You have successfully acknowledged receipt of ₹${updated.amount} from ${updated.fromName}. The group balance has been updated and the debt is closed.`,
+      settlement: updated,
       alreadyConfirmed: false
     }));
   } catch (err) {
@@ -598,10 +1051,208 @@ router.get('/settlements/ack', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/settlements/report-view & POST /api/settlements/report-email
+ * Allows the receiver to report a payment as not received from the email link within the 48h grace period.
+ */
+router.get('/settlements/report-view', async (req, res) => {
+  try {
+    await connectToDatabase();
+    const now = new Date();
+    const { token, id } = req.query;
+    if (!token || !id) {
+      return res.status(400).send(renderAckResultPage({
+        success: false,
+        title: 'Invalid Link',
+        message: 'Missing report token or settlement identifier.'
+      }));
+    }
+
+    const settlement = await Settlement.findById(id).lean();
+    if (!settlement) {
+      return res.status(404).send(renderAckResultPage({
+        success: false,
+        title: 'Settlement Not Found',
+        message: 'The requested payment record could not be found.'
+      }));
+    }
+
+    if (settlement.status === 'confirmed') {
+      return res.status(200).send(renderAckResultPage({
+        success: true,
+        title: 'Verification Grace Period Closed',
+        message: `This ₹${settlement.amount} payment from ${settlement.fromName} is already confirmed and can no longer be reported.`,
+        settlement
+      }));
+    }
+
+    if (settlement.status === 'disputed') {
+      return res.status(200).send(renderAckResultPage({
+        success: false,
+        title: 'Already Reported as Not Received',
+        message: `You already reported this ₹${settlement.amount} payment. The sender and group admin have been notified.`,
+        settlement
+      }));
+    }
+
+    if (!settlement.disputeToken || settlement.disputeToken !== token) {
+      return res.status(403).send(renderAckResultPage({
+        success: false,
+        title: 'Link Expired or Invalid',
+        message: 'This report link is invalid or no longer active.'
+      }));
+    }
+
+    if (settlement.gracePeriodEndsAt && now > new Date(settlement.gracePeriodEndsAt)) {
+      await maybeRunScheduledSettlementCatchup({ force: true });
+      return res.status(409).send(renderAckResultPage({
+        success: true,
+        title: '48-Hour Grace Period Expired',
+        message: `The 48-hour reporting window ended on ${new Date(settlement.gracePeriodEndsAt).toLocaleString('en-IN')}. The payment is automatically confirmed.`,
+        settlement
+      }));
+    }
+
+    return res.status(200).send(renderReportViewPage({ settlement, token }));
+  } catch (err) {
+    return res.status(500).send(renderAckResultPage({
+      success: false,
+      title: 'Server Error',
+      message: 'Could not load the report form. Please log into Vasool directly.'
+    }));
+  }
+});
+
+router.post('/settlements/report-email', async (req, res) => {
+  try {
+    await connectToDatabase();
+    const now = new Date();
+    const { id, token, reason } = req.body || {};
+    if (!id || !token) {
+      return res.status(400).json({ error: 'Settlement ID and dispute token are required.' });
+    }
+
+    const settlement = await Settlement.findById(id);
+    if (!settlement) {
+      return res.status(404).json({ error: 'Settlement not found.' });
+    }
+    if (settlement.status === 'confirmed') {
+      return res.status(409).json({ error: 'Payment is already confirmed; grace period has closed.' });
+    }
+    if (settlement.status === 'disputed') {
+      return res.status(200).json({ settlement, alreadyDisputed: true, message: 'Already reported as not received.' });
+    }
+    if (!settlement.disputeToken || settlement.disputeToken !== token) {
+      return res.status(403).json({ error: 'Invalid or expired report link token.' });
+    }
+    if (settlement.gracePeriodEndsAt && now > new Date(settlement.gracePeriodEndsAt)) {
+      await maybeRunScheduledSettlementCatchup({ force: true });
+      return res.status(409).json({ error: 'The 48-hour verification grace period has expired.' });
+    }
+
+    const disputeReason = String(reason || 'Payment not received in bank/UPI account').trim().slice(0, 500);
+    const updated = await Settlement.findOneAndUpdate(
+      {
+        _id: id,
+        disputeToken: token,
+        status: { $in: ['pending_admin_approval', 'pending_confirmation'] },
+        $or: [{ gracePeriodEndsAt: null }, { gracePeriodEndsAt: { $gt: now } }]
+      },
+      {
+        $set: {
+          status: 'disputed',
+          verificationStage: 'disputed',
+          disputedAt: now,
+          disputedByEmail: settlement.toEmail,
+          disputeReason,
+          confirmationToken: null,
+          disputeToken: null,
+          notificationProcessingLockUntil: null
+        }
+      },
+      { new: true }
+    );
+
+    if (!updated) {
+      return res.status(409).json({ error: 'Unable to record dispute because the payment state changed concurrently.' });
+    }
+
+    const group = await Group.findById(updated.groupId);
+    if (group) {
+      appendGroupAuditLog(group, {
+        action: 'settlement_disputed_email',
+        actorEmail: updated.toEmail,
+        actorName: updated.toName || updated.toEmail,
+        summary: `${updated.toName || updated.toEmail} reported ₹${updated.amount} payment from ${updated.fromName} as NOT received via email link`,
+        details: disputeReason
+      });
+      await group.save();
+    }
+
+    await notifyDisputeParties({
+      settlement: updated,
+      group,
+      reporterName: updated.toName || updated.toEmail,
+      disputeReason
+    });
+
+    otel.metrics.counter('vasool_settlements_disputed_total', 1);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Non-receipt report submitted. Sender and group administrator(s) have been notified.',
+      settlement: updated
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Background Scheduler Cron Endpoint (supports cron-job.org, Vercel Cron, or Admin manual trigger)
+async function handleProcessSettlementsCron(req, res) {
+  try {
+    const cronSecret = process.env.CRON_SECRET || '';
+    const authHeader = req.headers.authorization || '';
+    const bearer = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+    const headerSecret = req.headers['x-cron-secret'] || req.query.secret || '';
+
+    let authorized = false;
+    if (cronSecret && (bearer === cronSecret || headerSecret === cronSecret)) {
+      authorized = true;
+    } else if (bearer) {
+      const decoded = verifyAuthToken(bearer);
+      if (decoded && isSuperAdminUser(decoded)) {
+        authorized = true;
+      }
+    } else if (!cronSecret && process.env.NODE_ENV === 'test') {
+      authorized = true;
+    }
+
+    if (!authorized) {
+      return res.status(401).json({ error: 'Unauthorized cron trigger.' });
+    }
+
+    await connectToDatabase();
+    const summary = await processDueSettlementJobs({ now: new Date() });
+    return res.status(200).json({
+      ok: true,
+      serverNow: new Date().toISOString(),
+      ...summary
+    });
+  } catch (err) {
+    logger.error('[cron/process-settlements] Error:', err);
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+router.get('/cron/process-settlements', handleProcessSettlementsCron);
+router.post('/cron/process-settlements', handleProcessSettlementsCron);
+
 // GET /api/settlements - List recorded settlements
 router.get('/settlements', requireAuth, async (req, res) => {
   try {
     await connectToDatabase();
+    await maybeRunScheduledSettlementCatchup();
     const filter = {};
     if (req.query.groupId) {
       filter.groupId = req.query.groupId;
@@ -610,7 +1261,7 @@ router.get('/settlements', requireAuth, async (req, res) => {
       filter.groupId = { $in: userGroups.map((g) => g._id) };
     }
     const settlements = await Settlement.find(filter).sort({ settledAt: -1, createdAt: -1 }).lean();
-    return res.status(200).json({ settlements });
+    return res.status(200).json({ settlements, serverNow: new Date().toISOString() });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
@@ -876,6 +1527,91 @@ function renderAckResultPage({ success, title, message, settlement, alreadyConfi
         window.location.href = '/';
       }
     }, 1000);
+  </script>
+</body>
+</html>`;
+}
+
+function renderReportViewPage({ settlement, token }) {
+  const fromName = String(settlement.fromName || settlement.fromEmail || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const toName = String(settlement.toName || settlement.toEmail || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const amount = Number(settlement.amount).toLocaleString('en-IN');
+  const deadline = settlement.gracePeriodEndsAt ? new Date(settlement.gracePeriodEndsAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) + ' IST' : 'Within 48 hours';
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Report Payment Not Received · Vasool</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #050b09; color: #f8fafc; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1.5rem; }
+    .card { background: #0b1511; border: 1px solid rgba(244, 63, 94, 0.35); border-radius: 1.5rem; max-width: 460px; width: 100%; padding: 2rem; box-shadow: 0 25px 50px rgba(0,0,0,0.7); }
+    h1 { font-size: 1.3rem; font-weight: 800; color: #fda4af; margin-bottom: 0.5rem; }
+    p { font-size: 0.9rem; color: #94a3b8; line-height: 1.5; margin-bottom: 1.25rem; }
+    .box { background: #060d0a; border: 1px solid #163026; border-radius: 1rem; padding: 1rem; margin-bottom: 1.25rem; font-size: 0.85rem; }
+    .row { display: flex; justify-content: space-between; padding: 0.35rem 0; }
+    .lbl { color: #64748b; } .val { color: #f1f5f9; font-weight: 600; }
+    label { display: block; font-size: 0.8rem; color: #cbd5e1; margin-bottom: 0.4rem; font-weight: 600; }
+    input { width: 100%; padding: 0.75rem 0.9rem; border-radius: 0.75rem; background: #050b09; border: 1px solid #334155; color: #fff; font-size: 0.875rem; margin-bottom: 1rem; }
+    button { width: 100%; padding: 0.85rem; border-radius: 0.875rem; background: #e11d48; color: #fff; border: none; font-weight: 700; font-size: 0.95rem; cursor: pointer; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .msg { margin-top: 1rem; font-size: 0.85rem; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🚨 Report Payment Not Received</h1>
+    <p>Confirm if you have checked your account and did not receive ₹${amount} from ${fromName}. Deadline: ${deadline}.</p>
+    <div class="box">
+      <div class="row"><span class="lbl">Sender</span><span class="val">${fromName}</span></div>
+      <div class="row"><span class="lbl">Receiver</span><span class="val">${toName}</span></div>
+      <div class="row"><span class="lbl">Amount</span><span class="val" style="color:#fda4af;">₹${amount}</span></div>
+      <div class="row"><span class="lbl">Method</span><span class="val">${settlement.method || 'UPI'}</span></div>
+    </div>
+    <form id="disputeForm">
+      <label for="reason">Issue Details</label>
+      <input id="reason" name="reason" type="text" required value="Payment not received in bank/UPI account" />
+      <button type="submit" id="submitBtn">Submit Report Not Received</button>
+    </form>
+    <div class="msg" id="statusMsg"></div>
+  </div>
+  <script>
+    document.getElementById('disputeForm').addEventListener('submit', async function (e) {
+      e.preventDefault();
+      var btn = document.getElementById('submitBtn');
+      var msg = document.getElementById('statusMsg');
+      btn.disabled = true;
+      btn.textContent = 'Submitting report...';
+      try {
+        var res = await fetch('/api/settlements/report-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: ${JSON.stringify(String(settlement._id || settlement.id))},
+            token: ${JSON.stringify(String(token))},
+            reason: document.getElementById('reason').value
+          })
+        });
+        var data = await res.json();
+        if (res.ok) {
+          msg.style.color = '#34d399';
+          msg.textContent = 'Report submitted! The sender and group admin(s) have been notified. Redirecting...';
+          setTimeout(function () { window.location.href = '/#settle'; }, 1800);
+        } else {
+          msg.style.color = '#fb7185';
+          msg.textContent = data.error || 'Could not submit report.';
+          btn.disabled = false;
+          btn.textContent = 'Submit Report Not Received';
+        }
+      } catch (err) {
+        msg.style.color = '#fb7185';
+        msg.textContent = 'Network error. Please open Vasool to report.';
+        btn.disabled = false;
+        btn.textContent = 'Submit Report Not Received';
+      }
+    });
   </script>
 </body>
 </html>`;

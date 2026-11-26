@@ -6,10 +6,13 @@ const Expense = require('../models/Expense');
 const Settlement = require('../models/Settlement');
 const Feedback = require('../models/Feedback');
 const SystemConfig = require('../models/SystemConfig');
+const Notification = require('../models/Notification');
 const { requireAuth, sanitizeUser } = require('./auth');
 const { groupsRouter, hydrateGroupMembersUpi, classifyUserGroups } = require('./groups');
 const { expensesRouter, sanitizeExpensesForRequester } = require('./expenses');
 const { settlementsRouter } = require('./settlements');
+const { notificationsRouter } = require('./notifications');
+const { maybeRunScheduledSettlementCatchup } = require('../lib/settlement-scheduler');
 const { buildAdminGroupsSummary, formatAdminSettings } = require('./admin');
 const {
   isSuperAdminUser,
@@ -32,6 +35,7 @@ const router = express.Router();
 router.get('/bootstrap', requireAuth, async (req, res) => {
   try {
     await connectToDatabase();
+    await maybeRunScheduledSettlementCatchup();
     const userEmail = (req.user.email || '').toLowerCase().trim();
     const emailRegex = new RegExp('^' + userEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i');
     const wantsAdmin = req.query.includeAdmin === '1' && isSuperAdminUser(req.user);
@@ -62,15 +66,17 @@ router.get('/bootstrap', requireAuth, async (req, res) => {
 
     const groupIds = groups.map((g) => g._id);
 
-    // Step 2: Hydrate member UPIs, expenses, and settlements concurrently
-    const [, rawExpenses, settlements] = await Promise.all([
+    // Step 2: Hydrate member UPIs, expenses, settlements, and notifications concurrently
+    const [, rawExpenses, settlements, notifications, unreadNotificationCount] = await Promise.all([
       hydrateGroupMembersUpi(groups),
       groupIds.length > 0
         ? Expense.find({ groupId: { $in: groupIds } }).sort({ expenseDate: -1, createdAt: -1 }).lean()
         : Promise.resolve([]),
       groupIds.length > 0
         ? Settlement.find({ groupId: { $in: groupIds } }).sort({ settledAt: -1, createdAt: -1 }).lean()
-        : Promise.resolve([])
+        : Promise.resolve([]),
+      Notification.find({ recipientEmail: userEmail }).sort({ createdAt: -1 }).limit(30).lean(),
+      Notification.countDocuments({ recipientEmail: userEmail, isRead: false })
     ]);
 
     const { activeGroups, pendingInvites } = classifyUserGroups(groups, userEmail);
@@ -82,7 +88,10 @@ router.get('/bootstrap', requireAuth, async (req, res) => {
       activeGroups,
       pendingInvites,
       expenses,
-      settlements
+      settlements,
+      notifications,
+      unreadNotificationCount,
+      serverNow: new Date().toISOString()
     };
 
     if (wantsAdmin && isSuperAdminUser(userDoc)) {
@@ -109,6 +118,7 @@ router.get('/bootstrap', requireAuth, async (req, res) => {
 router.use(groupsRouter);
 router.use(expensesRouter);
 router.use(settlementsRouter);
+router.use(notificationsRouter);
 
 module.exports = {
   splitsRouter: router,

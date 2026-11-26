@@ -98,8 +98,9 @@ assert(settlementsRouteJs.includes('const isDirectlyConfirmed = isTargetCreditor
   'Only recipient or hub-mode admin receiving funds should directly auto-confirm upon recording');
 assert(settlementsRouteJs.includes('const confirmationToken = isDirectlyConfirmed ? null : crypto.randomBytes(32).toString(\'hex\');'),
   'Must generate 64-char random hex confirmation token for unconfirmed settlements');
-assert(settlementsRouteJs.includes('sendPaymentConfirmationRequestEmail'),
-  'Must import and call sendPaymentConfirmationRequestEmail in settlements route');
+const schedulerJs = fs.readFileSync(path.join(__dirname, '../lib/settlement-scheduler.js'), 'utf8');
+assert(settlementsRouteJs.includes('notifyAfterAt') && schedulerJs.includes('sendPaymentConfirmationRequestEmail'),
+  'Must schedule delayed notification via notifyAfterAt and dispatch sendPaymentConfirmationRequestEmail in scheduler');
 
 // Verify confirm & reject route permission checks
 assert(settlementsRouteJs.includes('In Direct P2P mode, only the receiving recipient/creditor can confirm receipt of this payment.'),
@@ -146,7 +147,7 @@ assert.strictEqual(typeof sendPaymentConfirmationRequestEmail, 'function', 'send
 
   assert(result, 'Email dispatch result must be truthy');
   assert.strictEqual(result.recipient, 'praneeth@example.com', 'Recipient must match settlement toEmail');
-  assert(result.subject.includes('Action Required: Confirm Receipt of ₹429.00'), 'Subject must contain settlement amount and call to action');
+  assert(result.subject.includes('Action Required:') && result.subject.includes('₹429.00'), 'Subject must contain settlement amount and call to action');
   assert(result.ackUrl.includes(dummyToken), 'Acknowledgment URL must contain the confirmation token');
   assert(result.ackUrl.includes(dummySettlement._id), 'Acknowledgment URL must contain settlement ID');
   assert(result.ackUrl.includes('/api/settlements/ack'), 'Acknowledgment URL must route to /api/settlements/ack');

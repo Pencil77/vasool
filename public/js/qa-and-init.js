@@ -767,7 +767,15 @@
       window.toggleGroupSplitVisibility = toggleGroupSplitVisibility;
       window.handleConfirmSettlement = handleConfirmSettlement;
       window.handleRejectSettlement = handleRejectSettlement;
+      window.handleReportNotReceived = handleReportNotReceived;
+      window.handleResolveDispute = handleResolveDispute;
       window.handleRevertSettlement = handleRevertSettlement;
+      window.toggleNotificationPanel = toggleNotificationPanel;
+      window.closeNotificationPanel = closeNotificationPanel;
+      window.markNotificationRead = markNotificationRead;
+      window.markAllNotificationsRead = markAllNotificationsRead;
+      window.handleNotificationClick = handleNotificationClick;
+      window.fetchNotifications = fetchNotifications;
       window.switchMainTab = switchMainTab;
       window.openAddExpenseModal = openAddExpenseModal;
       window.openNewGroupModal = openNewGroupModal;
@@ -976,6 +984,15 @@
         const validHashTabs = ['dashboard', 'expenses', 'groups', 'settle', 'admin'];
         if (validHashTabs.includes(hash)) {
           switchMainTab(hash);
+        }
+      });
+
+      // Close notification dropdown when clicking outside
+      document.addEventListener('click', (evt) => {
+        const wrapper = document.getElementById('notificationBellWrapper');
+        const panel = document.getElementById('notificationCenterPanel');
+        if (panel && !panel.classList.contains('hidden') && wrapper && !wrapper.contains(evt.target)) {
+          if (typeof closeNotificationPanel === 'function') closeNotificationPanel();
         }
       });
     }
