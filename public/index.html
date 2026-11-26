@@ -117,6 +117,41 @@
 
         <!-- Active User Pill -->
         <div id="headerUserArea" data-testid="header-user-area" class="hidden items-center gap-1.5 sm:gap-2 pl-1 sm:pl-2 border-l border-slate-800">
+          <!-- In-App Notification Centre Bell + Pop-Over -->
+          <div id="notificationBellWrapper" class="relative flex-shrink-0">
+            <button
+              type="button"
+              id="btnNotificationBell"
+              data-testid="btn-notification-bell"
+              onclick="toggleNotificationPanel(event)"
+              title="Notifications"
+              aria-label="Notifications"
+              class="relative w-8 h-8 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 hover:border-emerald-500/40 text-slate-200 flex items-center justify-center transition"
+            >
+              <svg class="w-4 h-4 text-emerald-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
+              </svg>
+              <span id="notificationBellBadge" data-testid="notification-bell-badge" class="hidden absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-emerald-500 text-slate-950 text-[10px] font-extrabold flex items-center justify-center shadow ring-2 ring-slate-950">0</span>
+            </button>
+
+            <!-- Compact Slide-Down Notification Panel -->
+            <div id="notificationCenterPanel" data-testid="notification-center-panel" class="hidden fixed sm:absolute right-2 sm:right-0 top-14 sm:top-11 w-[calc(100vw-1rem)] sm:w-96 max-h-[75vh] flex flex-col rounded-2xl bg-[#0b1511] border border-emerald-500/25 shadow-2xl shadow-black/80 z-50 overflow-hidden">
+              <div class="px-4 py-3 border-b border-slate-800/80 flex items-center justify-between gap-2 bg-[#070e0b]">
+                <div class="flex items-center gap-2">
+                  <span class="text-sm font-bold text-white">Notifications</span>
+                  <span id="notificationPanelUnreadPill" class="hidden px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">0 unread</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <button type="button" id="btnMarkAllNotificationsRead" data-testid="btn-mark-all-notifications-read" onclick="markAllNotificationsRead()" class="text-[11px] font-semibold text-emerald-400 hover:text-emerald-300 transition">Mark all read</button>
+                  <button type="button" onclick="closeNotificationPanel()" class="text-slate-400 hover:text-white text-xs px-1">✕</button>
+                </div>
+              </div>
+              <div id="notificationCenterList" data-testid="notification-center-list" class="overflow-y-auto divide-y divide-slate-800/60 max-h-[60vh]">
+                <div class="p-6 text-center text-xs text-slate-500">No notifications yet.</div>
+              </div>
+            </div>
+          </div>
+
           <button id="btnHeaderOnboarding" data-testid="btn-header-onboarding" onclick="openOnboardingWizard(0)" title="App Guide & Interactive Tour" class="px-2 py-1 rounded-xl bg-teal-500/10 hover:bg-teal-500/20 text-teal-300 border border-teal-500/30 text-[11px] font-bold transition flex items-center gap-1 flex-shrink-0">
             <span>🧭</span>
             <span class="hidden sm:inline">Guide</span>
@@ -2661,22 +2696,23 @@
     <div class="glass-panel rounded-t-3xl sm:rounded-3xl max-w-md w-full p-5 sm:p-6 border border-rose-500/40 shadow-2xl my-0 sm:my-8 space-y-4">
       <div class="flex items-center justify-between pb-3 border-b border-slate-800">
         <div>
-          <h3 class="text-base font-bold text-white flex items-center gap-2">
-            <span>❌</span> Reject Unverified Settlement Claim
+          <h3 id="rejectSettleModalTitle" class="text-base font-bold text-white flex items-center gap-2">
+            <span>🚨</span> Report Payment Not Received
           </h3>
-          <p class="text-[11px] text-slate-400">Provide a reason so the payer can verify their UTR</p>
+          <p id="rejectSettleModalSubtitle" class="text-[11px] text-slate-400">Notify the sender and group administrator(s) and halt auto-confirmation</p>
         </div>
         <button type="button" onclick="closeModal('rejectSettleModal')" class="text-slate-400 hover:text-white text-sm px-2">✕</button>
       </div>
       <form onsubmit="submitRejectSettleModal(event)" class="space-y-4">
         <input id="rejectSettleIdInput" type="hidden" />
+        <input id="rejectSettleModeInput" type="hidden" value="dispute" />
         <div>
-          <label for="rejectSettleReasonInput" class="block text-xs font-medium text-slate-300 mb-1">Rejection / Dispute Reason</label>
+          <label for="rejectSettleReasonInput" class="block text-xs font-medium text-slate-300 mb-1">Issue / Non-Receipt Reason</label>
           <input id="rejectSettleReasonInput" data-testid="input-reject-settle-reason" type="text" required value="Payment not received in bank/UPI account" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs sm:text-sm text-white focus:border-rose-500" />
         </div>
         <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
           <button type="button" onclick="closeModal('rejectSettleModal')" class="px-4 py-2 rounded-xl bg-slate-800 text-xs font-semibold text-slate-300">Cancel</button>
-          <button type="submit" data-testid="btn-submit-reject-settle" class="px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-400 text-white text-xs font-bold shadow-lg shadow-rose-500/20">Reject Claim</button>
+          <button type="submit" id="btnSubmitRejectSettle" data-testid="btn-submit-reject-settle" class="px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-400 text-white text-xs font-bold shadow-lg shadow-rose-500/20">Submit Report</button>
         </div>
       </form>
     </div>

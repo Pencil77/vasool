@@ -8,6 +8,7 @@ const { authRouter, verifyAuthToken, isSuperAdminEmail } = require('./routes/aut
 const { splitsRouter } = require('./routes/splits');
 const { adminRouter } = require('./routes/admin');
 const { connectToDatabase } = require('./lib/mongodb');
+const { maybeRunScheduledSettlementCatchup } = require('./lib/settlement-scheduler');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -136,11 +137,17 @@ if (require.main === module) {
   connectToDatabase()
     .then(() => {
       logger.info('[Vasool Splits] Connected to MongoDB Atlas');
+      maybeRunScheduledSettlementCatchup({ force: true });
     })
     .catch((err) => {
       logger.warn('[Vasool Splits] MongoDB connection deferred or offline:', err.message);
     })
     .finally(() => {
+      const bgTimer = setInterval(() => {
+        maybeRunScheduledSettlementCatchup({ force: true }).catch(() => {});
+      }, 60 * 1000);
+      if (typeof bgTimer.unref === 'function') bgTimer.unref();
+
       app.listen(PORT, '0.0.0.0', () => {
         logger.info(`[Vasool Splits] Server listening on http://0.0.0.0:${PORT}`);
       });

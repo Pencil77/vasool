@@ -777,6 +777,9 @@
     function refreshAllViews() {
       const currentTab = typeof activeMainTab !== 'undefined' ? activeMainTab : 'dashboard';
       renderTopLevelView();
+      if (typeof renderNotificationCenter === 'function') {
+        renderNotificationCenter();
+      }
       if (currentTab === 'admin') {
         if (typeof updateCloudInspector === 'function') {
           updateCloudInspector();
@@ -1985,14 +1988,18 @@
         if (customAdminNote) {
           payload.adminNote = customAdminNote;
         }
+        let confirmRes = null;
         if (localStorage.getItem(AUTH_TOKEN_KEY)) {
-          const res = await apiFetch(`/api/settlements/${settlementId}/confirm`, {
+          confirmRes = await apiFetch(`/api/settlements/${settlementId}/confirm`, {
             method: 'POST',
             body: JSON.stringify(payload)
           });
-          if (res && res.error) {
-            showToast('Failed to confirm settlement: ' + res.error, 'error');
+          if (confirmRes && confirmRes.error) {
+            showToast('Failed to confirm settlement: ' + confirmRes.error, 'error');
             return;
+          }
+          if (confirmRes && confirmRes.serverNow && typeof updateServerClockOffset === 'function') {
+            updateServerClockOffset(confirmRes.serverNow);
           }
         }
         const stl = appState.settlements.find((s) => s.id === settlementId);
@@ -2004,8 +2011,11 @@
           }
           if (customAdminNote) stl.adminNote = customAdminNote;
           stl.status = 'confirmed';
-          stl.confirmedAt = new Date().toISOString();
-          stl.confirmedByEmail = appState.currentUser?.email || '';
+          stl.confirmedAt = confirmRes?.settlement?.confirmedAt || new Date().toISOString();
+          stl.confirmedByEmail = confirmRes?.settlement?.confirmedByEmail || appState.currentUser?.email || '';
+          stl.confirmedRole = confirmRes?.settlement?.confirmedRole || stl.confirmedRole || 'creditor';
+          stl.verificationStage = confirmRes?.settlement?.verificationStage || 'confirmed_by_receiver';
+          stl.confirmationSource = confirmRes?.settlement?.confirmationSource || 'in_app_receiver';
           recordLocalGroupAudit(
             stl.groupId,
             stl.originalClaimedAmount ? 'settlement_partial_confirmed' : 'settlement_confirmed',
@@ -2017,6 +2027,9 @@
         }
         saveState();
         refreshAllViews();
+        if (typeof fetchNotifications === 'function') {
+          fetchNotifications(true);
+        }
         showToast(
           customReceivedAmount !== null
             ? `⚖️ Partial payment (${formatINR(customReceivedAmount)}) confirmed! Remainder stays open.`
@@ -2060,47 +2073,149 @@
       await handleConfirmSettlement(settlementId, parsed, note);
     }
 
-    function handleRejectSettlement(settlementId) {
+    function openRejectOrDisputeModal(settlementId, mode = 'dispute') {
       const idEl = document.getElementById('rejectSettleIdInput');
+      const modeEl = document.getElementById('rejectSettleModeInput');
       const rEl = document.getElementById('rejectSettleReasonInput');
+      const titleEl = document.getElementById('rejectSettleModalTitle');
+      const subEl = document.getElementById('rejectSettleModalSubtitle');
+      const btnEl = document.getElementById('btnSubmitRejectSettle');
+      const isDispute = mode === 'dispute';
+
       if (idEl) idEl.value = settlementId;
-      if (rEl) rEl.value = 'Payment not received in bank/UPI account';
+      if (modeEl) modeEl.value = isDispute ? 'dispute' : 'reject';
+      if (rEl) rEl.value = isDispute ? 'Payment not received in registered UPI ID' : 'Payment not received in bank/UPI account';
+      if (titleEl) titleEl.textContent = isDispute ? 'Report Payment Not Received' : 'Reject Payment Claim';
+      if (subEl) {
+        subEl.textContent = isDispute
+          ? 'This will put the settlement into a disputed state, halt auto-confirmation, and alert both the sender and group admin(s).'
+          : 'The payer claimed they sent money. Provide a reason so balances return cleanly.';
+      }
+      if (btnEl) btnEl.textContent = isDispute ? 'Submit Dispute' : 'Reject Payment';
       openModal('rejectSettleModal');
+    }
+
+    function handleReportNotReceived(settlementId) {
+      openRejectOrDisputeModal(settlementId, 'dispute');
+    }
+
+    function handleRejectSettlement(settlementId) {
+      openRejectOrDisputeModal(settlementId, 'reject');
     }
 
     async function submitRejectSettleModal(e) {
       e.preventDefault();
       const settlementId = document.getElementById('rejectSettleIdInput')?.value;
+      const mode = document.getElementById('rejectSettleModeInput')?.value || 'dispute';
       if (!settlementId) return;
       if (activeSettlementActionSet.has(settlementId)) {
         console.warn(`[Settlement] Action on ${settlementId} already in progress. Ignoring duplicate click.`);
         return;
       }
       activeSettlementActionSet.add(settlementId);
-      const reason = (document.getElementById('rejectSettleReasonInput')?.value || 'Payment not received').trim();
+      const isDispute = mode === 'dispute';
+      const reason = (document.getElementById('rejectSettleReasonInput')?.value || (isDispute ? 'Payment not received in registered UPI ID' : 'Payment not received')).trim();
       closeModal('rejectSettleModal');
       try {
+        let res = null;
         if (localStorage.getItem(AUTH_TOKEN_KEY)) {
-          const res = await apiFetch(`/api/settlements/${settlementId}/reject`, {
+          const endpoint = isDispute
+            ? `/api/settlements/${settlementId}/report-not-received`
+            : `/api/settlements/${settlementId}/reject`;
+          res = await apiFetch(endpoint, {
             method: 'POST',
             body: JSON.stringify({ reason })
           });
           if (res && res.error) {
-            showToast('Failed to reject settlement: ' + res.error, 'error');
+            showToast(`Failed to ${isDispute ? 'report' : 'reject'} settlement: ` + res.error, 'error');
             return;
           }
+          if (res && res.serverNow && typeof updateServerClockOffset === 'function') {
+            updateServerClockOffset(res.serverNow);
+          }
         }
-        const stl = appState.settlements.find((s) => s.id === settlementId);
+        const stl = appState.settlements.find((s) => String(s.id || s._id) === String(settlementId));
         if (stl) {
-          stl.status = 'rejected';
-          stl.rejectedReason = reason;
-          recordLocalGroupAudit(stl.groupId, 'settlement_rejected', `Rejected settlement claim from ${stl.fromName}`, reason);
+          if (isDispute) {
+            stl.status = 'disputed';
+            stl.verificationStage = 'disputed';
+            stl.disputedAt = res?.settlement?.disputedAt || new Date().toISOString();
+            stl.disputedByEmail = res?.settlement?.disputedByEmail || appState.currentUser?.email || '';
+            stl.disputeReason = reason;
+            recordLocalGroupAudit(stl.groupId, 'settlement_disputed', `Reported payment of ${formatINR(stl.amount)} from ${stl.fromName} as not received`, reason);
+          } else {
+            stl.status = 'rejected';
+            stl.verificationStage = 'rejected';
+            stl.rejectedReason = reason;
+            recordLocalGroupAudit(stl.groupId, 'settlement_rejected', `Rejected settlement claim from ${stl.fromName}`, reason);
+          }
         }
         saveState();
         refreshAllViews();
-        showToast('❌ Settlement claim rejected.');
+        if (typeof fetchNotifications === 'function') {
+          fetchNotifications(true);
+        }
+        showToast(isDispute
+          ? '🚨 Reported as not received. Sender and group admin(s) have been notified.'
+          : '❌ Settlement claim rejected.');
       } catch (err) {
-        showToast('Error rejecting settlement: ' + err.message, 'error');
+        showToast(`Error ${isDispute ? 'reporting' : 'rejecting'} settlement: ` + err.message, 'error');
+      } finally {
+        activeSettlementActionSet.delete(settlementId);
+      }
+    }
+
+    async function handleResolveDispute(settlementId, action = 'revert') {
+      if (!settlementId || !['confirm', 'revert'].includes(action)) return;
+      if (activeSettlementActionSet.has(settlementId)) return;
+      const stlPreview = appState.settlements.find((s) => String(s.id || s._id) === String(settlementId));
+      const amountLabel = stlPreview ? formatINR(stlPreview.amount) : 'this disputed settlement';
+      const promptText = action === 'confirm'
+        ? `Confirm that ${amountLabel} has now been received and close this dispute?`
+        : `Revert ${amountLabel} disputed settlement so the amount becomes due again?`;
+      if (typeof window !== 'undefined' && typeof window.confirm === 'function' && !window.confirm(promptText)) {
+        return;
+      }
+      activeSettlementActionSet.add(settlementId);
+      try {
+        let res = null;
+        if (localStorage.getItem(AUTH_TOKEN_KEY)) {
+          res = await apiFetch(`/api/settlements/${settlementId}/resolve-dispute`, {
+            method: 'POST',
+            body: JSON.stringify({ action })
+          });
+          if (res && res.error) {
+            showToast('Failed to resolve dispute: ' + res.error, 'error');
+            return;
+          }
+          if (res && res.serverNow && typeof updateServerClockOffset === 'function') {
+            updateServerClockOffset(res.serverNow);
+          }
+        }
+        const stl = appState.settlements.find((s) => String(s.id || s._id) === String(settlementId));
+        if (stl) {
+          if (action === 'confirm') {
+            stl.status = 'confirmed';
+            stl.verificationStage = 'confirmed_by_receiver';
+            stl.confirmedAt = res?.settlement?.confirmedAt || new Date().toISOString();
+            stl.confirmedByEmail = res?.settlement?.confirmedByEmail || appState.currentUser?.email || '';
+            stl.disputeResolvedAt = res?.settlement?.disputeResolvedAt || new Date().toISOString();
+          } else {
+            stl.status = 'reverted';
+            stl.verificationStage = 'reverted';
+            stl.revertedAt = res?.settlement?.revertedAt || new Date().toISOString();
+            stl.revertedByEmail = res?.settlement?.revertedByEmail || appState.currentUser?.email || '';
+            stl.disputeResolvedAt = res?.settlement?.disputeResolvedAt || new Date().toISOString();
+          }
+        }
+        saveState();
+        refreshAllViews();
+        if (typeof fetchNotifications === 'function') {
+          fetchNotifications(true);
+        }
+        showToast(action === 'confirm' ? '✅ Dispute resolved — payment confirmed.' : '↩️ Dispute resolved — payment reverted.');
+      } catch (err) {
+        showToast('Error resolving dispute: ' + err.message, 'error');
       } finally {
         activeSettlementActionSet.delete(settlementId);
       }
@@ -2132,18 +2247,236 @@
         const stl = appState.settlements.find((s) => String(s.id || s._id) === String(settlementId));
         if (stl) {
           stl.status = 'reverted';
+          stl.verificationStage = 'reverted';
           stl.revertedAt = new Date().toISOString();
           stl.revertedByEmail = appState.currentUser?.email || '';
           recordLocalGroupAudit(stl.groupId, 'settlement_reverted', `Reverted ${formatINR(stl.amount)} settlement from ${stl.fromName} to ${stl.toName}`, stl.method);
         }
         saveState();
         refreshAllViews();
+        if (typeof fetchNotifications === 'function') {
+          fetchNotifications(true);
+        }
         showToast('↩️ Settlement reverted. The amount is due again.');
       } catch (err) {
         showToast('Error reverting settlement: ' + err.message, 'error');
       } finally {
         activeSettlementActionSet.delete(settlementId);
       }
+    }
+
+    // =========================================================================
+    // IN-APP NOTIFICATION CENTRE
+    // =========================================================================
+    let notificationPanelOpen = false;
+    let isFetchingNotifications = false;
+
+    function formatRelativeTime(isoValue) {
+      if (!isoValue) return '';
+      const ts = new Date(isoValue).getTime();
+      if (!Number.isFinite(ts)) return '';
+      const nowMs = typeof getServerNowMs === 'function' ? getServerNowMs() : Date.now();
+      const diffSec = Math.max(0, Math.floor((nowMs - ts) / 1000));
+      if (diffSec < 60) return 'Just now';
+      const diffMin = Math.floor(diffSec / 60);
+      if (diffMin < 60) return `${diffMin}m ago`;
+      const diffHr = Math.floor(diffMin / 60);
+      if (diffHr < 24) return `${diffHr}h ago`;
+      const diffDays = Math.floor(diffHr / 24);
+      if (diffDays < 7) return `${diffDays}d ago`;
+      return new Date(ts).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+    }
+
+    function renderNotificationCenter() {
+      const badgeEl = document.getElementById('notificationBellBadge');
+      const unreadPillEl = document.getElementById('notificationPanelUnreadPill');
+      const listEl = document.getElementById('notificationCenterList');
+      const markAllBtn = document.getElementById('btnMarkAllNotificationsRead');
+
+      const items = Array.isArray(appState.notifications) ? appState.notifications : [];
+      const unreadCount = items.length > 0
+        ? items.filter((n) => !n.isRead).length
+        : Math.max(0, Number(appState.unreadNotificationCount || 0));
+      appState.unreadNotificationCount = unreadCount;
+
+      if (badgeEl) {
+        if (unreadCount > 0) {
+          badgeEl.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
+          badgeEl.classList.remove('hidden');
+        } else {
+          badgeEl.classList.add('hidden');
+        }
+      }
+      if (unreadPillEl) {
+        if (unreadCount > 0) {
+          unreadPillEl.textContent = `${unreadCount} unread`;
+          unreadPillEl.classList.remove('hidden');
+        } else {
+          unreadPillEl.classList.add('hidden');
+        }
+      }
+      if (markAllBtn) {
+        markAllBtn.classList.toggle('opacity-40', unreadCount === 0);
+        markAllBtn.disabled = unreadCount === 0;
+      }
+      if (!listEl) return;
+
+      if (!items.length) {
+        listEl.innerHTML = `<div class="py-8 px-4 text-center text-xs text-slate-400">No notifications yet. Payment acknowledgements, disputes, and settlement updates will appear here.</div>`;
+        return;
+      }
+
+      const typeToneMap = {
+        payment_acknowledged: { icon: '⏳', border: 'border-amber-500/30', bg: 'bg-amber-500/5', badge: 'bg-amber-500/15 text-amber-300' },
+        payment_confirmed: { icon: '✅', border: 'border-emerald-500/30', bg: 'bg-emerald-500/5', badge: 'bg-emerald-500/15 text-emerald-300' },
+        payment_auto_confirmed: { icon: '🤖', border: 'border-emerald-500/30', bg: 'bg-emerald-500/5', badge: 'bg-emerald-500/15 text-emerald-300' },
+        payment_disputed: { icon: '🚨', border: 'border-rose-500/35', bg: 'bg-rose-500/10', badge: 'bg-rose-500/20 text-rose-300' },
+        dispute_resolved: { icon: '⚖️', border: 'border-emerald-500/30', bg: 'bg-emerald-500/5', badge: 'bg-emerald-500/15 text-emerald-300' },
+        payment_reverted: { icon: '↩️', border: 'border-slate-700', bg: 'bg-slate-900/60', badge: 'bg-slate-800 text-slate-300' },
+        group_invite: { icon: '👥', border: 'border-cyan-500/30', bg: 'bg-cyan-500/5', badge: 'bg-cyan-500/15 text-cyan-300' },
+        settlement_update: { icon: 'ℹ️', border: 'border-cyan-500/30', bg: 'bg-cyan-500/5', badge: 'bg-cyan-500/15 text-cyan-300' }
+      };
+
+      listEl.innerHTML = items.map((n) => {
+        const tone = typeToneMap[n.type] || typeToneMap.group_update;
+        const unreadDot = !n.isRead
+          ? `<span class="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" title="Unread"></span>`
+          : '';
+        const amountChip = Number(n.amount) > 0
+          ? `<span class="px-1.5 py-0.5 rounded-md ${tone.badge} font-semibold">${formatINR(n.amount)}</span>`
+          : '';
+        const groupChip = n.groupName
+          ? `<span class="text-slate-400 truncate max-w-[140px]">· ${escapeHtml(n.groupName)}</span>`
+          : '';
+        const partiesText = (n.senderName || n.receiverName)
+          ? `<div class="text-[11px] text-slate-400 mt-1 truncate">${escapeHtml(n.senderName || n.senderEmail || '')}${n.receiverName || n.receiverEmail ? ' → ' + escapeHtml(n.receiverName || n.receiverEmail || '') : ''}</div>`
+          : '';
+
+        return `
+          <div data-testid="notification-item-${escapeHtml(n.id)}" onclick="handleNotificationClick('${escapeHtml(n.id)}')" class="p-3 rounded-xl border ${n.isRead ? 'border-slate-800/80 bg-slate-900/50 opacity-80' : `${tone.border} ${tone.bg}`} hover:bg-slate-800/70 transition cursor-pointer">
+            <div class="flex items-start justify-between gap-2">
+              <div class="flex items-center gap-1.5 min-w-0">
+                <span class="text-sm flex-shrink-0">${tone.icon}</span>
+                <span class="text-xs font-bold ${n.isRead ? 'text-slate-200' : 'text-white'} truncate">${escapeHtml(n.title || 'Notification')}</span>
+                ${unreadDot}
+              </div>
+              <span class="text-[10px] text-slate-500 whitespace-nowrap flex-shrink-0">${escapeHtml(formatRelativeTime(n.createdAt))}</span>
+            </div>
+            <p class="text-[11px] text-slate-300 leading-relaxed mt-1">${escapeHtml(n.message || '')}</p>
+            ${partiesText}
+            <div class="flex items-center gap-1.5 mt-1.5 text-[10px] flex-wrap">
+              ${amountChip}
+              ${groupChip}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function fetchNotifications(silent = true) {
+      if (isFetchingNotifications || !localStorage.getItem(AUTH_TOKEN_KEY)) return;
+      isFetchingNotifications = true;
+      try {
+        const res = await apiFetch('/api/notifications');
+        if (res && Array.isArray(res.notifications)) {
+          if (res.serverNow && typeof updateServerClockOffset === 'function') {
+            updateServerClockOffset(res.serverNow);
+          }
+          appState.notifications = res.notifications.map((n) => ({
+            ...n,
+            id: n.id || (n._id ? String(n._id) : '')
+          }));
+          appState.unreadNotificationCount = Number(res.unreadCount || 0);
+          renderNotificationCenter();
+        }
+      } catch (err) {
+        if (!silent) {
+          showToast('Unable to load notifications: ' + err.message, 'error');
+        }
+      } finally {
+        isFetchingNotifications = false;
+      }
+    }
+
+    function closeNotificationPanel() {
+      const panel = document.getElementById('notificationCenterPanel');
+      if (panel) panel.classList.add('hidden');
+      notificationPanelOpen = false;
+    }
+
+    function toggleNotificationPanel(e) {
+      if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
+      const panel = document.getElementById('notificationCenterPanel');
+      if (!panel) return;
+      const willOpen = panel.classList.contains('hidden');
+      if (willOpen) {
+        panel.classList.remove('hidden');
+        notificationPanelOpen = true;
+        renderNotificationCenter();
+        fetchNotifications(true);
+      } else {
+        closeNotificationPanel();
+      }
+    }
+
+    async function markNotificationRead(notificationId) {
+      if (!notificationId) return;
+      const item = (appState.notifications || []).find((n) => String(n.id || n._id) === String(notificationId));
+      if (item && !item.isRead) {
+        item.isRead = true;
+        item.readAt = new Date().toISOString();
+        appState.unreadNotificationCount = Math.max(0, (appState.notifications || []).filter((n) => !n.isRead).length);
+        renderNotificationCenter();
+      }
+      if (localStorage.getItem(AUTH_TOKEN_KEY)) {
+        try {
+          const res = await apiFetch(`/api/notifications/${encodeURIComponent(notificationId)}/read`, {
+            method: 'POST',
+            body: JSON.stringify({})
+          });
+          if (res && typeof res.unreadCount === 'number') {
+            appState.unreadNotificationCount = res.unreadCount;
+            renderNotificationCenter();
+          }
+        } catch {}
+      }
+    }
+
+    async function markAllNotificationsRead() {
+      const items = Array.isArray(appState.notifications) ? appState.notifications : [];
+      const hasUnread = items.some((n) => !n.isRead);
+      if (!hasUnread) return;
+      const nowIso = new Date().toISOString();
+      items.forEach((n) => {
+        if (!n.isRead) {
+          n.isRead = true;
+          n.readAt = nowIso;
+        }
+      });
+      appState.unreadNotificationCount = 0;
+      renderNotificationCenter();
+      if (localStorage.getItem(AUTH_TOKEN_KEY)) {
+        try {
+          await apiFetch('/api/notifications/read-all', { method: 'POST', body: JSON.stringify({}) });
+        } catch {}
+      }
+    }
+
+    async function handleNotificationClick(notificationId) {
+      const item = (appState.notifications || []).find((n) => String(n.id || n._id) === String(notificationId));
+      if (!item) return;
+      await markNotificationRead(notificationId);
+      closeNotificationPanel();
+      if (item.groupId && appState.groups.some((g) => String(g.id) === String(item.groupId))) {
+        selectedGroupId = item.groupId;
+        const sel = document.getElementById('groupFilterSelect');
+        if (sel) sel.value = item.groupId;
+        const grp = appState.groups.find((g) => String(g.id) === String(item.groupId));
+        const pill = document.getElementById('activeGroupPill');
+        if (pill && grp) pill.textContent = grp.name;
+      }
+      const targetTab = ['dashboard', 'expenses', 'groups', 'settle'].includes(item.targetTab) ? item.targetTab : 'settle';
+      switchMainTab(targetTab);
     }
 
     function selectGroupAndOpenExpenses(groupId) {
