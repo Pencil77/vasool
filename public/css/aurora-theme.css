@@ -89,3 +89,94 @@ input:focus, select:focus, textarea:focus {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* In-App Notification Centre (explicit styles ensure opaque rendering alongside precompiled Tailwind) */
+.vasool-bell-btn {
+  position: relative;
+  width: 2.125rem;
+  height: 2.125rem;
+  border-radius: 0.75rem;
+  background-color: #101d17;
+  border: 1px solid rgba(52, 211, 153, 0.32);
+  color: #a7f3d0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+.vasool-bell-btn:hover {
+  background-color: #152920;
+  border-color: rgba(52, 211, 153, 0.6);
+}
+
+.vasool-bell-badge {
+  position: absolute;
+  top: -0.375rem;
+  right: -0.375rem;
+  min-width: 1.125rem;
+  height: 1.125rem;
+  padding: 0 0.25rem;
+  border-radius: 9999px;
+  background-color: #10b981;
+  color: #022c22;
+  font-size: 0.625rem;
+  font-weight: 800;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 0 2px #050b09, 0 2px 6px rgba(16, 185, 129, 0.45);
+}
+.vasool-bell-badge.hidden {
+  display: none !important;
+}
+
+.vasool-notif-panel {
+  position: fixed;
+  top: 3.75rem;
+  right: 0.75rem;
+  width: calc(100vw - 1.5rem);
+  max-width: 24rem;
+  max-height: 75vh;
+  display: flex;
+  flex-direction: column;
+  border-radius: 1rem;
+  background-color: #0b1511;
+  background-image: linear-gradient(160deg, #0d1b15 0%, #070e0b 100%);
+  border: 1px solid rgba(16, 185, 129, 0.32);
+  box-shadow: 0 24px 56px rgba(0, 0, 0, 0.92), 0 0 0 1px rgba(16, 185, 129, 0.08);
+  z-index: 60;
+  overflow: hidden;
+}
+.vasool-notif-panel.hidden {
+  display: none !important;
+}
+@media (min-width: 640px) {
+  .vasool-notif-panel {
+    position: absolute;
+    top: 2.75rem;
+    right: 0;
+    width: 24rem;
+  }
+}
+
+.vasool-notif-header {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid rgba(51, 65, 85, 0.75);
+  background-color: #070e0b;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.vasool-notif-list {
+  overflow-y: auto;
+  max-height: 60vh;
+  padding: 0.625rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  background-color: #0b1511;
+}

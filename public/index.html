@@ -126,17 +126,17 @@
               onclick="toggleNotificationPanel(event)"
               title="Notifications"
               aria-label="Notifications"
-              class="relative w-8 h-8 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 hover:border-emerald-500/40 text-slate-200 flex items-center justify-center transition"
+              class="vasool-bell-btn"
             >
               <svg class="w-4 h-4 text-emerald-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
               </svg>
-              <span id="notificationBellBadge" data-testid="notification-bell-badge" class="hidden absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-emerald-500 text-slate-950 text-[10px] font-extrabold flex items-center justify-center shadow ring-2 ring-slate-950">0</span>
+              <span id="notificationBellBadge" data-testid="notification-bell-badge" class="hidden vasool-bell-badge">0</span>
             </button>
 
             <!-- Compact Slide-Down Notification Panel -->
-            <div id="notificationCenterPanel" data-testid="notification-center-panel" class="hidden fixed sm:absolute right-2 sm:right-0 top-14 sm:top-11 w-[calc(100vw-1rem)] sm:w-96 max-h-[75vh] flex flex-col rounded-2xl bg-[#0b1511] border border-emerald-500/25 shadow-2xl shadow-black/80 z-50 overflow-hidden">
-              <div class="px-4 py-3 border-b border-slate-800/80 flex items-center justify-between gap-2 bg-[#070e0b]">
+            <div id="notificationCenterPanel" data-testid="notification-center-panel" class="hidden vasool-notif-panel">
+              <div class="vasool-notif-header">
                 <div class="flex items-center gap-2">
                   <span class="text-sm font-bold text-white">Notifications</span>
                   <span id="notificationPanelUnreadPill" class="hidden px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">0 unread</span>
@@ -146,8 +146,12 @@
                   <button type="button" onclick="closeNotificationPanel()" class="text-slate-400 hover:text-white text-xs px-1">✕</button>
                 </div>
               </div>
-              <div id="notificationCenterList" data-testid="notification-center-list" class="overflow-y-auto divide-y divide-slate-800/60 max-h-[60vh]">
-                <div class="p-6 text-center text-xs text-slate-500">No notifications yet.</div>
+              <div id="notificationCenterList" data-testid="notification-center-list" class="vasool-notif-list custom-scroll">
+                <div class="py-8 px-4 text-center space-y-2">
+                  <div class="text-2xl">🔔</div>
+                  <div class="text-xs font-semibold text-white">No notifications at the moment</div>
+                  <p class="text-[11px] text-slate-400">Payment alerts, 48h verification updates, and dispute notices will appear here.</p>
+                </div>
               </div>
             </div>
           </div>

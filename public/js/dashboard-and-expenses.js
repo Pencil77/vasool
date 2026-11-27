@@ -2322,23 +2322,29 @@
       if (!listEl) return;
 
       if (!items.length) {
-        listEl.innerHTML = `<div class="py-8 px-4 text-center text-xs text-slate-400">No notifications yet. Payment acknowledgements, disputes, and settlement updates will appear here.</div>`;
+        listEl.innerHTML = `
+          <div class="py-8 px-4 text-center space-y-2 rounded-xl bg-slate-900/70 border border-slate-800">
+            <div class="text-2xl">🔔</div>
+            <div class="text-xs font-semibold text-white">No notifications at the moment</div>
+            <p class="text-[11px] text-slate-400 leading-relaxed">Payment acknowledgements, 48h verification updates, and dispute alerts will appear here.</p>
+          </div>
+        `;
         return;
       }
 
       const typeToneMap = {
-        payment_acknowledged: { icon: '⏳', border: 'border-amber-500/30', bg: 'bg-amber-500/5', badge: 'bg-amber-500/15 text-amber-300' },
-        payment_confirmed: { icon: '✅', border: 'border-emerald-500/30', bg: 'bg-emerald-500/5', badge: 'bg-emerald-500/15 text-emerald-300' },
-        payment_auto_confirmed: { icon: '🤖', border: 'border-emerald-500/30', bg: 'bg-emerald-500/5', badge: 'bg-emerald-500/15 text-emerald-300' },
-        payment_disputed: { icon: '🚨', border: 'border-rose-500/35', bg: 'bg-rose-500/10', badge: 'bg-rose-500/20 text-rose-300' },
-        dispute_resolved: { icon: '⚖️', border: 'border-emerald-500/30', bg: 'bg-emerald-500/5', badge: 'bg-emerald-500/15 text-emerald-300' },
-        payment_reverted: { icon: '↩️', border: 'border-slate-700', bg: 'bg-slate-900/60', badge: 'bg-slate-800 text-slate-300' },
-        group_invite: { icon: '👥', border: 'border-cyan-500/30', bg: 'bg-cyan-500/5', badge: 'bg-cyan-500/15 text-cyan-300' },
-        settlement_update: { icon: 'ℹ️', border: 'border-cyan-500/30', bg: 'bg-cyan-500/5', badge: 'bg-cyan-500/15 text-cyan-300' }
+        payment_acknowledged: { icon: '⏳', border: 'border-amber-500/30', bg: 'bg-amber-500/10', badge: 'bg-amber-500/20 text-amber-300' },
+        payment_confirmed: { icon: '✅', border: 'border-emerald-500/30', bg: 'bg-emerald-500/10', badge: 'bg-emerald-500/20 text-emerald-300' },
+        payment_auto_confirmed: { icon: '🤖', border: 'border-emerald-500/30', bg: 'bg-emerald-500/10', badge: 'bg-emerald-500/20 text-emerald-300' },
+        payment_disputed: { icon: '🚨', border: 'border-rose-500/40', bg: 'bg-rose-500/10', badge: 'bg-rose-500/20 text-rose-300' },
+        dispute_resolved: { icon: '⚖️', border: 'border-emerald-500/30', bg: 'bg-emerald-500/10', badge: 'bg-emerald-500/20 text-emerald-300' },
+        payment_reverted: { icon: '↩️', border: 'border-slate-700', bg: 'bg-slate-900/80', badge: 'bg-slate-800 text-slate-300' },
+        group_invite: { icon: '👥', border: 'border-cyan-500/30', bg: 'bg-cyan-500/10', badge: 'bg-cyan-500/20 text-cyan-300' },
+        settlement_update: { icon: 'ℹ️', border: 'border-cyan-500/30', bg: 'bg-cyan-500/10', badge: 'bg-cyan-500/20 text-cyan-300' }
       };
 
       listEl.innerHTML = items.map((n) => {
-        const tone = typeToneMap[n.type] || typeToneMap.group_update;
+        const tone = typeToneMap[n.type] || typeToneMap.settlement_update;
         const unreadDot = !n.isRead
           ? `<span class="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" title="Unread"></span>`
           : '';
