@@ -774,6 +774,10 @@
       window.closeNotificationPanel = closeNotificationPanel;
       window.markNotificationRead = markNotificationRead;
       window.markAllNotificationsRead = markAllNotificationsRead;
+      window.dismissNotification = dismissNotification;
+      window.dismissAllNotifications = dismissAllNotifications;
+      window.undoLastNotificationDismiss = undoLastNotificationDismiss;
+      window.hideNotificationUndoBar = hideNotificationUndoBar;
       window.handleNotificationClick = handleNotificationClick;
       window.fetchNotifications = fetchNotifications;
       window.switchMainTab = switchMainTab;

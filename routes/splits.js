@@ -75,8 +75,8 @@ router.get('/bootstrap', requireAuth, async (req, res) => {
       groupIds.length > 0
         ? Settlement.find({ groupId: { $in: groupIds } }).sort({ settledAt: -1, createdAt: -1 }).lean()
         : Promise.resolve([]),
-      Notification.find({ recipientEmail: userEmail }).sort({ createdAt: -1 }).limit(30).lean(),
-      Notification.countDocuments({ recipientEmail: userEmail, isRead: false })
+      Notification.find({ recipientEmail: userEmail, isDismissed: { $ne: true } }).sort({ createdAt: -1 }).limit(30).lean(),
+      Notification.countDocuments({ recipientEmail: userEmail, isDismissed: { $ne: true }, isRead: false })
     ]);
 
     const { activeGroups, pendingInvites } = classifyUserGroups(groups, userEmail);

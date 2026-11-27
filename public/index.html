@@ -66,6 +66,20 @@
   <!-- Toast Notification Container -->
   <div id="toastContainer" data-testid="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
 
+  <!-- Notification Dismiss Undo Popup (5-second window) -->
+  <div id="notificationUndoBar" data-testid="notification-undo-bar" class="hidden vasool-undo-toast" role="status" aria-live="polite">
+    <div class="flex items-center gap-2 min-w-0">
+      <span class="text-sm flex-shrink-0">🗑️</span>
+      <span id="notificationUndoText" class="text-xs font-medium text-slate-100 truncate">Notification dismissed</span>
+    </div>
+    <div class="flex items-center gap-2 flex-shrink-0">
+      <button type="button" id="btnUndoNotificationDismiss" data-testid="btn-undo-notification-dismiss" onclick="undoLastNotificationDismiss()" class="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs transition shadow-sm">
+        Undo
+      </button>
+      <button type="button" onclick="hideNotificationUndoBar()" aria-label="Close undo bar" class="text-slate-400 hover:text-white text-xs px-1">✕</button>
+    </div>
+  </div>
+
   <!-- Top Global Header -->
   <header class="sticky top-0 z-30 border-b border-slate-800/70 bg-slate-950/85 backdrop-blur-xl shadow-lg shadow-black/20">
     <div class="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-1.5 sm:gap-3">
@@ -142,7 +156,7 @@
                   <span id="notificationPanelUnreadPill" class="hidden px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">0 unread</span>
                 </div>
                 <div class="flex items-center gap-2">
-                  <button type="button" id="btnMarkAllNotificationsRead" data-testid="btn-mark-all-notifications-read" onclick="markAllNotificationsRead()" class="text-[11px] font-semibold text-emerald-400 hover:text-emerald-300 transition">Mark all read</button>
+                  <button type="button" id="btnDismissAllNotifications" data-testid="btn-dismiss-all-notifications" onclick="dismissAllNotifications()" class="text-[11px] font-semibold text-emerald-400 hover:text-emerald-300 transition">Dismiss all</button>
                   <button type="button" onclick="closeNotificationPanel()" class="text-slate-400 hover:text-white text-xs px-1">✕</button>
                 </div>
               </div>

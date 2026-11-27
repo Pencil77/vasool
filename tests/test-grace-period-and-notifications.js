@@ -457,7 +457,39 @@ async function requestJson(baseUrl, method, urlPath, { token = null, body = null
     const readAllRes = await requestJson(baseUrl, 'POST', '/api/notifications/read-all', { token: receiverToken, body: {} });
     assert.strictEqual(readAllRes.status, 200);
     assert.strictEqual(readAllRes.data.unreadCount, 0);
-    console.log('✅ Test 7 Passed: Notification Centre isolation, persistence, serverNow, and legacy v1 preservation verified.');
+
+    // Dismiss & Undo (Restore) verification
+    const crossDismiss = await requestJson(baseUrl, 'POST', `/api/notifications/${recNotifId}/dismiss`, { token: senderToken, body: {} });
+    assert.strictEqual(crossDismiss.status, 404, 'User must NOT be able to dismiss another user notification');
+
+    const totalBeforeDismiss = recNotifRes.data.notifications.length;
+    const singleDismiss = await requestJson(baseUrl, 'POST', `/api/notifications/${recNotifId}/dismiss`, { token: receiverToken, body: {} });
+    assert.strictEqual(singleDismiss.status, 200);
+    assert.strictEqual(singleDismiss.data.notification.isDismissed, true);
+
+    const afterSingleDismiss = await requestJson(baseUrl, 'GET', '/api/notifications', { token: receiverToken });
+    assert.strictEqual(afterSingleDismiss.data.notifications.length, totalBeforeDismiss - 1, 'Dismissed notification must stay hidden across fetches');
+
+    const singleRestore = await requestJson(baseUrl, 'POST', `/api/notifications/${recNotifId}/restore`, { token: receiverToken, body: {} });
+    assert.strictEqual(singleRestore.status, 200);
+    assert.strictEqual(singleRestore.data.notification.isDismissed, false);
+
+    const afterRestore = await requestJson(baseUrl, 'GET', '/api/notifications', { token: receiverToken });
+    assert.strictEqual(afterRestore.data.notifications.length, totalBeforeDismiss, 'Restored notification must reappear after Undo');
+
+    const dismissAllRes = await requestJson(baseUrl, 'POST', '/api/notifications/dismiss-all', { token: receiverToken, body: {} });
+    assert.strictEqual(dismissAllRes.status, 200);
+    assert.strictEqual(dismissAllRes.data.dismissedIds.length, totalBeforeDismiss);
+    const afterDismissAll = await requestJson(baseUrl, 'GET', '/api/notifications', { token: receiverToken });
+    assert.strictEqual(afterDismissAll.data.notifications.length, 0);
+
+    const restoreBatchRes = await requestJson(baseUrl, 'POST', '/api/notifications/restore-batch', {
+      token: receiverToken,
+      body: { notificationIds: dismissAllRes.data.dismissedIds }
+    });
+    assert.strictEqual(restoreBatchRes.status, 200);
+    assert.strictEqual(restoreBatchRes.data.notifications.length, totalBeforeDismiss);
+    console.log('✅ Test 7 Passed: Notification Centre isolation, persistence, dismiss, undo/restore, serverNow, and legacy v1 preservation verified.');
 
     // =========================================================================
     // TEST 8: JSDOM Frontend Notification Bell + Graceful 48h Expiry UI Hiding
@@ -472,7 +504,11 @@ async function requestJson(baseUrl, method, urlPath, { token = null, body = null
     const win = dom.window;
     assert(win.document.getElementById('btnNotificationBell'), 'Notification bell button must exist in index.html');
     assert(win.document.getElementById('notificationCenterPanel'), 'Notification popover panel must exist in index.html');
+    assert(win.document.getElementById('btnDismissAllNotifications'), 'Dismiss all button must exist in notification header');
+    assert(win.document.getElementById('notificationUndoBar'), 'Bottom undo bar must exist in index.html');
+    assert(win.document.getElementById('btnUndoNotificationDismiss'), 'Undo button must exist in bottom undo bar');
     assert(win.document.getElementById('rejectSettleModeInput'), 'Dispute/Reject mode hidden input must exist');
+    assert(dashJs.includes('5000') && dashJs.includes('undoLastNotificationDismiss') && dashJs.includes('dismissNotification'), '5-second dismiss + undo handlers must exist in dashboard-and-expenses.js');
 
     // Verify getSettlementTimingMeta strictly follows server clock and hides Report Not Received after 48h
     const baseServerNow = Date.parse('2026-11-26T12:00:00.000Z');

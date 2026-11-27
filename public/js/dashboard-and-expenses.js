@@ -2291,12 +2291,10 @@
       const badgeEl = document.getElementById('notificationBellBadge');
       const unreadPillEl = document.getElementById('notificationPanelUnreadPill');
       const listEl = document.getElementById('notificationCenterList');
-      const markAllBtn = document.getElementById('btnMarkAllNotificationsRead');
+      const dismissAllBtn = document.getElementById('btnDismissAllNotifications');
 
-      const items = Array.isArray(appState.notifications) ? appState.notifications : [];
-      const unreadCount = items.length > 0
-        ? items.filter((n) => !n.isRead).length
-        : Math.max(0, Number(appState.unreadNotificationCount || 0));
+      const items = (Array.isArray(appState.notifications) ? appState.notifications : []).filter((n) => !n.isDismissed);
+      const unreadCount = items.filter((n) => !n.isRead).length;
       appState.unreadNotificationCount = unreadCount;
 
       if (badgeEl) {
@@ -2315,9 +2313,9 @@
           unreadPillEl.classList.add('hidden');
         }
       }
-      if (markAllBtn) {
-        markAllBtn.classList.toggle('opacity-40', unreadCount === 0);
-        markAllBtn.disabled = unreadCount === 0;
+      if (dismissAllBtn) {
+        dismissAllBtn.disabled = items.length === 0;
+        dismissAllBtn.classList.toggle('hidden', items.length === 0);
       }
       if (!listEl) return;
 
@@ -2359,14 +2357,19 @@
           : '';
 
         return `
-          <div data-testid="notification-item-${escapeHtml(n.id)}" onclick="handleNotificationClick('${escapeHtml(n.id)}')" class="p-3 rounded-xl border ${n.isRead ? 'border-slate-800/80 bg-slate-900/50 opacity-80' : `${tone.border} ${tone.bg}`} hover:bg-slate-800/70 transition cursor-pointer">
+          <div data-testid="notification-item-${escapeHtml(n.id)}" onclick="handleNotificationClick('${escapeHtml(n.id)}')" class="p-3 rounded-xl border ${n.isRead ? 'border-slate-800/80 bg-slate-900/60 opacity-85' : `${tone.border} ${tone.bg}`} hover:bg-slate-800/70 transition cursor-pointer">
             <div class="flex items-start justify-between gap-2">
               <div class="flex items-center gap-1.5 min-w-0">
                 <span class="text-sm flex-shrink-0">${tone.icon}</span>
                 <span class="text-xs font-bold ${n.isRead ? 'text-slate-200' : 'text-white'} truncate">${escapeHtml(n.title || 'Notification')}</span>
                 ${unreadDot}
               </div>
-              <span class="text-[10px] text-slate-500 whitespace-nowrap flex-shrink-0">${escapeHtml(formatRelativeTime(n.createdAt))}</span>
+              <div class="flex items-center gap-2 flex-shrink-0">
+                <span class="text-[10px] text-slate-500 whitespace-nowrap">${escapeHtml(formatRelativeTime(n.createdAt))}</span>
+                <button type="button" data-testid="btn-dismiss-notification-${escapeHtml(n.id)}" onclick="event.stopPropagation(); dismissNotification('${escapeHtml(n.id)}')" title="Dismiss notification" class="px-2 py-0.5 rounded-md bg-slate-800/90 hover:bg-rose-500/20 text-slate-300 hover:text-rose-200 border border-slate-700 text-[10px] font-semibold transition">
+                  Dismiss
+                </button>
+              </div>
             </div>
             <p class="text-[11px] text-slate-300 leading-relaxed mt-1">${escapeHtml(n.message || '')}</p>
             ${partiesText}
@@ -2464,6 +2467,124 @@
       if (localStorage.getItem(AUTH_TOKEN_KEY)) {
         try {
           await apiFetch('/api/notifications/read-all', { method: 'POST', body: JSON.stringify({}) });
+        } catch {}
+      }
+    }
+
+    let pendingUndoDismissState = null;
+    let pendingUndoTimer = null;
+
+    function hideNotificationUndoBar() {
+      if (pendingUndoTimer) {
+        clearTimeout(pendingUndoTimer);
+        pendingUndoTimer = null;
+      }
+      pendingUndoDismissState = null;
+      const bar = document.getElementById('notificationUndoBar');
+      if (bar) bar.classList.add('hidden');
+    }
+
+    function showNotificationUndoBar(labelText, state) {
+      if (pendingUndoTimer) {
+        clearTimeout(pendingUndoTimer);
+        pendingUndoTimer = null;
+      }
+      pendingUndoDismissState = state;
+      const bar = document.getElementById('notificationUndoBar');
+      const textEl = document.getElementById('notificationUndoText');
+      if (textEl) textEl.textContent = labelText || 'Notification dismissed';
+      if (bar) bar.classList.remove('hidden');
+      pendingUndoTimer = setTimeout(() => {
+        hideNotificationUndoBar();
+      }, 5000);
+    }
+
+    async function dismissNotification(notificationId) {
+      if (!notificationId) return;
+      const items = Array.isArray(appState.notifications) ? appState.notifications : [];
+      const targetIndex = items.findIndex((n) => String(n.id || n._id) === String(notificationId));
+      if (targetIndex === -1) return;
+      const removedItem = items[targetIndex];
+      const nextList = items.filter((n) => String(n.id || n._id) !== String(notificationId));
+      appState.notifications = nextList;
+      appState.unreadNotificationCount = nextList.filter((n) => !n.isRead && !n.isDismissed).length;
+      renderNotificationCenter();
+
+      showNotificationUndoBar('Notification dismissed', {
+        mode: 'single',
+        items: [{ ...removedItem, isDismissed: false }]
+      });
+
+      if (localStorage.getItem(AUTH_TOKEN_KEY)) {
+        try {
+          const res = await apiFetch(`/api/notifications/${encodeURIComponent(notificationId)}/dismiss`, {
+            method: 'POST',
+            body: JSON.stringify({})
+          });
+          if (res && typeof res.unreadCount === 'number') {
+            appState.unreadNotificationCount = res.unreadCount;
+            renderNotificationCenter();
+          }
+        } catch {}
+      }
+    }
+
+    async function dismissAllNotifications() {
+      const items = (Array.isArray(appState.notifications) ? appState.notifications : []).filter((n) => !n.isDismissed);
+      if (!items.length) return;
+      const snapshot = items.map((n) => ({ ...n, isDismissed: false }));
+      const notificationIds = snapshot.map((n) => String(n.id || n._id)).filter(Boolean);
+
+      appState.notifications = [];
+      appState.unreadNotificationCount = 0;
+      renderNotificationCenter();
+
+      showNotificationUndoBar(`Dismissed ${snapshot.length} notification${snapshot.length === 1 ? '' : 's'}`, {
+        mode: 'batch',
+        items: snapshot
+      });
+
+      if (localStorage.getItem(AUTH_TOKEN_KEY)) {
+        try {
+          await apiFetch('/api/notifications/dismiss-all', {
+            method: 'POST',
+            body: JSON.stringify({ notificationIds })
+          });
+        } catch {}
+      }
+    }
+
+    async function undoLastNotificationDismiss() {
+      const undoState = pendingUndoDismissState;
+      hideNotificationUndoBar();
+      if (!undoState || !Array.isArray(undoState.items) || !undoState.items.length) return;
+
+      const restoredIds = undoState.items.map((n) => String(n.id || n._id)).filter(Boolean);
+      const existing = Array.isArray(appState.notifications) ? appState.notifications : [];
+      const mergedMap = new Map();
+      [...existing, ...undoState.items].forEach((n) => {
+        const nid = String(n.id || n._id || '');
+        if (nid) mergedMap.set(nid, { ...n, id: nid, isDismissed: false, dismissedAt: null });
+      });
+      const sorted = Array.from(mergedMap.values()).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+      appState.notifications = sorted;
+      appState.unreadNotificationCount = sorted.filter((n) => !n.isRead && !n.isDismissed).length;
+      renderNotificationCenter();
+
+      if (localStorage.getItem(AUTH_TOKEN_KEY)) {
+        try {
+          if (undoState.mode === 'single' && restoredIds[0]) {
+            await apiFetch(`/api/notifications/${encodeURIComponent(restoredIds[0])}/restore`, {
+              method: 'POST',
+              body: JSON.stringify({})
+            });
+          } else if (restoredIds.length > 0) {
+            await apiFetch('/api/notifications/restore-batch', {
+              method: 'POST',
+              body: JSON.stringify({ notificationIds: restoredIds })
+            });
+          }
+          await fetchNotifications(true);
         } catch {}
       }
     }

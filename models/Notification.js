@@ -32,12 +32,15 @@ const NotificationSchema = new mongoose.Schema(
     metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
     isRead: { type: Boolean, default: false, index: true },
     readAt: { type: Date, default: null },
+    isDismissed: { type: Boolean, default: false, index: true },
+    dismissedAt: { type: Date, default: null },
     // Unique idempotency key per event & recipient so background workers/retries never duplicate
     eventKey: { type: String, unique: true, sparse: true }
   },
   { timestamps: true }
 );
 
+NotificationSchema.index({ recipientEmail: 1, isDismissed: 1, createdAt: -1 });
 NotificationSchema.index({ recipientEmail: 1, createdAt: -1 });
 NotificationSchema.index({ recipientEmail: 1, isRead: 1 });
 
