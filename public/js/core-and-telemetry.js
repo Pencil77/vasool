@@ -301,6 +301,7 @@ const STORAGE_KEY = 'vasool_clean_state_v1';
             rejectedReason: s.rejectedReason,
             revertedAt: s.revertedAt || null,
             revertedByEmail: s.revertedByEmail || null,
+            createdAt: s.createdAt || null,
             settledAt: s.settledAt ? String(s.settledAt).slice(0, 10) : new Date().toISOString().slice(0, 10)
           }));
         }

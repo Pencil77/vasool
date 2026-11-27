@@ -1038,6 +1038,28 @@
       simpEl.innerHTML = html;
 
       // 5. Settlement History List
+      const formatSettlementDateTime = (rawVal) => {
+        if (!rawVal) return 'Recent';
+        const str = String(rawVal).trim();
+        if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+          const [y, m, d] = str.split('-').map(Number);
+          const dateOnly = new Date(y, m - 1, d);
+          return isNaN(dateOnly.getTime())
+            ? str
+            : dateOnly.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+        }
+        const dt = new Date(str);
+        if (isNaN(dt.getTime())) return str;
+        return dt.toLocaleString('en-IN', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        });
+      };
+
       if (!visibleSettlements.length) {
         histEl.innerHTML = `<div class="text-xs text-slate-500 py-6 text-center">No settlements recorded yet.</div>`;
       } else {
@@ -1056,68 +1078,61 @@
               String(s.recordedByEmail || '').toLowerCase().trim() === currentEmail
             );
             const isCreditorViewer = String(s.toEmail || '').toLowerCase().trim() === currentEmail;
-
             const isPartial = Boolean(s.originalClaimedAmount && Number(s.originalClaimedAmount) > Number(s.amount));
-            let statusBadge = '';
+
+            const transferTimestamp = formatSettlementDateTime(s.acknowledgedAt || s.createdAt || s.settledAt);
+            const confirmedTimestamp = (s.confirmedAt || s.autoConfirmedAt)
+              ? formatSettlementDateTime(s.confirmedAt || s.autoConfirmedAt)
+              : '';
+
+            let statusChip = '';
             if (isConfirmed) {
-              if (s.verificationStage === 'auto_confirmed_48h' || s.confirmationSource === 'auto_48h') {
-                statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">🤖 Auto-Confirmed (48h)</span>`;
-              } else {
-                const confirmedByEmail = String(s.confirmedByEmail || '').toLowerCase().trim();
-                const recipientEmail = String(s.toEmail || '').toLowerCase().trim();
-                const roleTitle = s.settlementMode === 'admin_hub' && s.confirmedRole === 'admin'
-                  ? 'Admin'
-                  : (confirmedByEmail && recipientEmail && confirmedByEmail === recipientEmail
-                    ? 'Creditor'
-                    : (s.confirmedRole === 'admin' ? 'Admin' : 'Creditor'));
-                statusBadge = isPartial
-                  ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/20 text-teal-300 border border-teal-500/40">⚖️ Partial: ${formatINR(s.amount)} Confirmed by ${roleTitle}</span>`
-                  : `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">✅ Confirmed by ${roleTitle}</span>`;
+              if (isPartial) {
+                statusChip = `<span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/20 text-teal-300 border border-teal-500/40">⚖️ Partial</span>`;
+              } else if (s.verificationStage === 'auto_confirmed_48h' || s.confirmationSource === 'auto_48h') {
+                statusChip = `<span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Auto 48h</span>`;
               }
             } else if (isPending) {
               if (timing.isNotificationPending) {
-                statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/35">⏳ Receiver notification in ${escapeHtml(timing.notifyRemainingLabel)}</span>`;
+                statusChip = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">⏳ Notify in ${escapeHtml(timing.notifyRemainingLabel)}</span>`;
               } else if (timing.isGraceActive) {
-                statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">⏳ Grace Window (${escapeHtml(timing.graceRemainingLabel)} left)</span>`;
+                statusChip = `<span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">⏳ ${escapeHtml(timing.graceRemainingLabel)} left</span>`;
               } else if (timing.isGraceExpired) {
-                statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/35">✅ Grace Period Complete (Auto-confirming)</span>`;
+                statusChip = `<span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/35">✅ Confirming</span>`;
               } else {
-                statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">⏳ Awaiting Confirmation</span>`;
+                statusChip = `<span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">⏳ Pending</span>`;
               }
             } else if (isDisputed) {
-              statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">🚨 Disputed: ${escapeHtml(s.disputeReason || 'Not received')}</span>`;
+              statusChip = `<span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">🚨 Disputed</span>`;
             } else if (isRejected) {
-              statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">❌ Rejected: ${escapeHtml(s.rejectedReason || 'Unverified')}</span>`;
+              statusChip = `<span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">❌ Rejected</span>`;
             } else if (isReverted) {
-              statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-700/40 text-slate-300 border border-slate-600/60">↩️ Reverted</span>`;
+              statusChip = `<span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-700/40 text-slate-300 border border-slate-600/60">↩️ Reverted</span>`;
             }
 
             return `
-              <div data-testid="settle-history-card-${escapeHtml(s.id)}" class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                <div class="text-xs">
-                  <div class="flex items-center gap-2 flex-wrap">
-                    <div><strong class="text-emerald-300">${escapeHtml(s.fromName)}</strong> paid <strong class="text-white">${escapeHtml(s.toName)}</strong></div>
-                    ${statusBadge}
+              <div data-testid="settle-history-card-${escapeHtml(s.id)}" class="px-3 py-2 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between gap-2.5">
+                <div class="min-w-0 text-xs">
+                  <div class="flex items-center gap-1.5 flex-wrap">
+                    <span class="truncate"><strong class="text-emerald-300">${escapeHtml(s.fromName)}</strong> <span class="text-slate-400">paid</span> <strong class="text-white">${escapeHtml(s.toName)}</strong></span>
+                    ${statusChip}
                   </div>
-                  <div class="text-[11px] text-slate-400 mt-0.5">
-                    ${escapeHtml(s.method)} · ${escapeHtml(s.settledAt || 'Recent')}
-                    ${s.utrNumber ? `· <span class="text-emerald-300 font-mono-code font-semibold">UTR: ${escapeHtml(s.utrNumber)}</span>` : ''}
-                    ${s.referenceNote ? '· ' + escapeHtml(s.referenceNote) : ''}
-                    ${s.confirmedByEmail ? `· Confirmed by ${escapeHtml(s.confirmedByEmail)}` : ''}
+                  <div class="text-[11px] text-slate-400 mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                    <span>Transfer on <strong class="text-slate-300 font-medium">${escapeHtml(transferTimestamp)}</strong></span>
+                    ${isConfirmed && confirmedTimestamp ? `<span>· Confirmed on <strong class="text-emerald-300 font-medium">${escapeHtml(confirmedTimestamp)}</strong></span>` : ''}
                   </div>
                 </div>
-                <div class="flex items-center gap-2 sm:gap-3 flex-wrap justify-end">
-                  <div class="text-sm font-bold ${isConfirmed ? 'text-emerald-400' : isRejected || isReverted || isDisputed ? 'text-rose-400 line-through' : 'text-amber-300'}">
+                <div class="flex items-center gap-1.5 flex-shrink-0">
+                  <div class="text-xs sm:text-sm font-bold whitespace-nowrap ${isConfirmed ? 'text-emerald-400' : isRejected || isReverted || isDisputed ? 'text-rose-400 line-through' : 'text-amber-300'}">
                     ${formatINR(s.amount)}
-                    ${isPartial ? `<span class="text-[10px] text-slate-400 font-normal block sm:inline"> (of ${formatINR(s.originalClaimedAmount)} claimed)</span>` : ''}
                   </div>
                   ${isCreditorViewer && timing.canDispute && timing.workflowVersion >= 2 ? `
-                    <button data-testid="btn-history-report-${escapeHtml(s.id)}" onclick="handleReportNotReceived('${escapeHtml(s.id)}')" class="px-2.5 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/35 font-semibold text-[11px] transition">
-                      🚨 Not Received
+                    <button data-testid="btn-history-report-${escapeHtml(s.id)}" onclick="handleReportNotReceived('${escapeHtml(s.id)}')" title="Report Not Received" class="px-2 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/35 font-semibold text-[10px] transition">
+                      🚨
                     </button>
                   ` : ''}
                   ${canRevert ? `
-                    <button data-testid="btn-revert-settle-${escapeHtml(s.id)}" onclick="handleRevertSettlement('${escapeHtml(s.id)}')" title="Revert this settlement and make the amount due again" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600/70 font-semibold text-[11px] transition">
+                    <button data-testid="btn-revert-settle-${escapeHtml(s.id)}" onclick="handleRevertSettlement('${escapeHtml(s.id)}')" title="Revert this settlement and make the amount due again" class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600/70 font-semibold text-[10px] transition whitespace-nowrap">
                       ↩️ Revert
                     </button>
                   ` : ''}
@@ -3030,7 +3045,8 @@
 
         let workflowVersion = 1;
         let verificationStage = status === 'confirmed' ? 'confirmed_by_receiver' : 'legacy';
-        let acknowledgedAt = null;
+        let acknowledgedAt = new Date().toISOString();
+        let createdAt = acknowledgedAt;
         let notifyAfterAt = null;
         let receiverUpiIdSnapshot = '';
         let gracePeriodEndsAt = null;
@@ -3062,7 +3078,8 @@
               confirmedRole = res.settlement.confirmedRole || confirmedRole;
               workflowVersion = Number(res.settlement.workflowVersion || 1);
               verificationStage = res.settlement.verificationStage || verificationStage;
-              acknowledgedAt = res.settlement.acknowledgedAt || null;
+              acknowledgedAt = res.settlement.acknowledgedAt || acknowledgedAt;
+              createdAt = res.settlement.createdAt || createdAt;
               notifyAfterAt = res.settlement.notifyAfterAt || null;
               receiverUpiIdSnapshot = res.settlement.receiverUpiIdSnapshot || '';
               gracePeriodEndsAt = res.settlement.gracePeriodEndsAt || null;
@@ -3096,6 +3113,7 @@
             workflowVersion,
             verificationStage,
             acknowledgedAt,
+            createdAt,
             notifyAfterAt,
             receiverUpiIdSnapshot,
             gracePeriodEndsAt,
